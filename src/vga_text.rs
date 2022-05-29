@@ -1,0 +1,141 @@
+// src/vga_text.rs
+
+/*
+The vga buffer located at 0xb8000 allows characters to be printed to the screen. 
+Actual values in memory are not written to as this is only a buffer which maps to VRAM.
+Screen has 25 rows of 80 length.
+Each entry in the buffer must be formatted like this:
++---------------------------------------------+
+|         | 15 | 12-14 | 8-11| 0-7 |          |
++---------------------------------------------+
+| | Blink | Background | Foreground | ASCII | |
++---------------------------------------------+
+*/
+
+use lazy_static::lazy_static;
+use core::fmt;
+
+#[allow(dead_code)]
+enum VgaColours {
+    Black = 0,
+    Bue = 1,
+    Green = 2,
+    Cyan = 3,
+    Red = 4,  
+    Magenta = 5,
+    Brown = 6,
+    LightGrey = 7,
+    DarkGrey = 8,
+    LightBlue = 9,
+    LightGreen = 10,
+    LightCyan = 11,
+    LightRed = 12,
+    LightMagenta = 13,
+    LightBrown = 14,
+    White = 15,
+}
+
+pub struct Terminal {
+    terminal_row: usize,
+    terminal_col: usize,
+    vga_buffer: &'static mut [[u16; VGA_WIDTH]; VGA_HEIGHT], 
+    // Static reference means this can survive the entire duration of program
+}
+
+// Statics have fixed address in memory
+// Lazy statics allows initialization at runtime 
+lazy_static! {
+    /*
+    Mutable static variables are very unsafe
+    Spinlocks cause a thread which wants to use something to wait in a while loop until the lock is free which prevents data being overwritten
+    */
+    pub static ref TERMINAL: spin::Mutex<Terminal> = spin::Mutex::new(Terminal {
+        terminal_row: 0,
+        terminal_col: 0,
+        vga_buffer: unsafe { &mut *(0xb8000 as *mut [[u16; VGA_WIDTH]; VGA_HEIGHT]) }, // Make an array pointed at the address
+    });
+}
+
+const VGA_WIDTH: usize = 80;
+const VGA_HEIGHT: usize = 25;
+
+#[macro_export] // Allows us to use this macro across modules
+macro_rules! print {
+    ($($arg:tt)*) => ({
+        use core::fmt::Write;
+        TERMINAL.lock().write_fmt(format_args!($($arg)*)).unwrap();
+    });
+}
+
+impl fmt::Write for Terminal {
+    // To support the rust formatting system and use the write! macro, the write_str method must be supported
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
+    }
+}
+
+impl Terminal {
+    fn write_string(&mut self, string: &str) {
+        for c in string.chars() {
+            self.put_char(c, VgaColours::get_attributes((VgaColours::Black, VgaColours::White)));
+        }
+    }
+
+    fn put_char(&mut self, byte: char, attributes: u8) {
+        match byte {
+            '\n' => { self.new_line() },
+            _ => {
+                self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(attributes, byte as u8);
+                self.terminal_col += 1;
+                if self.terminal_col >= VGA_WIDTH { self.new_line(); }
+            }
+        }
+    }
+
+    fn scroll(&mut self) {
+        for i in 0..(VGA_HEIGHT-1) {
+            for j in 0..VGA_WIDTH {
+                self.vga_buffer[i][j] = (self.vga_buffer[i+1][j]).clone()
+            }
+        }
+        self.terminal_row = VGA_HEIGHT - 1;
+        self.terminal_col = 0;
+        self.clear_row(VGA_HEIGHT - 1);
+    }
+
+    fn new_line(&mut self) {
+        self.terminal_row += 1;
+        self.terminal_col = 0;
+        if self.terminal_row >= VGA_HEIGHT { self.scroll(); } 
+    }
+
+    fn clear(&mut self) {
+        self.terminal_row = 0;
+        self.terminal_col = 0;
+        for _i in 0..VGA_HEIGHT {
+            for _j in 0..VGA_WIDTH {
+                self.put_char(' ', VgaColours::get_attributes((VgaColours::Black, VgaColours::White)));
+            }
+        }
+    }
+
+    fn clear_row(&mut self, row_num: usize) {
+        for j in 0..VGA_WIDTH {
+            self.vga_buffer[row_num][j] = 0;
+        }
+    }
+}
+
+impl VgaColours {
+    fn get_vga_entry(attribute: u8, character: u8) -> u16 {
+        // First 8 bits is character and last 8 bits are attributes
+        return (attribute as u16) << 8 | (character as u16);
+    }
+
+    fn get_attributes(colours: (VgaColours, VgaColours)) -> u8 {
+        // Background Color, Foreground Color
+        return (colours.0 as u8) << 4 | (colours.1 as u8)
+    }
+}
+
