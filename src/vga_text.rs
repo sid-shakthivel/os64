@@ -39,16 +39,9 @@ pub struct Terminal {
     terminal_row: usize,
     terminal_col: usize,
     vga_buffer: &'static mut [[u16; VGA_WIDTH]; VGA_HEIGHT], 
-    // Static reference means this can survive the entire duration of program
 }
 
-// Statics have fixed address in memory
-// Lazy statics allows initialization at runtime 
 lazy_static! {
-    /*
-    Mutable static variables are very unsafe
-    Spinlocks cause a thread which wants to use something to wait in a while loop until the lock is free which prevents data being overwritten
-    */
     pub static ref TERMINAL: spin::Mutex<Terminal> = spin::Mutex::new(Terminal {
         terminal_row: 0,
         terminal_col: 0,
@@ -59,7 +52,7 @@ lazy_static! {
 const VGA_WIDTH: usize = 80;
 const VGA_HEIGHT: usize = 25;
 
-#[macro_export] // Allows us to use this macro across modules
+#[macro_export] 
 macro_rules! print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
