@@ -1,7 +1,8 @@
-global start ; entry point of kernel
+global start
 
-section .text 
-bits 32 ; CPU is in protected mode 
+section .text
+bits 32
 start:
-  mov dword [0xb8000], 0x2f4b2f4f
-  hlt
+    ; print `OK` to screen
+    mov dword [0xb8000], 0x2f4b2f4f
+    hlt
