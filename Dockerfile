@@ -17,4 +17,4 @@ WORKDIR /
 
 # Create ISO
 
-CMD cd code && grub-mkrescue -o os64.iso isodir
+# CMD cd code && grub-mkrescue -o os64.iso isodir
