@@ -5,9 +5,12 @@ section .text
 bits 32
 start:
     mov esp, stack_top ; Stack grows downwards
+    mov edi, ebx; Multiboot information structure
+
     call setup_paging
     call enable_paging
-    lgdt [gdt64.pointer] 
+
+    lgdt [gdt64.pointer] ; Load the new GDT
     jmp gdt64.code:long_mode_start
 
 setup_paging:
@@ -77,5 +80,5 @@ p3_table:
 p2_table:
     resb 4096
 stack_bottom:
-    resb 64
+    resb 16384
 stack_top:

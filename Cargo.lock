@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "bitflags"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -28,10 +34,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "multiboot2"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b209a4456a3cc81fb69ad318ed6d47af81a90b829701f151354e3994d8b216d4"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
 name = "os64"
 version = "0.1.0"
 dependencies = [
  "lazy_static",
+ "multiboot2",
  "spin 0.9.3",
 ]
 

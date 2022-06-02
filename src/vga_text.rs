@@ -104,13 +104,13 @@ impl Terminal {
     }
 
     pub fn clear(&mut self) {
-        self.terminal_row = 0;
-        self.terminal_col = 0;
         for _i in 0..VGA_HEIGHT {
             for _j in 0..VGA_WIDTH {
                 self.put_char(' ', VgaColours::get_attributes((VgaColours::Black, VgaColours::White)));
             }
         }
+        self.terminal_row = 0;
+        self.terminal_col = 0;
     }
 
     fn clear_row(&mut self, row_num: usize) {
