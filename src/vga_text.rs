@@ -103,7 +103,7 @@ impl Terminal {
         if self.terminal_row >= VGA_HEIGHT { self.scroll(); } 
     }
 
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.terminal_row = 0;
         self.terminal_col = 0;
         for _i in 0..VGA_HEIGHT {
