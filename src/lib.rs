@@ -15,9 +15,8 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     TERMINAL.lock().clear();
     let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-    let test = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
-    print!("{:x}", test);
-    let mut PAGE_FRAME_ALLOCATOR = page_frame_allocator::PageFrameAllocator::new(boot_info.end_address() as u32, test as u32);    
+    let memory_end = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
+    let mut PAGE_FRAME_ALLOCATOR = page_frame_allocator::PageFrameAllocator::new(boot_info.end_address() as u64, memory_end as u64);    
 
     loop {}
 }
