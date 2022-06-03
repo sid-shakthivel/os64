@@ -12,46 +12,52 @@ use core::prelude::v1::Some;
 /*
 Each frame must store a reference to the next frame along with physical data
 */
-struct Frame {
-    test: u32,
-    next_frame: Option<*mut Frame>,
+
+#[derive(Debug)]
+pub struct Frame {
+    pub test: u32,
+    pub next_frame: Option<*mut Frame>,
 }
 
-struct Stack {
-    head: Option<*mut Frame>,
-    length: u32,
+pub struct Stack {
+    pub current: Option<*mut Frame>,
+    pub length: u32,
+    pub number: u32,
 }
 
-struct SimplePageFrameAllocator {
+pub struct SimplePageFrameAllocator {
     memory_start: u32,
     memory_end: u32,
-    free_frames: *mut Stack,
-    current_page: *mut u32,
+    pub free_frames: *mut Stack,
+    pub current_page: *mut u32,
 }
 
 /*
 Basic operations any data structure should be able to do
 Can be used when building vectors, stacks, queues, etc
 */
-pub trait Operations {
+pub trait Operations<T> {
     fn is_empty(&self) -> bool;
-    fn push(&mut self, node: impl Operations);
-    // fn pop(&mut self) -> impl Operations;
+    fn push(&mut self, node: T);
+    fn pop(&mut self) -> Option<T>;
 }
 
-// impl Operations for Frame {
-//     fn push(&mut self, node: Frame) {
-//         self.next_frame = Some(&mut node);
-//     }
+impl<T> Operations<T> for Stack {
+    fn is_empty(&self) -> bool {
+        self.length == 0
+    }
 
-//     fn is_empty(&self) -> bool {
+    fn push(&mut self, node: T) {
+        node.next_frame = self.current;
+        self.current = Some(node);
+    }
 
-//     }
-
-//     fn pop(&mut self) -> Frame {
-
-//     }
-// }
+    fn pop(&mut self) -> Option<T> {
+        let old_current = self.current.clone();
+        self.current = Some(self.current.next_frame);
+        some(old_current)
+    }
+}
 
 impl Frame {
     pub fn new() -> Frame {
@@ -59,20 +65,38 @@ impl Frame {
     }
 }
 
-impl Stack {
-    
-}
-
-// 0x100000 - Stack should be stored here hopefully?
-
 pub trait FrameAllocator {
     fn alloc_frame(&mut self) -> Frame;
     fn free_frame(&mut self, frame: Frame);
 }
 
 impl SimplePageFrameAllocator {
-    pub fn new(memory_start: u32, memory_end: u32) -> SimplePageFrameAllocator {
-        SimplePageFrameAllocator { memory_start: memory_start + 4096, memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u32) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } }
+    pub fn new(mut memory_start: u32, memory_end: u32) -> SimplePageFrameAllocator {
+        memory_start += 4096;
+        SimplePageFrameAllocator { memory_start: memory_start, memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u32) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } }
+    }
+
+    /*
+    This test function will setup a simple stack at a variety of page locations from an address
+    */
+    pub fn setup_stack(&mut self) {
+        unsafe {
+            (*self.free_frames).length = 0;
+            (*self.free_frames).number = 0;
+            (*self.free_frames).current = None;
+
+            let test = &mut *(self.current_page as *mut Frame);
+            test.test = 10;
+            test.next_frame = None;
+            (*self.free_frames).current = Some(test);
+
+            self.current_page = self.current_page.offset(1024); // 4096 / 4 as this is a 32 bit pointer
+
+            let best = &mut *(self.current_page as *mut Frame);
+            best.test = 15;
+            best.next_frame = (*self.free_frames).current;
+            (*self.free_frames).current = Some(best);
+        }
     }
 }
 
