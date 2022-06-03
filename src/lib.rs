@@ -21,22 +21,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     // }
 
     unsafe {
-        let mut stack_page_frame_alloc = page_frame_allocator::SimplePageFrameAllocator::new(0x120000, 0x7ee0000);
-        print!("First Page: {:p}\n", stack_page_frame_alloc.current_page);
-        stack_page_frame_alloc.setup_stack();
-        print!("Second Page: {:p}\n", stack_page_frame_alloc.current_page);
-        match (*stack_page_frame_alloc.free_frames).current {
-            Some(test) => {
-                print!("{:p}\n", test);
-                match (*test).next_frame {
-                    Some(best) => {
-                        print!("{:p}\n", best);
-                    },
-                    _ => {}
-                }
-            },
-            _ => {}
-        }
+        let mut stack_page_frame_alloc = page_frame_allocator::PageFrameAllocator::new(0x120000, 0x7ee0000);
     }
 
     // let test = &mut *(0x120000 as *mut u32);
