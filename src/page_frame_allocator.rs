@@ -10,12 +10,10 @@ A stack of free pages along with a pointer to the first page will be used in ord
 use core::prelude::v1::Some;
 
 /*
-Each frame must store a reference to the next frame along with physical meta data
+Each frame must store a reference to the next frame along with physical meta data (value is for testing)
 */
-
 #[derive(Debug)]
 pub struct Frame {
-    pub value: u32,
     pub next_frame: Option<*mut Frame>,
 }
 
@@ -30,9 +28,12 @@ TODO: Change u32 to u8
 pub struct PageFrameAllocator {
     memory_start: u32,
     memory_end: u32,
-    pub free_frames: *mut Stack,
+    pub free_frames: &'static mut Stack,
     pub current_page: *mut u32,
-    pub number: u32,
+}
+
+pub struct Test {
+    pub free_frames: &'static mut Stack
 }
 
 /*
@@ -52,14 +53,14 @@ impl Operations for Stack {
     }
 
     fn push(&mut self, node: *mut Frame) {
-        unsafe {
-            (*node).next_frame = self.current;
-        }
+        unsafe { (*node).next_frame = self.current; }
         self.current = Some(node);
+        self.length += 1;
     }
 
     fn pop(&mut self) -> Option<*mut Frame> {
         let old_current = self.current.clone();
+        self.length -= 1;
         unsafe {
             self.current = match self.current {
                 Some(frame) => (*frame).next_frame,
@@ -69,6 +70,7 @@ impl Operations for Stack {
         old_current 
     }
 }
+
 
 pub trait FrameAllocator {
     fn alloc_frame(&mut self) -> Option<*mut u32>;
@@ -81,16 +83,14 @@ impl FrameAllocator for PageFrameAllocator {
     If there are no free frames, increment the pointer to the next frame and return that
     */
     fn alloc_frame(&mut self) -> Option<*mut u32> {
-        unsafe {
-            if (*self.free_frames).is_empty() {
-                // Current Page is a 32 bit address thus 1 page is 1024 32 bits (4096 bytes)
-                self.current_page = self.current_page.offset(1024);
-                return Some(self.current_page);
-            } else {
-                return  match (*self.free_frames).pop() {
-                    Some(frame) => Some(&mut *(frame as *mut u32)),
-                    _ => None
-                }
+        if self.free_frames.is_empty() {
+            // Current Page is a 32 bit address thus 1 page is 1024 32 bits (4096 bytes)
+            self.current_page = unsafe { self.current_page.offset(1024) };
+            return Some(self.current_page);
+        } else {
+            return  match self.free_frames.pop() {
+                Some(frame) => unsafe { Some(&mut *(frame as *mut u32)) }, 
+                _ => None
             }
         }
     }
@@ -101,41 +101,22 @@ impl FrameAllocator for PageFrameAllocator {
     */
     fn free_frame(&mut self, frame_address: *mut u32) {
         let new_free_frame = unsafe { &mut *(frame_address as *mut Frame) };
-        {
-            // For testing purposes
-            new_free_frame.value = self.number; 
-            self.number += 5;
-        }
-        unsafe { (*self.free_frames).push(new_free_frame) }
+        self.free_frames.push(new_free_frame);
     }
 }
 
 impl PageFrameAllocator {
     pub fn new(mut memory_start: u32, memory_end: u32) -> PageFrameAllocator {
         memory_start += 4096;
-        PageFrameAllocator { memory_start: memory_start, memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u32) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) }, number: 0 }
+        let mut page_frame_allocator = PageFrameAllocator { memory_start: memory_start, memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u32) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };
+        page_frame_allocator.setup_stack();
+        return page_frame_allocator;
     }
 
-    /*
-    This test function will setup a simple stack at a variety of page locations from an address
-    */
     pub fn setup_stack(&mut self) {
         unsafe {
-            (*self.free_frames).length = 0;
-            (*self.free_frames).current = None;
-
-            // let test = &mut *(self.current_page as *mut Frame);
-            // test.value = 10;
-            // test.next_frame = None;
-            // (*self.free_frames).current = Some(test);
-
-            // self.current_page = self.current_page.offset(1024); // 4096 / 4 as this is a 32 bit pointer
-
-            // let best = &mut *(self.current_page as *mut Frame);
-            // best.value = 15;
-            // best.next_frame = (*self.free_frames).current;
-            // (*self.free_frames).current = Some(best);
+            self.free_frames.length = 0;
+            self.free_frames.current = None;
         }
     }
 }
-

@@ -2,9 +2,10 @@
 
 #![no_std] // Don't link with Rust standard library
 
-use core::panic::PanicInfo;
 mod vga_text;
 mod page_frame_allocator;
+
+use core::panic::PanicInfo;
 use crate::vga_text::TERMINAL;
 
 extern crate multiboot2;
@@ -12,19 +13,12 @@ extern crate multiboot2;
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     TERMINAL.lock().clear();
-    // let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
-    // let memory_map_tag = boot_info.memory_map_tag()
-    //     .expect("Memory map tag required\n");
-    // print!("memory areas:\n");
-    // for area in memory_map_tag.memory_areas() {
-    //     print!("    start: 0x{:x}, length: 0x{:x}\n", area.base_addr, area.length);
-    // }
+    let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
+    let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
+    let test = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
+    print!("{:x}", test);
+    let mut PAGE_FRAME_ALLOCATOR = page_frame_allocator::PageFrameAllocator::new(boot_info.end_address() as u32, test as u32);    
 
-    unsafe {
-        let mut stack_page_frame_alloc = page_frame_allocator::PageFrameAllocator::new(0x120000, 0x7ee0000);
-    }
-
-    // let test = &mut *(0x120000 as *mut u32);
     loop {}
 }
 
