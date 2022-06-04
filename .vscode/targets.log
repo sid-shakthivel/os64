@@ -10,7 +10,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 make: *** No rule to make target `all'.  Stop.
 
 
-# Make data base, printed on Fri Jun  3 19:18:24 2022
+# Make data base, printed on Sat Jun  4 15:38:15 2022
 
 # Variables
 
@@ -47,7 +47,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-6e7e5b1e-7962-4ade-b324-b72991566fe7.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-89be1b80-522c-4461-8356-3fe775ca80e5.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -171,7 +171,7 @@ LANG = C
 # environment
 TERM = xterm-256color
 # environment
-VSCODE_PID = 28330
+VSCODE_PID = 44368
 # makefile (from `Makefile', line 10)
 LINKER_FILE := src/linker.ld
 # makefile (from `Makefile', line 13)
@@ -196,7 +196,7 @@ ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/long_mode_init.o 
 # x86_64-unknown-none.json (device 16777225, inode 65398582): could not be opened.
 # src (device 16777225, inode 65398396): 9 files, no impossibilities.
 # Dockerfile (device 16777225, inode 65267988): could not be opened.
-# kernel.bin (device 16777225, inode 67572214): could not be opened.
+# kernel.bin (device 16777225, inode 67585231): could not be opened.
 # Cargo.lock (device 16777225, inode 65398690): could not be opened.
 
 # 41 files, no impossibilities in 13 directories.
@@ -332,6 +332,6 @@ object_files/src/boot.o: src/boot.asm src/long_mode_init.asm src/multiboot_heade
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Fri Jun  3 19:18:24 2022
+# Finished Make data base on Sat Jun  4 15:38:15 2022
 
  
