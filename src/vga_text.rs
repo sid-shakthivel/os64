@@ -131,4 +131,3 @@ impl VgaColours {
         return (colours.0 as u8) << 4 | (colours.1 as u8)
     }
 }
-

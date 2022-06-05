@@ -10,7 +10,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 make: *** No rule to make target `all'.  Stop.
 
 
-# Make data base, printed on Sat Jun  4 15:38:15 2022
+# Make data base, printed on Sun Jun  5 15:32:45 2022
 
 # Variables
 
@@ -47,7 +47,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-89be1b80-522c-4461-8356-3fe775ca80e5.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-a4561624-e6a7-4118-85fe-1b65e168a18a.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -117,6 +117,7 @@ LESS = -R
 # automatic
 %D = $(patsubst %/,%,$(dir $%))
 # default
+ 
 MAKE_COMMAND := /Applications/Xcode.app/Contents/Developer/usr/bin/make
 # default
 .VARIABLES := 
@@ -171,7 +172,7 @@ LANG = C
 # environment
 TERM = xterm-256color
 # environment
-VSCODE_PID = 44368
+VSCODE_PID = 57724
 # makefile (from `Makefile', line 10)
 LINKER_FILE := src/linker.ld
 # makefile (from `Makefile', line 13)
@@ -185,21 +186,23 @@ ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/long_mode_init.o 
 
 # Directories
 
+# bochslog.txt (device 16777225, inode 67625157): could not be opened.
 # target (device 16777225, inode 66717635): 8 files, no impossibilities.
 # Makefile (device 16777225, inode 66586869): could not be opened.
-# . (device 16777225, inode 65398368): 18 files, no impossibilities.
+# . (device 16777225, inode 65398368): 20 files, no impossibilities.
 # object_files (device 16777225, inode 66612915): 3 files, no impossibilities.
 # isodir (device 16777225, inode 66548808): 3 files, no impossibilities.
 # os64.iso (device 16777225, inode 66711535): could not be opened.
 # Cargo.toml (device 16777225, inode 65398395): could not be opened.
 # README.md (device 16777225, inode 65538259): could not be opened.
 # x86_64-unknown-none.json (device 16777225, inode 65398582): could not be opened.
-# src (device 16777225, inode 65398396): 9 files, no impossibilities.
+# src (device 16777225, inode 65398396): 10 files, no impossibilities.
 # Dockerfile (device 16777225, inode 65267988): could not be opened.
 # kernel.bin (device 16777225, inode 67585231): could not be opened.
+# bochsrc.txt (device 16777225, inode 67625097): could not be opened.
 # Cargo.lock (device 16777225, inode 65398690): could not be opened.
 
-# 41 files, no impossibilities in 13 directories.
+# 44 files, no impossibilities in 15 directories.
 
 # Implicit Rules
 
@@ -237,7 +240,7 @@ src/boot.asm:
 # Not a target:
 Makefile:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-02 22:11:09
+#  Last modified 2022-06-04 15:57:11
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
@@ -273,7 +276,8 @@ run:
 	$(R_COMPILER) build --target $(TARGET)
 	rm kernel.bin
 	docker run --rm -v /Users/siddharth/Code/rust/os64:/code os64/toolchain
-	qemu-system-x86_64 -cdrom os64.iso
+	# qemu-system-x86_64 -cdrom os64.iso
+	bochs -f bochsrc.txt -q
 	
 
 clean:
@@ -281,7 +285,6 @@ clean:
 #  Modification time never checked.
 #  File has not been updated.
 #  commands to execute (from `Makefile', line 27):
- 
 	$(R_COMPILER) clean
 	rm kernel.bin
 	rm os64.iso
@@ -332,6 +335,6 @@ object_files/src/boot.o: src/boot.asm src/long_mode_init.asm src/multiboot_heade
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Sat Jun  4 15:38:15 2022
+# Finished Make data base on Sun Jun  5 15:32:45 2022
 
  

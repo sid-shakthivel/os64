@@ -30,7 +30,7 @@ clean:
 
 run:
 	$(R_COMPILER) build --target $(TARGET)
-	rm kernel.bin
+	rm -f kernel.bin
 	docker run --rm -v /Users/siddharth/Code/rust/os64:/code os64/toolchain
-	# qemu-system-x86_64 -cdrom os64.iso
-	bochs -f bochsrc.txt -q
+	qemu-system-x86_64 -cdrom os64.iso
+	# bochs -f bochsrc.txt -q
