@@ -10,6 +10,7 @@ start:
     call setup_paging
 
     ; Recursive Paging
+
     mov eax, p4_table
     or eax, 0b11 ; Present, Writeable
     mov [p4_table + 511 * 8], eax
