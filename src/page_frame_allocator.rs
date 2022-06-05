@@ -22,15 +22,12 @@ pub struct Stack {
     pub length: u64,
 }
 
+// TODO: Remove memory_start
 pub struct PageFrameAllocator {
     memory_start: u64,
     memory_end: u64,
     pub free_frames: &'static mut Stack,
     pub current_page: *mut u64,
-}
-
-pub struct Test {
-    pub free_frames: &'static mut Stack
 }
 
 /*
@@ -70,13 +67,14 @@ impl Operations for Stack {
 
 pub trait FrameAllocator {
     fn alloc_frame(&mut self) -> Option<*mut u64>;
-    fn free_frame(&mut self, frame_address: *mut u64);
+    fn free_frame(&mut self, frame_address: *mut u64) -> ();
 }
 
 impl FrameAllocator for PageFrameAllocator {
     /*
     Check the stack for any known free frames and pop it
     If there are no free frames, increment the pointer to the next frame and return that
+    TODO: If beyond memory_end, should end + return error
     */
     fn alloc_frame(&mut self) -> Option<*mut u64> {
         if self.free_frames.is_empty() {
@@ -110,9 +108,7 @@ impl PageFrameAllocator {
     }
 
     pub fn setup_stack(&mut self) {
-        unsafe {
-            self.free_frames.length = 0;
-            self.free_frames.current = None;
-        }
+        self.free_frames.length = 0;
+        self.free_frames.current = None;
     }
 }

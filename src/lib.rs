@@ -4,11 +4,13 @@
 
 mod vga_text;
 mod page_frame_allocator;
+mod paging;
 
 use core::panic::PanicInfo;
 use crate::vga_text::TERMINAL;
 
 extern crate multiboot2;
+extern crate x86_64;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {

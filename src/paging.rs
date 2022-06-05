@@ -21,9 +21,10 @@ Page table entries have a certain 64 bit format which looks like this:
 +---------+-----------+------------------+---------------+---------------+-------+-----------+--------+-----------+------------------+-----------+------------+
 */
 
-mod vga_text;
-mod page_frame_allocator;
+use crate::vga_text;
+use crate::page_frame_allocator;
 use page_frame_allocator::PageFrameAllocator;
+use crate::page_frame_allocator::FrameAllocator;
 
 enum Flags {
     Present,
@@ -36,58 +37,60 @@ enum Flags {
     Global,
 }
 
+
+#[derive(Debug, Copy, Clone)]
 struct Page {
     entry: u64
 }
 
 impl Page {
-    pub fn new(physical_address: u64) {
-        self.entry = 0x000fffff_fffff000 & (physical_address >> 12);
+    pub fn new(physical_address: u64) -> Page {
+        Page { entry: 0x000fffff_fffff000 & (physical_address >> 12) }
     }
 
     fn set_flag(&mut self, flag: Flags) {
-        self.entry |= (1 << match flag {
-            Present => 0,
-            Writable => 1,
-            UserAccessible => 2,
-            WriteThrough => 3,
-            DisableCache => 4,
-            Dirty => 5,
-            Huge => 6,
-            Global => 7
-        });
+        self.entry |= 1 << match flag {
+            Flags::Present => 0,
+            Flags::Writable => 1,
+            Flags::UserAccessible => 2,
+            Flags::WriteThrough => 3,
+            Flags::DisableCache => 4,
+            Flags::Dirty => 5,
+            Flags::Huge => 6,
+            Flags::Global => 7
+        };
     }
 
-    pub is_unused(&self) -> bool {
+    pub fn is_unused(&self) -> bool {
         return self.entry == 0;
     }
 
-    pub set_unused(&mut self) {
+    pub fn set_unused(&mut self) {
         self.entry = 0;
     }
 
-    pub get_physical_address(&self) -> &*mut u64 {
-        return self.entry & 0x000fffff_fffff000;
+    pub fn get_physical_address(&self) -> *mut u64 {
+        return (self.entry & 0x000fffff_fffff000) as *mut u64;
     }
 }
 
-struct Table {
-    entries: [Page, 512]
+pub struct Table {
+    entries: [Page; 512]
 }
 
 impl Table {
     // When unmapping a page, if there are no other entries, the table can be freed from memory
     fn drop_table(&mut self, allocator: &mut PageFrameAllocator) {
-        let mut i = ;
+        let i = 0;
         for i in 0..self.entries.len() {
-            if self.entries[i] != 0 {
+            if self.entries[i].entry != 0 {
                 break
             }
         }
         
         // If there are 512 empty entries, the table may be freed
         if i != 512 {
-            allocator.free_frame(self as *const _ as u64);
+            allocator.free_frame(self as *const _ as *mut u64);
         }
     }
 
@@ -95,26 +98,26 @@ impl Table {
     When mapping an address, new tables may have to be created if there are none for a certain memory address
     If there is no table, it is created and then returned
     */
-    fn create_next_table(&mut self, index: u64, allocator: &mut PageFrameAllocator) {
+    fn create_next_table(&mut self, index: usize, allocator: &mut PageFrameAllocator) -> &mut Table {
         if self.get_table(index).is_none() {
             // Create new table
             let page_frame = allocator.alloc_frame();
-            self.entries[index] = Page::new(page_frame);
+            self.entries[index] = Page::new(page_frame.unwrap() as u64);
             self.entries[index].set_flag(Flags::Present);
             self.entries[index].set_flag(Flags::Writable);
         }
-        return self.get_table(index);
+        return self.get_table(index).unwrap();
     }
 
     // A reference to the actual table is needed instead of an address
-    fn get_table(&mut self, index: u64) -> Option<&mut Table> {
-        return self.next_table_address(index).map(|address| unsafe { &mut *(address as *mut _) });
+    fn get_table(&mut self, index: usize) -> Option<&mut Table> {
+        return self.get_table_address(index).map(|address| unsafe { &mut *(address as *mut _) });
     }
 
     // Each table from the level of hierarchy can be accessed via this formula: next_table_address = (table_address << 9) | (index << 12) in which index refers to certain sections of a virtual address
-    fn get_table_address(&mut self, index: u64) -> Option<u64> {
-        if (self.entries[index] & 1) {
-            return self as *const _ as u64; << 8 | (index >> 12);
+    fn get_table_address(&mut self, index: usize) -> Option<u64> {
+        if self.entries[index].entry & 1 == 1{
+            return Some(((self as *const _ as u64) << 8) | ((index as u64) >> 12));
         } else {
             None
         }
@@ -130,47 +133,49 @@ pub const P4: *mut Table = 0xffffffff_fffff000 as *mut _;
     YYY is the index for P2
     ZZZ is the index for P1
 */
-fn get_p4_index(virtual_address: u64) {
-    return (virtual_address >> 27) & 0o777;
+fn get_p4_index(virtual_address: u64) -> usize {
+    return ((virtual_address >> 27) & 0o777) as usize;
 }
 
-fn get_p3_index(virtual_address: u64) {
-    return (virtual_address >> 18) & 0o777;
+fn get_p3_index(virtual_address: u64) -> usize {
+    return ((virtual_address >> 18) & 0o777) as usize;
 }
 
-fn get_p2_index(virtual_address: u64) {
-    return (virtual_address >> 9) & 0o777;
+fn get_p2_index(virtual_address: u64) -> usize {
+    return ((virtual_address >> 9) & 0o777) as usize;
 }
 
-fn get_p1_index(virtual_address: u64) {
-    return (virtual_address >> 0) & 0o777;
+fn get_p1_index(virtual_address: u64) -> usize {
+    return ((virtual_address >> 0) & 0o777) as usize;
 }
 
 // The index from the address is used to go to or create tables
-fn map_page(physical_address: u64, virtual_address: u64, allocator: PageFrameAllocator) {
-    let mut p3 = P4.create_next_table(get_p4_index(virtual_address),  &mut allocator);
-    let mut p2 = p3.create_next_table(get_p3_index(virtual_address), &mut allocator);
-    let mut p1 = p2.create_next_table(get_p2_index(virtual_address), &mut allocator);
+fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator) {
+    let p4 = unsafe { &mut *P4 };
+    let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
+    let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
+    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
 
     // If the address is not already mapped, create the mapping
-    if (p1.entries[get_p1_index(virtual_address)].is_unused()) {
+    if p1.entries[get_p1_index(virtual_address)].is_unused() {
         p1.entries[get_p1_index(virtual_address)] = Page::new(physical_address);
-        self.entries[get_p1_index(virtual_address)].set_flag(Flags::Present);
-        self.entries[get_p1_index(virtual_address)].set_flag(Flags::Writable);
+        p1.entries[get_p1_index(virtual_address)].set_flag(Flags::Present);
+        p1.entries[get_p1_index(virtual_address)].set_flag(Flags::Writable);
     }
 }
 
-fn unmap_page(virtual_address: u64, allocator: PageFrameAllocator) {
+fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
     // Loop through each table and if empty drop it
-    let mut p3 = P4.create_next_table(get_p4_index(virtual_address),  &mut allocator);
-    p3.drop_table();
-    let mut p2 = p3.create_next_table(get_p3_index(virtual_address), &mut allocator);
-    p2.drop_table();
-    let mut p1 = p2.create_next_table(get_p2_index(virtual_address), &mut allocator);
-    p1.drop_table();
+    let p4 = unsafe { &mut *P4 };
+    let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
+    p3.drop_table(allocator);
+    let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
+    p2.drop_table(allocator);
+    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
+    p1.drop_table(allocator);
 
     let frame = p1.entries[get_p1_index(virtual_address)];
-    if (frame.is_unused() == false) {
+    if frame.is_unused() == false {
         allocator.free_frame(frame.get_physical_address());
         p1.entries[get_p1_index(virtual_address)].set_unused();
 
@@ -178,8 +183,8 @@ fn unmap_page(virtual_address: u64, allocator: PageFrameAllocator) {
         Translation lookaside buffer
         This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
         */
-        use x86_64::instructions::tlb;
-        use x86_64::VirtualAddress;
-        tlb::flush(VirtualAddress(page.start_address()));
+        // use x86_64::instructions::tlb;
+        // use x86_64::VirtualAddress;
+        // tlb::flush(VirtualAddress(virtual_address));
     }
 }
