@@ -196,3 +196,11 @@ pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
         tlb::flush(VirtAddr::new(virtual_address));
     }
 }
+
+pub fn identity_map(starting_address: u64, b: u64, allocator: &mut PageFrameAllocator) {
+    let page_size = 4096;
+
+    for i in 0..b {
+        map_page(i, i, allocator);
+    }
+}

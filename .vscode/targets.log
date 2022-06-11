@@ -6,11 +6,8 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
- 
-make: *** No rule to make target `all'.  Stop.
 
-
-# Make data base, printed on Sat Jun 11 15:36:30 2022
+# Make data base, printed on Sat Jun 11 20:29:39 2022
 
 # Variables
 
@@ -47,7 +44,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-0a063873-0eef-4269-a825-da10ed329e4b.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-565d3073-3107-481c-ba44-89a6f92503a6.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -167,7 +164,7 @@ LANG = C
 # environment
 TERM = xterm-256color
 # environment
-VSCODE_PID = 27847
+VSCODE_PID = 42832
 # makefile (from `Makefile', line 10)
 LINKER_FILE := src/linker.ld
 # makefile (from `Makefile', line 13)
@@ -193,7 +190,7 @@ ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/long_mode_init.o 
 # x86_64-unknown-none.json (device 16777220, inode 65398582): could not be opened.
 # src (device 16777220, inode 65398396): 10 files, no impossibilities.
 # Dockerfile (device 16777220, inode 65267988): could not be opened.
-# kernel.bin (device 16777220, inode 68345327): could not be opened.
+# kernel.bin (device 16777220, inode 68379738): could not be opened.
 # bochsrc.txt (device 16777220, inode 67625097): could not be opened.
 # Cargo.lock (device 16777220, inode 65398690): could not be opened.
 
@@ -268,6 +265,9 @@ run:
 #  Modification time never checked.
 #  File has not been updated.
 #  commands to execute (from `Makefile', line 32):
+ 
+make: *** No rule to make target `all'.  Stop.
+
 	$(R_COMPILER) build --target $(TARGET)
 	rm -f kernel.bin
 	docker run --rm -v /Users/siddharth/Code/rust/os64:/code os64/toolchain
@@ -279,7 +279,6 @@ clean:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
- 
 #  commands to execute (from `Makefile', line 27):
 	$(R_COMPILER) clean
 	rm kernel.bin
@@ -331,6 +330,6 @@ object_files/src/boot.o: src/boot.asm src/long_mode_init.asm src/multiboot_heade
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Sat Jun 11 15:36:30 2022
+# Finished Make data base on Sat Jun 11 20:29:39 2022
 
  
