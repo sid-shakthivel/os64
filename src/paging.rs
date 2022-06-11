@@ -22,7 +22,6 @@ Page table entries have a certain 64 bit format which looks like this:
 */
 
 use crate::print;
-use crate::vga_text;
 use crate::vga_text::TERMINAL;
 use crate::page_frame_allocator;
 use page_frame_allocator::PageFrameAllocator;
@@ -105,6 +104,7 @@ impl Table {
     */
     fn create_next_table(&mut self, index: usize, allocator: &mut PageFrameAllocator) -> &mut Table {
         if self.get_table(index).is_none() {
+            print!("Building new table\n");
             let page_frame = allocator.alloc_frame();
             self.entries[index] = Page::new(page_frame.unwrap() as u64);
             self.entries[index].set_flag(Flags::Present);
@@ -120,6 +120,8 @@ impl Table {
 
     // Each table from the level of hierarchy can be accessed via this formula: next_table_address = (table_address << 9) | (index << 12) in which index refers to certain sections of a virtual address
     fn get_table_address(&mut self, index: usize) -> Option<u64> {
+        // print!("Address: {:x}\n", (self as *const _ as u64));
+        // print!("Entry Val: {:x}\n", self.entries[index].entry);
         if self.entries[index].entry & 1 > 0 {
             return Some(((self as *const _ as u64) << 9) | ((index as u64) >> 12));
         } else {
@@ -138,57 +140,58 @@ pub const P4: *mut Table = 0xffffffff_fffff000 as *mut _;
     ZZZ is the index for P1
 */
 fn get_p4_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 27) & 0o777) as usize;
+    return ((virtual_address >> 39) & 0x1ff) as usize;
 }
 
 fn get_p3_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 18) & 0o777) as usize;
+    return ((virtual_address >> 30) & 0x1ff) as usize;
 }
 
 fn get_p2_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 9) & 0o777) as usize;
+    return ((virtual_address >> 21) & 0x1ff) as usize;
 }
 
 fn get_p1_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 0) & 0o777) as usize;
+    return ((virtual_address >> 12) & 0x1ff) as usize;
 }
 
 // The index from the address is used to go to or create tables
-pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator) {
+pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator) {   
+    assert!(virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000, "invalid address: 0x{:x}", virtual_address);
+
     let p4 = unsafe { &mut *P4 };
+
     let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
     let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
     let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
 
-    // If the address is not already mapped, create the mapping
-    if p1.entries[get_p1_index(virtual_address)].is_unused() {
-        p1.entries[get_p1_index(virtual_address)] = Page::new(physical_address);
-        p1.entries[get_p1_index(virtual_address)].set_flag(Flags::Present);
-        p1.entries[get_p1_index(virtual_address)].set_flag(Flags::Writable);
-    }
+    let p1_index = get_p1_index(virtual_address);
+    p1.entries[p1_index] = Page::new(physical_address);
+    p1.entries[p1_index].set_flag(Flags::Present);
+    p1.entries[p1_index].set_flag(Flags::Writable);
 
-    tlb::flush(VirtAddr::new(0x000fffff_fffff000 & virtual_address));
+    tlb::flush(VirtAddr::new(virtual_address));
 }
 
-fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
-    // Loop through each table and if empty drop it
-    let p4 = unsafe { &mut *P4 };
-    let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
-    p3.drop_table(allocator);
-    let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
-    p2.drop_table(allocator);
-    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
-    p1.drop_table(allocator);
+// fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
+//     // Loop through each table and if empty drop it
+//     let p4 = unsafe { &mut *P4 };
+//     let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
+//     p3.drop_table(allocator);
+//     let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
+//     p2.drop_table(allocator);
+//     let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
+//     p1.drop_table(allocator);
 
-    let frame = p1.entries[get_p1_index(virtual_address)];
-    if frame.is_unused() == false {
-        allocator.free_frame(frame.get_physical_address());
-        p1.entries[get_p1_index(virtual_address)].set_unused();
+//     let frame = p1.entries[get_p1_index(virtual_address)];
+//     if frame.is_unused() == false {
+//         allocator.free_frame(frame.get_physical_address());
+//         p1.entries[get_p1_index(virtual_address)].set_unused();
 
-        /*
-        Translation lookaside buffer
-        This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
-        */
-        tlb::flush(VirtAddr::new(virtual_address));
-    }
-}
+//         /*
+//         Translation lookaside buffer
+//         This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
+//         */
+//         tlb::flush(VirtAddr::new(virtual_address));
+//     }
+// }

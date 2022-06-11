@@ -32,17 +32,57 @@ setup_paging:
     or eax, 0b11 ; Present, Writeable
     mov [p3_table], eax
 
+    mov eax, p1_table_1
+    or eax, 0b11 ; Present, Writeable
+    mov [p2_table + 0 * 8], eax
+
+    mov eax, p1_table_2
+    or eax, 0b11
+    mov [p2_table + 1 * 8], eax
+
+    mov eax, p1_table_3
+    or eax, 0b11
+    mov [p2_table + 2 * 8], eax
+
     mov ecx, 0
 
-.map_p2_table
-    mov eax, 0x200000
+.map_p1_table_1
+    mov eax, 0x1000
     mul ecx
-    or eax, 0b10000011 ; Present, Writable, Huge
-    mov [p2_table + ecx * 8], eax ; 8 bit entries
+    or eax, 0b11 ; Present, Writable
+    mov [p1_table_1 + ecx * 8], eax ; 8 bit entries
 
     inc ecx
     cmp ecx, 512
-    jne .map_p2_table
+    jne .map_p1_table_1
+
+    mov ebx, 0
+
+.map_p1_table_2
+    mov eax, 0x1000
+    mul ecx
+    or eax, 0b11 ; Present, Writable
+    mov [p1_table_2 + ebx * 8], eax ; 8 bit entries
+
+    inc ebx
+    inc ecx
+    cmp ebx, 512
+    jne .map_p1_table_2
+
+    mov ebx, 0
+
+.map_p1_table_3
+    mov eax, 0x1000
+    mul ecx
+    or eax, 0b11 ; Present, Writable
+    mov [p1_table_3 + ebx * 8], eax ; 8 bit entries
+
+    inc ebx
+    inc ecx
+    cmp ebx, 512
+    jne .map_p1_table_3
+
+    mov ecx, 0
 
     ret
 
@@ -85,6 +125,12 @@ p4_table:
 p3_table:
     resb 4096
 p2_table:
+    resb 4096
+p1_table_1:
+    resb 4096
+p1_table_2:
+    resb 4096
+p1_table_3:
     resb 4096
 stack_bottom:
     resb 16384
