@@ -93,7 +93,8 @@ impl Table {
         }
         
         // If there are 512 empty entries, the table may be freed
-        if i != 512 {
+        if i == 512 {
+            print!("Dropping table\n");
             allocator.free_frame(self as *const _ as *mut u64);
         }
     }
@@ -170,28 +171,28 @@ pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut Pag
     p1.entries[p1_index].set_flag(Flags::Present);
     p1.entries[p1_index].set_flag(Flags::Writable);
 
+    /*
+        Translation lookaside buffer
+        This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
+    */
     tlb::flush(VirtAddr::new(virtual_address));
 }
 
-// fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
-//     // Loop through each table and if empty drop it
-//     let p4 = unsafe { &mut *P4 };
-//     let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
-//     p3.drop_table(allocator);
-//     let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
-//     p2.drop_table(allocator);
-//     let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
-//     p1.drop_table(allocator);
+pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
+    // Loop through each table and if empty drop it
+    let p4 = unsafe { &mut *P4 };
+    let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
+    p3.drop_table(allocator);
+    let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
+    p2.drop_table(allocator);
+    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
+    p1.drop_table(allocator);
 
-//     let frame = p1.entries[get_p1_index(virtual_address)];
-//     if frame.is_unused() == false {
-//         allocator.free_frame(frame.get_physical_address());
-//         p1.entries[get_p1_index(virtual_address)].set_unused();
+    let frame = p1.entries[get_p1_index(virtual_address)];
+    if frame.is_unused() == false {
+        allocator.free_frame(frame.get_physical_address());
+        p1.entries[get_p1_index(virtual_address)].set_unused();
 
-//         /*
-//         Translation lookaside buffer
-//         This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
-//         */
-//         tlb::flush(VirtAddr::new(virtual_address));
-//     }
-// }
+        tlb::flush(VirtAddr::new(virtual_address));
+    }
+}

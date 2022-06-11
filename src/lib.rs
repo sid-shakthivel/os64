@@ -25,6 +25,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     let mut address = PAGE_FRAME_ALLOCATOR.alloc_frame().unwrap() as u64;
     paging::map_page(address, 0x0000000000000000, &mut PAGE_FRAME_ALLOCATOR);
+    paging::unmap_page(0x0000000000000000, &mut PAGE_FRAME_ALLOCATOR);
 
     print!("Paging Finished\n");
     loop {}
