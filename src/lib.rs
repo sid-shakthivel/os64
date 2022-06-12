@@ -30,11 +30,12 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     interrupts::init_idt();
 
-    unsafe {
-        asm!("int $0x0"); // Should trigger interrupt 0
-    }
+    // Triggering test interrupts
+    // unsafe { asm!("int $0x0"); } 
+    // unsafe { asm!("int $0x18"); } 
+    // unsafe { asm!("int $0x1C"); } 
 
-    print!("Finished everything\n");
+    print!("Finished execution\n");
     loop {}
 }
 

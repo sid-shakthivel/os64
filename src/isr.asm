@@ -1,90 +1,81 @@
 extern exception_handler
-; isr_no_err_stub 1
-; isr_no_err_stub 2
-; isr_no_err_stub 3
-; isr_no_err_stub 4
-; isr_no_err_stub 5
-; isr_no_err_stub 6
-; isr_no_err_stub 7
-; isr_err_stub    8
-; isr_no_err_stub 9
-; isr_err_stub    10
-; isr_err_stub    11
-; isr_err_stub    12
-; isr_err_stub    13
-; isr_err_stub    14
-; isr_no_err_stub 15
-; isr_no_err_stub 16
-; isr_err_stub    17
-; isr_no_err_stub 18
-; isr_no_err_stub 19
-; isr_no_err_stub 20
-; isr_no_err_stub 21
-; isr_no_err_stub 22
-; isr_no_err_stub 23
-; isr_no_err_stub 24
-; isr_no_err_stub 25
-; isr_no_err_stub 26
-; isr_no_err_stub 27
-; isr_no_err_stub 28
-; isr_no_err_stub 29
-; isr_err_stub    30
-; isr_no_err_stub 31
 
 %macro handle_no_err_exception 1
 global handle_no_err_exception%1
 handle_no_err_exception%1:
-    push rax
+    push qword 0 ; Dummy error code
+    push qword %1
+    pushaq
     cld
     call exception_handler
-    pop rax
+    popaq
+    add rsp, 0x10 
     iretq
 %endmacro
 
+
+%macro handle_err_exception 1
+global handle_err_exception%1
+handle_err_exception%1:
+    push qword %1
+    pushaq
+    cld
+    call exception_handler
+    popaq
+    add rsp, 0x10 
+    iretq
+%endmacro
+
+%macro pushaq 0
+push rax
+push rbx
+push rcx
+push rdx
+push rsi
+push rdi
+%endmacro
+
+%macro popaq 0
+pop rdi
+pop rsi
+pop rdx
+pop rcx
+pop rbx
+pop rax
+%endmacro
+
 handle_no_err_exception 0
-
-; %macro isr_err_stub 1
-; isr_stub_%+%1:
-;     push %1
-;     pushaq
-;     cld
-;     call exception_handler
-;     popq
-;     add rsp, 0x08
-;     iretq 
-; %endmacro
-
-; %macro isr_no_err_stub 1
-; isr_stub_%+%1:
-;     push %1
-;     pushaq
-;     cld
-;     call exception_handler
-;     popq
-;     add rsp, 0x08
-;     iretq 
-; %endmacro
-
-; .macro pushaq
-;     push %rax
-;     push %rcx
-;     push %rdx
-;     push %rbx
-;     push %rbp
-;     push %rsi
-;     push %rdi
-; .endm # pushaq
-
-
-; .macro popaq
-;     pop %rdi
-;     pop %rsi
-;     pop %rbp
-;     pop %rbx
-;     pop %rdx
-;     pop %rcx
-;     pop %rax
-; .endm # popaq
+handle_no_err_exception 1
+handle_no_err_exception 2
+handle_no_err_exception 3
+handle_no_err_exception 4
+handle_no_err_exception 5
+handle_no_err_exception 6
+handle_no_err_exception 7
+handle_err_exception 8
+handle_no_err_exception 9
+handle_err_exception 10
+handle_err_exception 11
+handle_err_exception 12
+handle_err_exception 13
+handle_err_exception 14
+handle_no_err_exception 15
+handle_no_err_exception 16
+handle_err_exception 17
+handle_no_err_exception 18
+handle_no_err_exception 19
+handle_no_err_exception 20
+handle_err_exception 21
+handle_no_err_exception 22
+handle_no_err_exception 23
+handle_no_err_exception 24
+handle_no_err_exception 25
+handle_no_err_exception 26
+handle_no_err_exception 27
+handle_no_err_exception 28
+handle_err_exception 29
+handle_err_exception 30
+handle_no_err_exception 31
 
 global idt_flush    
 
