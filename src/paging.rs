@@ -30,6 +30,7 @@ use crate::page_frame_allocator::FrameAllocator;
 use x86_64::instructions::tlb;
 use x86_64::addr::VirtAddr;
 
+#[allow(dead_code)]
 enum Flags {
     Present,
     Writable,
@@ -40,7 +41,6 @@ enum Flags {
     Huge,
     Global,
 }
-
 
 #[derive(Debug, Copy, Clone)]
 struct Page {

@@ -6,8 +6,11 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
+ 
+make: *** No rule to make target `all'.  Stop.
 
-# Make data base, printed on Sat Jun 11 20:29:39 2022
+
+# Make data base, printed on Sun Jun 12 12:49:46 2022
 
 # Variables
 
@@ -37,6 +40,7 @@ VSCODE_NLS_CONFIG = {"locale":"en-gb","availableLanguages":{},"_languagePackSupp
 _ = /usr/bin/make
 # makefile (from `Makefile', line 1)
 MAKEFILE_LIST :=  Makefile
+ 
 # environment
 VSCODE_VERBOSE_LOGGING = true
 # environment
@@ -44,15 +48,17 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-565d3073-3107-481c-ba44-89a6f92503a6.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-14f0fdd8-580d-403c-b5b3-a5341cca4340.sock
 # environment
 VSCODE_CWD = /
 # environment
-PATH = /usr/local/opt/python@3.8/bin:/usr/local/opt/openjdk/bin:/usr/local/opt/binutils/bin:/usr/local/opt/flex/bin:/usr/local/opt/bison/bin:/usr/local/opt/python@3.8/bin:/usr/local/opt/python@3.8/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Apple/usr/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Applications/Wireshark.app/Contents/MacOS:/Users/siddharth/.cargo/bin:/Users/siddharth/Code/go/bin:/usr/local/opt/mongodb-community@4.0/bin:/Users/siddharth/.fzf/bin
+PATH = /usr/local/opt/python@3.8/bin:/usr/local/opt/openjdk/bin:/usr/local/opt/binutils/bin:/usr/local/opt/flex/bin:/usr/local/opt/bison/bin:/usr/local/opt/python@3.8/bin:/usr/local/opt/python@3.8/bin:/usr/local/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/VMware Fusion.app/Contents/Public:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Apple/usr/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/Applications/Wireshark.app/Contents/MacOS:/Users/siddharth/.cargo/bin:/Users/siddharth/Code/go/bin:/usr/local/opt/mongodb-community@4.0/bin:/Users/siddharth/.fzf/bin
 # environment
 LSCOLORS = Gxfxcxdxbxegedabagacad
 # environment
 GOPATH = /Users/siddharth/Code/go
+# environment
+LaunchInstanceID = BE43B259-3B11-4C7C-B461-D0DE93383DCB
 # environment
 VSCODE_LOG_STACK = false
 # environment
@@ -60,7 +66,7 @@ ELECTRON_RUN_AS_NODE = 1
 # default
 .FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
 # environment
-SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.fw68Eqb16k/Listeners
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.ujMu4T4BQc/Listeners
 # automatic
 %F = $(notdir $%)
 # environment
@@ -149,8 +155,11 @@ MAKEFILES :=
 PAGER = less
 # environment
 LC_ALL = C
+# environment
+SECURITYSESSIONID = 186a4
 # automatic
 ^F = $(notdir $^)
+ 
 # default
 SUFFIXES := 
 # default
@@ -164,13 +173,13 @@ LANG = C
 # environment
 TERM = xterm-256color
 # environment
-VSCODE_PID = 42832
+VSCODE_PID = 1412
 # makefile (from `Makefile', line 10)
 LINKER_FILE := src/linker.ld
 # makefile (from `Makefile', line 13)
 ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/long_mode_init.o  object_files/src/multiboot_header.o
 # variable set hash-table stats:
-# Load=79/1024=8%, Rehash=0, Collisions=6/109=6%
+# Load=81/1024=8%, Rehash=0, Collisions=6/111=5%
 
 # Pattern-specific Variable Values
 
@@ -181,20 +190,19 @@ ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/long_mode_init.o 
 # bochslog.txt (device 16777220, inode 67625157): could not be opened.
 # target (device 16777220, inode 66717635): 8 files, no impossibilities.
 # Makefile (device 16777220, inode 66586869): could not be opened.
-# . (device 16777220, inode 65398368): 20 files, no impossibilities.
+# . (device 16777220, inode 65398368): 19 files, no impossibilities.
 # object_files (device 16777220, inode 66612915): 3 files, no impossibilities.
 # isodir (device 16777220, inode 66548808): 3 files, no impossibilities.
 # os64.iso (device 16777220, inode 66711535): could not be opened.
 # Cargo.toml (device 16777220, inode 65398395): could not be opened.
 # README.md (device 16777220, inode 65538259): could not be opened.
 # x86_64-unknown-none.json (device 16777220, inode 65398582): could not be opened.
-# src (device 16777220, inode 65398396): 10 files, no impossibilities.
+# src (device 16777220, inode 65398396): 12 files, no impossibilities.
 # Dockerfile (device 16777220, inode 65267988): could not be opened.
-# kernel.bin (device 16777220, inode 68379738): could not be opened.
 # bochsrc.txt (device 16777220, inode 67625097): could not be opened.
 # Cargo.lock (device 16777220, inode 65398690): could not be opened.
 
-# 44 files, no impossibilities in 15 directories.
+# 45 files, no impossibilities in 14 directories.
 
 # Implicit Rules
 
@@ -265,9 +273,6 @@ run:
 #  Modification time never checked.
 #  File has not been updated.
 #  commands to execute (from `Makefile', line 32):
- 
-make: *** No rule to make target `all'.  Stop.
-
 	$(R_COMPILER) build --target $(TARGET)
 	rm -f kernel.bin
 	docker run --rm -v /Users/siddharth/Code/rust/os64:/code os64/toolchain
@@ -283,6 +288,7 @@ clean:
 	$(R_COMPILER) clean
 	rm kernel.bin
 	rm os64.iso
+ 
 	
 
 object_files/src/long_mode_init.o: src/boot.asm src/long_mode_init.asm src/multiboot_header.asm
@@ -330,6 +336,6 @@ object_files/src/boot.o: src/boot.asm src/long_mode_init.asm src/multiboot_heade
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Sat Jun 11 20:29:39 2022
+# Finished Make data base on Sun Jun 12 12:49:46 2022
 
  
