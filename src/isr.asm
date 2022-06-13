@@ -5,13 +5,13 @@ extern interrupt_handler
 global handle_no_err_exception%1
 handle_no_err_exception%1:
     push qword 0 ; Dummy error code
-    push qword %1
-    pushaq
+    push qword %1 ; Number
+    pushaq ; Push registers
     cld
     call exception_handler
     popaq
-    add rsp, 0x10 
-    iretq
+    add rsp, 0x10 ; Must remove both 64 bit values pushed onto stack
+    iretq ; Exit from interrupt
 %endmacro
 
 
@@ -91,8 +91,8 @@ handle_err_exception 29
 handle_err_exception 30
 handle_no_err_exception 31
 
-handle_interrupt 0
-handle_interrupt 1
+handle_interrupt 32
+handle_interrupt 33
 
 global idt_flush    
 

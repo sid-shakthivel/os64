@@ -40,10 +40,11 @@ pub struct idtr {
 }
 
 pub enum GateType {
-    Trap,
-    Interrupt
+    Trap, // For exceptions 
+    Interrupt // To call specific exceptions
 }
 
+// The ISR will return a stack frame which consists of the following data
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct Registers {
@@ -61,7 +62,7 @@ pub struct Registers {
 pub static mut IDTR: idtr = idtr { limit: 0, base: 0 };
 pub static mut IDT: [idt_entry; 256] = [idt_entry { isr_low: 0, kernel_cs: 0x08, ist: 0, attributes: 0, isr_mid: 0, isr_high: 0, reserved: 0}; 256];
 
-const exception_messages: &'static [&'static str] = &["Divide By Zero", "Debug", "Non-maskable Interrupt", "Breakpoint", "Overflow", "Bound Range Exceeded", "Invalid Opcode", "Device not Available", "Double Fault", "Coprocessor Segment Overrun", "Invalid TSS", "Segment Not Present", "Stack-Segment Fault", "General Protection Fault", "Page Fault", "Reserved", "x87 Floating Point Exception", "Alignment Check", "Machine Check", "SIMD Floating Point Exception", "Virtualisation Exception", "Control Exception", "Hypervisor Injection Exception", "Security Exception", "Reserved"];
+const EXCEPTION_MESSAGES: &'static [&'static str] = &["Divide By Zero", "Debug", "Non-maskable Interrupt", "Breakpoint", "Overflow", "Bound Range Exceeded", "Invalid Opcode", "Device not Available", "Double Fault", "Coprocessor Segment Overrun", "Invalid TSS", "Segment Not Present", "Stack-Segment Fault", "General Protection Fault", "Page Fault", "Reserved", "x87 Floating Point Exception", "Alignment Check", "Machine Check", "SIMD Floating Point Exception", "Virtualisation Exception", "Control Exception", "Hypervisor Injection Exception", "Security Exception", "Reserved"];
 
 impl idt_entry {
     pub fn edit_entry(vector: usize, func_address: u64, gate_type: GateType) {
@@ -83,6 +84,7 @@ pub fn init_idt() {
         IDTR.limit = (size_of::<idt_entry>() as u16) * (IDT_MAX_DESCRIPTIONS as u16 - 1);
         IDTR.base = idt_address;
 
+        // Exceptions
         idt_entry::edit_entry(0, (handle_no_err_exception0 as *const u64) as u64, GateType::Trap);
         idt_entry::edit_entry(1, (handle_no_err_exception1 as *const u64) as u64, GateType::Trap);
         idt_entry::edit_entry(2, (handle_no_err_exception2 as *const u64) as u64, GateType::Trap);
@@ -116,46 +118,55 @@ pub fn init_idt() {
         idt_entry::edit_entry(30, (handle_err_exception30 as *const u64) as u64, GateType::Trap);
         idt_entry::edit_entry(31, (handle_no_err_exception31 as *const u64) as u64, GateType::Trap);
 
-        // idt_entry::edit_entry(32, (handle_interrupt0 as *const u64) as u64, GateType::Interrupt);
-        idt_entry::edit_entry(33, (handle_interrupt1 as *const u64) as u64, GateType::Interrupt);
+        // Interrupts
+        idt_entry::edit_entry(32, (handle_interrupt32 as *const u64) as u64, GateType::Interrupt);
+        idt_entry::edit_entry(33, (handle_interrupt33 as *const u64) as u64, GateType::Interrupt);
     
+        // Load idt
         idt_flush();
     }
 }
 
 #[no_mangle]
 pub extern fn exception_handler(registers: Registers) {
+    // Since registers is a packed struct, it must be aligned correctly
     let unaligned_registers = core::ptr::addr_of!(registers);
     let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
 
+    // Print a suitable error message
     if aligned_registers.num < 22 {
-        print!("{}\n", exception_messages[aligned_registers.num as usize]);
+        print!("{}\n", EXCEPTION_MESSAGES[aligned_registers.num as usize]);
     } else if aligned_registers.num > 27 { 
-        print!("{}\n", exception_messages[(aligned_registers.num as usize) - 6]);
+        print!("{}\n", EXCEPTION_MESSAGES[(aligned_registers.num as usize) - 6]);
     } else {
         print!("Reserved\n");
     }
 
+    // Print registers
     print!("{:?}\n", aligned_registers);
 }
 
 #[no_mangle]
 pub extern fn interrupt_handler(registers: Registers) {
-    let unaligned_registers = core::ptr::addr_of!(registers);
-    let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
-
     print!("Interrupt!\n");
-    print!("{:?}\n", aligned_registers);
-    // TODO: Depending on interrupt call function eg keyboard, timer, etc
+    let unaligned_register_num = core::ptr::addr_of!(registers.num);
+    let aligned_register_num = unsafe { core::ptr::read_unaligned(unaligned_register_num) };
+
+    match aligned_register_num {
+        0x20 => {} // Timer
+        0x21 => {
+            // Keyboard interrupt doesn't trigger until read
+            let test = inb(0x60) as char;
+        } // Keyboard
+    }
     // TODO: Call PIC acknowledge
 
-    // Keyboard interrupt doesn't trigger until read
-    let test = inb(0x60) as char;
-    print!("{}", test);
-    pic::acknowledge_pic(33);
+    pic::acknowledge_pic(aligned_register_num as u8);
 }
 
 extern "C" {
+    // All assembly functions
+    // TODO: Find way to reduce code here
     fn handle_no_err_exception0(registers: Registers);
     fn handle_no_err_exception1(registers: Registers);
     fn handle_no_err_exception2(registers: Registers);
@@ -188,7 +199,7 @@ extern "C" {
     fn handle_err_exception29(registers: Registers);
     fn handle_err_exception30(registers: Registers);
     fn handle_no_err_exception31(registers: Registers);
-    fn handle_interrupt0(registers: Registers); // Timer
-    fn handle_interrupt1(registers: Registers); // Keyboard
+    fn handle_interrupt32(registers: Registers); // Timer
+    fn handle_interrupt33(registers: Registers); // Keyboard
     fn idt_flush();
 }

@@ -16,6 +16,7 @@ use core::panic::PanicInfo;
 use crate::vga_text::TERMINAL;
 use page_frame_allocator::PageFrameAllocator;
 use crate::page_frame_allocator::FrameAllocator;
+use crate::pic::PICS;
 use core::arch::asm;
 
 #[no_mangle]
@@ -30,7 +31,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     // let mut address = PAGE_FRAME_ALLOCATOR.alloc_frame().unwrap() as u64;
     // paging::map_page(address, 0x0000000000010000, &mut PAGE_FRAME_ALLOCATOR);
 
-    pic::init_pic();
+    PICS.lock().init();
     interrupts::init_idt();
 
     // Triggering test interrupts
