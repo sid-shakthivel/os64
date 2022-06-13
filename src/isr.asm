@@ -1,4 +1,5 @@
 extern exception_handler
+extern interrupt_handler
 
 %macro handle_no_err_exception 1
 global handle_no_err_exception%1
@@ -21,6 +22,18 @@ handle_err_exception%1:
     pushaq
     cld
     call exception_handler
+    popaq
+    add rsp, 0x10 
+    iretq
+%endmacro
+
+%macro handle_interrupt 1
+global handle_interrupt%1
+handle_interrupt%1:
+    push qword %1
+    pushaq
+    cld
+    call interrupt_handler
     popaq
     add rsp, 0x10 
     iretq
@@ -76,6 +89,9 @@ handle_no_err_exception 28
 handle_err_exception 29
 handle_err_exception 30
 handle_no_err_exception 31
+
+handle_interrupt 0
+handle_interrupt 1
 
 global idt_flush    
 

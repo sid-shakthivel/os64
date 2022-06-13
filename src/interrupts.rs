@@ -9,10 +9,8 @@ An interrupt descriptor table defines what each interrupt will do
 
 use crate::print;
 use crate::vga_text::TERMINAL;
-use core::arch::asm;
 use core::mem::size_of;
-use core::prelude::v1::Some;
-use lazy_static::lazy_static;
+use core::arch::asm;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -58,7 +56,7 @@ pub struct Registers {
 }
 
 #[no_mangle]
-pub static mut IDTR: idtr = unsafe { idtr { limit: 0, base: 0 } };
+pub static mut IDTR: idtr = idtr { limit: 0, base: 0 };
 pub static mut IDT: [idt_entry; 256] = [idt_entry { isr_low: 0, kernel_cs: 0x08, ist: 0, attributes: 0, isr_mid: 0, isr_high: 0, reserved: 0}; 256];
 
 const exception_messages: &'static [&'static str] = &["Divide By Zero", "Debug", "Non-maskable Interrupt", "Breakpoint", "Overflow", "Bound Range Exceeded", "Invalid Opcode", "Device not Available", "Double Fault", "Coprocessor Segment Overrun", "Invalid TSS", "Segment Not Present", "Stack-Segment Fault", "General Protection Fault", "Page Fault", "Reserved", "x87 Floating Point Exception", "Alignment Check", "Machine Check", "SIMD Floating Point Exception", "Virtualisation Exception", "Control Exception", "Hypervisor Injection Exception", "Security Exception", "Reserved"];
@@ -115,6 +113,9 @@ pub fn init_idt() {
         idt_entry::edit_entry(29, (handle_err_exception29 as *const u64) as u64, GateType::Trap);
         idt_entry::edit_entry(30, (handle_err_exception30 as *const u64) as u64, GateType::Trap);
         idt_entry::edit_entry(31, (handle_no_err_exception31 as *const u64) as u64, GateType::Trap);
+
+        // idt_entry::edit_entry(32, (handle_interrupt0 as *const u64) as u64, GateType::Interrupt);
+        idt_entry::edit_entry(33, (handle_interrupt1 as *const u64) as u64, GateType::Interrupt);
     
         idt_flush();
     }
@@ -134,6 +135,18 @@ pub extern fn exception_handler(registers: Registers) {
     }
 
     print!("{:?}\n", aligned_registers);
+}
+
+#[no_mangle]
+pub extern fn interrupt_handler(registers: Registers) {
+    let unaligned_registers = core::ptr::addr_of!(registers);
+    let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
+
+    print!("Interrupt!\n");
+    print!("{:?}\n", aligned_registers);
+    // TODO: Depending on interrupt call function eg keyboard, timer, etc
+    // TODO: Call PIC acknowledge
+    unsafe { asm!("cli; hlt"); }
 }
 
 extern "C" {
@@ -169,5 +182,7 @@ extern "C" {
     fn handle_err_exception29(registers: Registers);
     fn handle_err_exception30(registers: Registers);
     fn handle_no_err_exception31(registers: Registers);
+    fn handle_interrupt0(registers: Registers); // Timer
+    fn handle_interrupt1(registers: Registers); // Keyboard
     fn idt_flush();
 }
