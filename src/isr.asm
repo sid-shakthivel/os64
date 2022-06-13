@@ -30,6 +30,7 @@ handle_err_exception%1:
 %macro handle_interrupt 1
 global handle_interrupt%1
 handle_interrupt%1:
+    push qword 0
     push qword %1
     pushaq
     cld

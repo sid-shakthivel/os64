@@ -4,21 +4,19 @@
 
 use core::arch::asm;
 
-// pub fn outb(port: u16, value:  u8) {
-//     unsafe {
-//         // asm!("outb %al, %dx" :: "{dx}"(port), "{al}"(val));
-//         asm! ("outb {1}, {2}", )
-//     }
-// }
+pub fn outb(port: u16, value: u8) {
+    unsafe { outb_raw(port, value); }
+}
 
-// pub fn inb(port: u16) -> u8 {
-//     let result: u8;
-//     // llvm_asm!("inb %dx, %al" : "={al}"(result) : "{dx}"(port) :: "volatile");
-//     result
-// }
+pub fn inb(port: u16) -> u8 {
+    unsafe { inb_raw(port) }
+}
 
 pub fn io_wait() {
-    unsafe {
-        asm!("out 0x80, eax", in("eax") 0x00);
-    }
+    outb(0x80, 0);
+}
+
+extern "C" {
+    fn outb_raw(port: u16, value: u8);
+    fn inb_raw(port: u16) -> u8;
 }

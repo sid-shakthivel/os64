@@ -30,10 +30,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     // let mut address = PAGE_FRAME_ALLOCATOR.alloc_frame().unwrap() as u64;
     // paging::map_page(address, 0x0000000000010000, &mut PAGE_FRAME_ALLOCATOR);
 
-    // pic::init_pic();
-    unsafe {
-        test_pic();
-    }
+    pic::init_pic();
     interrupts::init_idt();
 
     // Triggering test interrupts
@@ -47,8 +44,4 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 fn panic(info: &PanicInfo) -> ! {
     print!("{}", info);
     loop {}
-}
-
-extern "C" {
-    fn test_pic();
 }

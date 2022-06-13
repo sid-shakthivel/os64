@@ -11,6 +11,8 @@ use crate::print;
 use crate::vga_text::TERMINAL;
 use core::mem::size_of;
 use core::arch::asm;
+use crate::pic;
+use crate::ports::inb;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -146,7 +148,11 @@ pub extern fn interrupt_handler(registers: Registers) {
     print!("{:?}\n", aligned_registers);
     // TODO: Depending on interrupt call function eg keyboard, timer, etc
     // TODO: Call PIC acknowledge
-    unsafe { asm!("cli; hlt"); }
+
+    // Keyboard interrupt doesn't trigger until read
+    let test = inb(0x60) as char;
+    print!("{}", test);
+    pic::acknowledge_pic(33);
 }
 
 extern "C" {
