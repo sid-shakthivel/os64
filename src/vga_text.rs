@@ -97,7 +97,7 @@ impl Terminal {
         self.clear_row(VGA_HEIGHT - 1);
     }
 
-    fn new_line(&mut self) {
+    pub fn new_line(&mut self) {
         self.terminal_row += 1;
         self.terminal_col = 0;
         if self.terminal_row >= VGA_HEIGHT { self.scroll(); } 
@@ -116,6 +116,17 @@ impl Terminal {
     fn clear_row(&mut self, row_num: usize) {
         for j in 0..VGA_WIDTH {
             self.vga_buffer[row_num][j] = 0;
+        }
+    }
+
+    pub fn backspace(&mut self) {
+        if self.terminal_col == 0 {
+            self.terminal_col = 79;
+            self.terminal_row -= 1;
+            self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(VgaColours::get_attributes((VgaColours::Black, VgaColours::White)), ' ' as u8);
+        } else {
+            self.terminal_col -= 1;
+            self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(VgaColours::get_attributes((VgaColours::Black, VgaColours::White)), ' ' as u8);
         }
     }
 }

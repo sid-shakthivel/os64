@@ -1,3 +1,5 @@
+; /src/long_mode_init.asm
+
 global long_mode_start
 
 section .text

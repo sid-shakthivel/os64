@@ -1,3 +1,5 @@
+; src/boot.asm
+
 extern long_mode_start
 global start
 

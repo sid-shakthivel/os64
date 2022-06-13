@@ -4,6 +4,7 @@
     Programmable interrupt controller manages hardware signals and converts them to software interrupts
     There are 2 PIC's of 8 inputs called master and slave (15 interrupts)
     PIC is initially mapped to the first interrupts however these are used for interrupts thus need to be remapped to 32-47
+    TODO: get ascii table here
 */
 
 use crate::ports::outb;
@@ -34,10 +35,10 @@ pub struct ChainedPics {
     slave: Pic
 }
 
-trait pic_functions {
-    fn set_mask(&mut self, interrupt: u8);
-    fn clean_mask(&mut self, interrupt: u8);
-    fn acknowledge(&mut self, interrupt: u8);
+pub trait pic_functions {
+    fn set_mask(&self, interrupt: u8);
+    fn clean_mask(&self, interrupt: u8);
+    fn acknowledge(&self, interrupt: u8);
 }
 
 impl ChainedPics {
@@ -56,7 +57,7 @@ impl ChainedPics {
         };
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&self) {
         // Start initialization
         outb(self.master.command, 0x11);
         outb(self.slave.command, 0x11);
@@ -77,7 +78,7 @@ impl ChainedPics {
 }
 
 impl pic_functions for ChainedPics {
-    fn set_mask(&mut self, interrupt: u8) {
+    fn set_mask(&self, interrupt: u8) {
         if interrupt < PIC2_START_INTERRUPT {
             self.master.set_mask(interrupt);
         } else {
@@ -85,7 +86,7 @@ impl pic_functions for ChainedPics {
         }
     }
 
-    fn clean_mask(&mut self, interrupt: u8) {
+    fn clean_mask(&self, interrupt: u8) {
         if interrupt < PIC2_START_INTERRUPT {
             self.master.clean_mask(interrupt);
         } else {
@@ -93,7 +94,7 @@ impl pic_functions for ChainedPics {
         }
     }
 
-    fn acknowledge(&mut self, interrupt: u8) {
+    fn acknowledge(&self, interrupt: u8) {
     if interrupt < PIC2_START_INTERRUPT {
             self.master.acknowledge(interrupt);
         } else {
@@ -104,21 +105,21 @@ impl pic_functions for ChainedPics {
 
 impl pic_functions for Pic {
     // Disable interrupt
-    fn set_mask(&mut self, interrupt: u8) {
+    fn set_mask(&self, interrupt: u8) {
         let value = inb(self.data) | (1 << interrupt);
         outb(self.data, value);
     }
 
     // Enable interrupt
-    fn clean_mask(&mut self, interrupt: u8) {
+    fn clean_mask(&self, interrupt: u8) {
         let value = inb(self.data) & !(1 << interrupt);
         outb(self.data, value);
     }
 
     // Every interrupt from PIC must be acknowledged to confirm interrupt has been handled
-    fn acknowledge(&mut self, interrupt: u8) {
+    fn acknowledge(&self, interrupt: u8) {
         outb(self.command, PIC_ACK);
     }
 }
 
-pub static PICS: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(PIC1_START_INTERRUPT, PIC2_START_INTERRUPT) });
+pub static PICS: Mutex<ChainedPics> = Mutex::new(ChainedPics::new(PIC1_START_INTERRUPT, PIC2_START_INTERRUPT));

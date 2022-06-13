@@ -13,6 +13,9 @@ use core::mem::size_of;
 use core::arch::asm;
 use crate::pic;
 use crate::ports::inb;
+use crate::pic::PICS;
+use crate::pic::pic_functions;
+use crate::keyboard::KEYBOARD;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -148,20 +151,16 @@ pub extern fn exception_handler(registers: Registers) {
 
 #[no_mangle]
 pub extern fn interrupt_handler(registers: Registers) {
-    print!("Interrupt!\n");
     let unaligned_register_num = core::ptr::addr_of!(registers.num);
     let aligned_register_num = unsafe { core::ptr::read_unaligned(unaligned_register_num) };
 
     match aligned_register_num {
         0x20 => {} // Timer
-        0x21 => {
-            // Keyboard interrupt doesn't trigger until read
-            let test = inb(0x60) as char;
-        } // Keyboard
+        0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
+        _ => {}
     }
-    // TODO: Call PIC acknowledge
 
-    pic::acknowledge_pic(aligned_register_num as u8);
+    PICS.lock().acknowledge(aligned_register_num as u8);
 }
 
 extern "C" {

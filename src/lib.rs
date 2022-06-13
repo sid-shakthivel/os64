@@ -8,6 +8,7 @@ mod paging;
 mod interrupts;
 mod ports;
 mod pic;
+mod keyboard;
 
 extern crate multiboot2;
 extern crate x86_64;
