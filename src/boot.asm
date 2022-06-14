@@ -11,7 +11,7 @@ start:
 
     call setup_paging
 
-    ; Recursive Paging
+    ; Recursive paging in which the last entry points to the first
 
     mov eax, p4_table
     or eax, 0b11 ; Present, Writeable
@@ -21,6 +21,8 @@ start:
 
     lgdt [gdt64.pointer] ; Load the new GDT
     jmp gdt64.code:long_mode_start
+
+    hlt
 
 setup_paging:
     ; Point P4 to P3 to P2

@@ -96,9 +96,3 @@ handle_no_err_exception 31
 handle_interrupt 32
 handle_interrupt 33
 
-global idt_flush    
-
-idt_flush:
-    extern IDTR
-    lidt [IDTR]
-    ret

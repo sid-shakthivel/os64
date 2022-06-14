@@ -81,7 +81,7 @@ impl idt_entry {
     }
 }
 
-pub fn init_idt() {
+pub fn init() {
     unsafe {
         let idt_address = (&IDT[0] as *const idt_entry) as u64;
         IDTR.limit = (size_of::<idt_entry>() as u16) * (IDT_MAX_DESCRIPTIONS as u16 - 1);

@@ -1,10 +1,12 @@
 make --dry-run --always-make --keep-going --print-directory
 make: Entering directory `/Users/siddharth/Code/rust/os64'
 nasm -f elf64  src/boot.asm -o object_files/src/boot.o
+ 
+nasm -f elf64  src/cpu.asm -o object_files/src/cpu.o
 nasm -f elf64  src/isr.asm -o object_files/src/isr.o
 nasm -f elf64  src/long_mode_init.asm -o object_files/src/long_mode_init.o
 nasm -f elf64  src/multiboot_header.asm -o object_files/src/multiboot_header.o
-ld -n --gc-sections -o kernel.bin -T src/linker.ld  object_files/src/boot.o  object_files/src/isr.o  object_files/src/long_mode_init.o  object_files/src/multiboot_header.o target/x86_64-unknown-none/debug/libos64.a
+ld -n --gc-sections -o kernel.bin -T src/linker.ld  object_files/src/boot.o  object_files/src/cpu.o  object_files/src/isr.o  object_files/src/long_mode_init.o  object_files/src/multiboot_header.o target/x86_64-unknown-none/debug/libos64.a
 rm isodir/boot/kernel.bin
 cp kernel.bin isodir/boot
 grub-mkrescue /usr/lib/grub/i386-pc -o os64.iso isodir

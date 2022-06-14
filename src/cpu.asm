@@ -12,3 +12,29 @@ outb_raw:
   mov al, sil ; Value, second parameter
   out dx, al
   ret
+
+; Load IDT
+global idt_flush    
+idt_flush:
+  cli ; Disable interrupts
+  extern IDTR
+  lidt [IDTR]
+  ret
+
+; %macro reload_segments 0
+; reload_segments:
+;   mov ax, 0x10
+;   mov ss, ax
+;   mov ds, ax
+;   mov es, ax
+;   mov fs, ax
+;   mov gs, ax 
+; %endmacro
+
+
+global gdt_flush
+gdt_flush:
+  xchg bx, bx
+  extern GDTR
+  lgdt  [GDTR]
+  ret

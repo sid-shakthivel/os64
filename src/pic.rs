@@ -4,7 +4,18 @@
     Programmable interrupt controller manages hardware signals and converts them to software interrupts
     There are 2 PIC's of 8 inputs called master and slave (15 interrupts)
     PIC is initially mapped to the first interrupts however these are used for interrupts thus need to be remapped to 32-47
-    TODO: get ascii table here
+    +------+-------------+------+-----------------+
+    | PIC1 |  Hardware   | PIC2 |    Hardware     |
+    +------+-------------+------+-----------------+
+    |    0 | Timer       |    8 | Real Time Clock |
+    |    1 | Keyboard    |    9 | General I/O     |
+    |    2 | PIC 2       |   10 | General I/O     |
+    |    3 | COM 2       |   11 | General I/O     |
+    |    4 | COM 1       |   12 | General I/O     |
+    |    5 | LPT 2       |   13 | Coprocessor     |
+    |    6 | Floppy Disk |   14 | IDE Bus         |
+    |    7 | LPT 1       |   15 | IDE Bus         |
+    +------+-------------+------+-----------------+
 */
 
 use crate::ports::outb;
