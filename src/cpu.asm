@@ -21,20 +21,21 @@ idt_flush:
   lidt [IDTR]
   ret
 
-; %macro reload_segments 0
-; reload_segments:
-;   mov ax, 0x10
-;   mov ss, ax
-;   mov ds, ax
-;   mov es, ax
-;   mov fs, ax
-;   mov gs, ax 
-; %endmacro
+global reload_segments
+%macro reload_segments 0
+reload_segments:
+  mov ax, 0x00
+  mov ss, ax
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov gs, ax 
+%endmacro
 
 
 global gdt_flush
 gdt_flush:
-  xchg bx, bx
   extern GDTR
   lgdt  [GDTR]
+  reload_segments
   ret

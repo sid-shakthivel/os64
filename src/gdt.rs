@@ -29,7 +29,7 @@ use crate::vga_text::TERMINAL;
     +-------------+------+-----------+----------+
 */
 
-const GDT_MAX_DESCRIPTORS: usize = 3;
+const GDT_MAX_DESCRIPTORS: usize = 5;
 
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
@@ -62,49 +62,23 @@ impl gdt_entry {
 
 #[no_mangle]
 pub static mut GDTR: gdtr = gdtr { offset: 0, size: 0 };
-pub static mut GDT: [u64; GDT_MAX_DESCRIPTORS] = [0; GDT_MAX_DESCRIPTORS];
-
-fn get_descriptor(is_code: bool, is_present: bool, is_64: bool) -> u64 {
-    let mut descriptor = 0;
-    if is_code == true {
-        descriptor |= (1<<43);
-        descriptor |= (1<<44);
-    }
-
-    if is_present == true {
-        descriptor |= (1<<47);
-    }
-
-    if is_64 == true {
-        descriptor |= (1<<53);
-    }
-
-    return descriptor;
-}
+pub static mut GDT: [gdt_entry; GDT_MAX_DESCRIPTORS] = [gdt_entry { limit_low: 0, base_low: 0, base_middle: 0, access_byte: 0, attributes: 0, base_high: 0 }; GDT_MAX_DESCRIPTORS];
 
 pub fn init() {
     unsafe {
         asm!("cli"); // Disable interrupts
 
         // TODO: Make sure these are accurate
-        // GDT[0].edit(0, 0, 0, 0);
-        // GDT[1].edit(0, 0xFFFFF, 0b10011010, 0xA); // Kernel Code Segment
-        // GDT[2].edit(0, 0xFFFFF, 0b10010010, 0b0010); // Kernel Data Segment
-        // GDT[3].edit(0, 0xFFFFF, 0b11111010, 0b0010); // User Code Segment
-        // GDT[5].edit(0, 0xFFFFF, 0b11110010, 0b0010); // User Data Segment
-
-        GDT[1] = get_descriptor(true, true, true);
-        GDT[2] = get_descriptor(false, true, true);
-
-        print!("{:x}", GDT[1]);
-        print!("{:x}", GDT[2]);
+        GDT[0].edit(0, 0, 0, 0);
+        GDT[1].edit(0, 0xFFFFF, 0b10011010, 0xA); // Kernel Code Segment
+        GDT[2].edit(0, 0xFFFFF, 0b10010010, 0xC); // Kernel Data Segment
+        GDT[3].edit(0, 0xFFFFF, 0b11111010, 0xA); // User Code Segment
+        GDT[4].edit(0, 0xFFFFF, 0b11110010, 0xC); // User Data Segment
 
         // Set gdtr
-        let gdt_address = (&GDT[0] as *const u64) as u64;
-        GDTR.size = (size_of::<u64>() as u16) * (GDT_MAX_DESCRIPTORS as u16) - 1;
+        let gdt_address = (&GDT[0] as *const gdt_entry) as u64;
+        GDTR.size = (size_of::<gdt_entry>() as u16) * (GDT_MAX_DESCRIPTORS as u16) - 1;
         GDTR.offset = gdt_address;
-
-
 
         gdt_flush();
     } 

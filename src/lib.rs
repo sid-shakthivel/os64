@@ -33,14 +33,14 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     // let mut address = PAGE_FRAME_ALLOCATOR.alloc_frame().unwrap() as u64;
     // paging::map_page(address, 0x0000000000010000, &mut PAGE_FRAME_ALLOCATOR);
 
-    print!("Finished execution\n");
-
     gdt::init();
     // PICS.lock().init();
     // interrupts::init();
 
     // Triggering test interrupts
     // unsafe { asm!("sti"); }
+
+    print!("Finished execution\n");
     loop {}
 }
 
