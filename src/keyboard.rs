@@ -1,8 +1,8 @@
 // src/keyboard.rs
 
 /*
-    PS/2 Keyboard
-    TODO: include more information
+    PS/2 Keyboard which uses serial communication
+    Accept commands and sends scancodes which comply to a scancode set
 */
 
 use crate::ports::inb;

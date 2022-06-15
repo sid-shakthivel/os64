@@ -4,13 +4,13 @@
     Global descriptor table which contains entries about memory segments
     It's pointed to by value in GDTR register
     Entries are 8 bytes
-    TODO: Include details on how GDT entries are formatted
 */
 
 use core::arch::asm;
 use core::mem::size_of;
 use crate::print;
 use crate::vga_text::TERMINAL;
+use crate::interrupts;
 
 /*
     Base: 32 bit address of where segment begins
@@ -66,9 +66,8 @@ pub static mut GDT: [gdt_entry; GDT_MAX_DESCRIPTORS] = [gdt_entry { limit_low: 0
 
 pub fn init() {
     unsafe {
-        asm!("cli"); // Disable interrupts
+        interrupts::disable();
 
-        // TODO: Make sure these are accurate
         GDT[0].edit(0, 0, 0, 0);
         GDT[1].edit(0, 0xFFFFF, 0b10011010, 0xA); // Kernel Code Segment
         GDT[2].edit(0, 0xFFFFF, 0b10010010, 0xC); // Kernel Data Segment

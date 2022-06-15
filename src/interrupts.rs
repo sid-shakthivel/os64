@@ -163,6 +163,14 @@ pub extern fn interrupt_handler(registers: Registers) {
     PICS.lock().acknowledge(aligned_register_num as u8);
 }
 
+pub extern fn enable() {
+    unsafe { asm!("sti"); }
+}
+
+pub extern fn disable() {
+    unsafe { asm!("cli"); }
+}
+
 extern "C" {
     // All assembly functions
     // TODO: Find way to reduce code here
