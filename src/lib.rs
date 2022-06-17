@@ -9,6 +9,7 @@ mod interrupts;
 mod ports;
 mod pic;
 mod keyboard;
+mod pit;
 mod gdt;
 
 extern crate multiboot2;
@@ -19,6 +20,7 @@ use crate::vga_text::TERMINAL;
 use page_frame_allocator::PageFrameAllocator;
 use crate::page_frame_allocator::FrameAllocator;
 use crate::pic::PICS;
+use crate::pit::PIT;
 use core::arch::asm;
 
 #[no_mangle]
@@ -33,12 +35,14 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     // let mut address = PAGE_FRAME_ALLOCATOR.alloc_frame().unwrap() as u64;
     // paging::map_page(address, 0x0000000000010000, &mut PAGE_FRAME_ALLOCATOR);
 
-    gdt::init();
+    // gdt::init();
+    PIT.lock().init();
     PICS.lock().init();
     interrupts::init();
-    interrupts::enable();
 
+    interrupts::enable();
     print!("Finished execution\n");
+
     loop {}
 }
 

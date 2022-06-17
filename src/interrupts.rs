@@ -16,6 +16,7 @@ use crate::ports::inb;
 use crate::pic::PICS;
 use crate::pic::pic_functions;
 use crate::keyboard::KEYBOARD;
+use crate::pit::PIT;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -122,9 +123,9 @@ pub fn init() {
         idt_entry::edit_entry(31, (handle_no_err_exception31 as *const u64) as u64, GateType::Trap);
 
         // Interrupts
-        idt_entry::edit_entry(32, (handle_interrupt32 as *const u64) as u64, GateType::Interrupt);
         idt_entry::edit_entry(33, (handle_interrupt33 as *const u64) as u64, GateType::Interrupt);
-    
+        idt_entry::edit_entry(32, (handle_interrupt32 as *const u64) as u64, GateType::Interrupt);
+
         // Load idt
         idt_flush();
     }
@@ -136,6 +137,9 @@ pub extern fn exception_handler(registers: Registers) {
     let unaligned_registers = core::ptr::addr_of!(registers);
     let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
 
+    // Print registers
+    print!("{:?}\n", aligned_registers);
+    
     // Print a suitable error message
     if aligned_registers.num < 22 {
         print!("{}\n", EXCEPTION_MESSAGES[aligned_registers.num as usize]);
@@ -145,8 +149,7 @@ pub extern fn exception_handler(registers: Registers) {
         print!("Reserved\n");
     }
 
-    // Print registers
-    print!("{:?}\n", aligned_registers);
+    unsafe { asm!("hlt"); }
 }
 
 #[no_mangle]
@@ -155,7 +158,7 @@ pub extern fn interrupt_handler(registers: Registers) {
     let aligned_register_num = unsafe { core::ptr::read_unaligned(unaligned_register_num) };
 
     match aligned_register_num {
-        0x20 => {} // Timer
+        0x20 => PIT.lock().handle_timer(), // Timer
         0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
         _ => {}
     }

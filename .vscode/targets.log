@@ -10,7 +10,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 make: *** No rule to make target `all'.  Stop.
 
 
-# Make data base, printed on Wed Jun 15 12:40:14 2022
+# Make data base, printed on Fri Jun 17 12:44:37 2022
 
 # Variables
 
@@ -35,6 +35,7 @@ CURDIR := /Users/siddharth/Code/rust/os64
 # makefile
 SHELL = /bin/sh
 # environment
+ 
 VSCODE_NLS_CONFIG = {"locale":"en-gb","availableLanguages":{},"_languagePackSupport":true}
 # environment
 _ = /usr/bin/make
@@ -43,12 +44,11 @@ MAKEFILE_LIST :=  Makefile
 # environment
 VSCODE_VERBOSE_LOGGING = true
 # environment
- 
 __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-e1d89e58-92b4-4e39-a108-c382e75d775e.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-1d260deb-0e7f-4734-b72f-1c2e1ede6b55.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -58,15 +58,13 @@ LSCOLORS = Gxfxcxdxbxegedabagacad
 # environment
 GOPATH = /Users/siddharth/Code/go
 # environment
-LaunchInstanceID = 4BBA1126-0D2B-4DFA-B3B7-1E77A2E35AB3
-# environment
 VSCODE_LOG_STACK = false
 # environment
 ELECTRON_RUN_AS_NODE = 1
 # default
 .FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
 # environment
-SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.0watOblCrF/Listeners
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.F1Q1YLQ6MV/Listeners
 # automatic
 %F = $(notdir $%)
 # environment
@@ -82,7 +80,7 @@ HOME = /Users/siddharth
 # default
 MAKEFILEPATH := /Applications/Xcode.app/Contents/Developer/Makefiles
 # environment
-VSCODE_CODE_CACHE_PATH = /Users/siddharth/Library/Application Support/Code/CachedData/4af164ea3a06f701fe3e89a2bcbb421d2026b68f
+VSCODE_CODE_CACHE_PATH = /Users/siddharth/Library/Application Support/Code/CachedData/30d9c6cd9483b2cc586687151bcbcd635f373630
 # environment
 LOGNAME = siddharth
 # environment
@@ -126,7 +124,7 @@ TMPDIR = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/
 # automatic
 *F = $(notdir $*)
 # environment
-VSCODE_IPC_HOOK = /Users/siddharth/Library/Application Support/Code/1.68.0-main.sock
+VSCODE_IPC_HOOK = /Users/siddharth/Library/Application Support/Code/1.68.1-main.sock
 # makefile
 MAKEFLAGS = Rrqp
 # environment
@@ -155,8 +153,6 @@ MAKEFILES :=
 PAGER = less
 # environment
 LC_ALL = C
-# environment
-SECURITYSESSIONID = 186a4
 # automatic
 ^F = $(notdir $^)
 # default
@@ -166,21 +162,21 @@ SUFFIXES :=
 # environment
 MAKELEVEL := 0
 # makefile (from `Makefile', line 12)
-ASSEMBLY_SOURCES := src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm src/long_mode_init.asm src/multiboot_header.asm 
+ASSEMBLY_SOURCES := src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.asm src/multiboot_header.asm 
 # environment
 LANG = C
 # environment
 TERM = xterm-256color
 # environment
-VSCODE_PID = 2558
+VSCODE_PID = 2396
 # makefile (from `Makefile', line 10)
+ 
 LINKER_FILE := src/linker.ld
 # makefile (from `Makefile', line 13)
-ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/cpu.o  object_files/src/isr.o  object_files/src/load_gdt.o  object_files/src/long_mode_init.o  object_files/src/multiboot_header.o
+ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/cpu.o  object_files/src/isr.o  object_files/src/long_mode_init.o  object_files/src/multiboot_header.o
 # variable set hash-table stats:
-# Load=81/1024=8%, Rehash=0, Collisions=6/111=5%
+# Load=79/1024=8%, Rehash=0, Collisions=6/109=6%
 
- 
 # Pattern-specific Variable Values
 
 # No pattern-specific variable values.
@@ -197,13 +193,13 @@ ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/cpu.o  object_fil
 # Cargo.toml (device 16777220, inode 65398395): could not be opened.
 # README.md (device 16777220, inode 65538259): could not be opened.
 # x86_64-unknown-none.json (device 16777220, inode 65398582): could not be opened.
-# src (device 16777220, inode 65398396): 18 files, no impossibilities.
+# src (device 16777220, inode 65398396): 17 files, no impossibilities.
 # Dockerfile (device 16777220, inode 65267988): could not be opened.
-# kernel.bin (device 16777220, inode 69205391): could not be opened.
+# kernel.bin (device 16777220, inode 69411744): could not be opened.
 # bochsrc.txt (device 16777220, inode 67625097): could not be opened.
 # Cargo.lock (device 16777220, inode 65398690): could not be opened.
 
-# 52 files, no impossibilities in 15 directories.
+# 51 files, no impossibilities in 15 directories.
 
 # Implicit Rules
 
@@ -219,12 +215,6 @@ src/long_mode_init.asm:
 
 # Not a target:
 src/isr.asm:
-#  Implicit rule search has not been done.
-#  Modification time never checked.
-#  File has not been updated.
-
-# Not a target:
-src/load_gdt.asm:
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -259,13 +249,13 @@ src/cpu.asm:
 # Not a target:
 Makefile:
 #  Implicit rule search has been done.
-#  Last modified 2022-06-12 16:36:03
+#  Last modified 2022-06-16 22:30:48
 #  File has been updated.
 #  Successfully updated.
 # variable set hash-table stats:
 # Load=0/32=0%, Rehash=0, Collisions=0/0=0%
 
-kernel.bin: object_files/src/boot.o object_files/src/cpu.o object_files/src/isr.o object_files/src/load_gdt.o object_files/src/long_mode_init.o object_files/src/multiboot_header.o
+kernel.bin: object_files/src/boot.o object_files/src/cpu.o object_files/src/isr.o object_files/src/long_mode_init.o object_files/src/multiboot_header.o
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -273,7 +263,7 @@ kernel.bin: object_files/src/boot.o object_files/src/cpu.o object_files/src/isr.
 	ld -n --gc-sections -o kernel.bin -T ${LINKER_FILE} ${ASSEMBLY_OBJECTS} $(RUST_LIBRARY)
 	
 
-object_files/src/multiboot_header.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm src/long_mode_init.asm src/multiboot_header.asm
+object_files/src/multiboot_header.o: src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.asm src/multiboot_header.asm
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -309,11 +299,12 @@ clean:
 	rm os64.iso
 	
 
-object_files/src/long_mode_init.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm src/long_mode_init.asm src/multiboot_header.asm
+object_files/src/long_mode_init.o: src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.asm src/multiboot_header.asm
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
 #  commands to execute (from `Makefile', line 24):
+ 
 	$(ASSEMBLER) $(ASSEMBLER_FLAGS) $(patsubst $(OBJ)/%.o, %.asm, $@) -o $@
 	
 
@@ -323,15 +314,7 @@ src/multiboot_header.asm:
 #  Modification time never checked.
 #  File has not been updated.
 
-object_files/src/isr.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm src/long_mode_init.asm src/multiboot_header.asm
-#  Implicit rule search has not been done.
-#  Modification time never checked.
-#  File has not been updated.
-#  commands to execute (from `Makefile', line 24):
-	$(ASSEMBLER) $(ASSEMBLER_FLAGS) $(patsubst $(OBJ)/%.o, %.asm, $@) -o $@
-	
-
-object_files/src/load_gdt.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm src/long_mode_init.asm src/multiboot_header.asm
+object_files/src/isr.o: src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.asm src/multiboot_header.asm
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -349,16 +332,15 @@ os64.iso: kernel.bin
 	grub-mkrescue /usr/lib/grub/i386-pc -o os64.iso isodir
 	
 
-object_files/src/boot.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm src/long_mode_init.asm src/multiboot_header.asm
+object_files/src/boot.o: src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.asm src/multiboot_header.asm
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
 #  commands to execute (from `Makefile', line 24):
 	$(ASSEMBLER) $(ASSEMBLER_FLAGS) $(patsubst $(OBJ)/%.o, %.asm, $@) -o $@
- 
 	
 
-object_files/src/cpu.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm src/long_mode_init.asm src/multiboot_header.asm
+object_files/src/cpu.o: src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.asm src/multiboot_header.asm
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -367,7 +349,7 @@ object_files/src/cpu.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm sr
 	
 
 # files hash-table stats:
-# Load=20/1024=2%, Rehash=0, Collisions=1/75=1%
+# Load=18/1024=2%, Rehash=0, Collisions=1/61=2%
 # VPATH Search Paths
 
 # No `vpath' search paths.
@@ -379,6 +361,6 @@ object_files/src/cpu.o: src/boot.asm src/cpu.asm src/isr.asm src/load_gdt.asm sr
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Wed Jun 15 12:40:14 2022
+# Finished Make data base on Fri Jun 17 12:44:37 2022
 
  

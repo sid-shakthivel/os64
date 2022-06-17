@@ -82,8 +82,10 @@ impl ChainedPics {
         // ECW4 Enable 8086 Mode
         outb(self.master.data, 1); 
         outb(self.slave.data, 1);        
-
-        outb(self.master.data, 0xfd); // Only enable keyboard interrupt
+ 
+        // fc keyboard + timer
+        // fd keyboard only
+        outb(self.master.data, 0xfc); // Only enable keyboard and timer
         outb(self.slave.data, 0xff); // Disable Slave completely
     }
 }
