@@ -11,11 +11,13 @@ use crate::ports::inb;
 use crate::print;
 use crate::vga_text::TERMINAL;
 use spin::Mutex;
+use crate::multitask::Process;
+use crate::multitask;
 
 pub struct pit {
     divisor: u64,
     frequency: u64,
-    ticks: u64
+    ticks: u64,
 }
 
 const INPUT_CLOCK: u64 = 1193180;
@@ -28,25 +30,29 @@ impl pit {
         pit {
             ticks: 0,
             frequency: frequency,
-            divisor: INPUT_CLOCK / frequency
+            divisor: INPUT_CLOCK / frequency,
         }
     }
 
     pub fn init(&self) {
         // Set command byte
         outb(0x43, 0x36);
-
-        // To set a frequency, a divisor is sent in bits
-        outb(0x40, (self.divisor & 0xFF) as u8);
-        outb(0x40, (self.divisor >> 8) as u8);
+        self.set_frequency();
     }
 
     pub fn handle_timer(&mut self) {
         self.ticks += 1;
 
         if self.ticks % self.frequency == 0 {
-            // Multitasking code here
-            print!("1 Second Passed\n");
+            print!("Here\n");
+            multitask::schedule_process();
         }
     }
+
+    fn set_frequency(&self) {
+        // To set a frequency, a divisor is sent in bits
+        outb(0x40, (self.divisor & 0xFF) as u8);
+        outb(0x40, (self.divisor >> 8) as u8);
+    }
 }
+

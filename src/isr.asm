@@ -60,6 +60,17 @@ pop rbx
 pop rax
 %endmacro
 
+%macro handle_timer 0
+global handle_timer
+handle_timer:
+    pushaq
+    cld
+    call interrupt_handler
+    popaq
+    add rsp, 0x10 
+    iretq
+%endmacro
+
 handle_no_err_exception 0
 handle_no_err_exception 1
 handle_no_err_exception 2
@@ -95,4 +106,6 @@ handle_no_err_exception 31
 
 handle_interrupt 32
 handle_interrupt 33
+
+
 

@@ -137,6 +137,9 @@ pub extern fn exception_handler(registers: Registers) {
     let unaligned_registers = core::ptr::addr_of!(registers);
     let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
 
+    let ting = core::ptr::addr_of!(registers.num);
+    let bing = unsafe { core::ptr::read_unaligned(ting) };
+
     // Print registers
     print!("{:?}\n", aligned_registers);
     
@@ -148,8 +151,6 @@ pub extern fn exception_handler(registers: Registers) {
     } else {
         print!("Reserved\n");
     }
-
-    unsafe { asm!("hlt"); }
 }
 
 #[no_mangle]
@@ -157,13 +158,15 @@ pub extern fn interrupt_handler(registers: Registers) {
     let unaligned_register_num = core::ptr::addr_of!(registers.num);
     let aligned_register_num = unsafe { core::ptr::read_unaligned(unaligned_register_num) };
 
+    PICS.lock().acknowledge(aligned_register_num as u8);
+
     match aligned_register_num {
-        0x20 => PIT.lock().handle_timer(), // Timer
+        0x20 => {
+            PIT.lock().handle_timer()
+        }, // Timer
         0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
         _ => {}
     }
-
-    PICS.lock().acknowledge(aligned_register_num as u8);
 }
 
 pub extern fn enable() {

@@ -34,3 +34,8 @@ gdt_flush:
   mov gs, ax
   
   ret
+
+global find_ting
+find_ting:
+  xchg bx, bx 
+  ret

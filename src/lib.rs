@@ -11,6 +11,7 @@ mod pic;
 mod keyboard;
 mod pit;
 mod gdt;
+mod multitask;
 
 extern crate multiboot2;
 extern crate x86_64;
@@ -26,24 +27,48 @@ use core::arch::asm;
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     TERMINAL.lock().clear();        
-    // let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
-    // let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-    // let memory_end = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
+    let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
+    let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
+    let memory_end = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
 
-    // let mut PAGE_FRAME_ALLOCATOR = page_frame_allocator::PageFrameAllocator::new(boot_info.end_address() as u64, memory_end as u64);    
+    let mut PAGE_FRAME_ALLOCATOR = page_frame_allocator::PageFrameAllocator::new(boot_info.end_address() as u64, memory_end as u64);    
 
-    // let mut address = PAGE_FRAME_ALLOCATOR.alloc_frame().unwrap() as u64;
-    // paging::map_page(address, 0x0000000000010000, &mut PAGE_FRAME_ALLOCATOR);
-
-    // gdt::init();
-    PIT.lock().init();
+    // TODO: Fix GDT
+    // gdt::init(); 
+    unsafe { PIT.lock().init(); }
     PICS.lock().init();
     interrupts::init();
 
-    interrupts::enable();
     print!("Finished execution\n");
 
+    unsafe {
+        let address1 = process_a as *const ()as u64;
+        let process1 = multitask::Process::init(address1, &mut PAGE_FRAME_ALLOCATOR, multitask::ProcessType::Kernel);
+
+        let address2 = process_b as *const ()as u64;
+        let process2 = multitask::Process::init(address2, &mut PAGE_FRAME_ALLOCATOR, multitask::ProcessType::Kernel);   
+        
+        multitask::a_process = Some(process1);
+        multitask::b_process = Some(process2);
+    }
+
+    interrupts::enable();
+
     loop {}
+}
+
+// This is an example process func - will eventually be embellished
+pub fn process_a() {
+    print!("From task 1\n");
+    multitask::schedule_process();
+    loop{}
+}
+
+// This is an example process func - will eventually be embellished
+pub fn process_b() {
+    print!("From task 2\n");
+    multitask::schedule_process();
+    loop{}
 }
 
 #[panic_handler] // This function is called on panic.
@@ -51,4 +76,9 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 fn panic(info: &PanicInfo) -> ! {
     print!("{}", info);
     loop {}
+}
+
+extern "C" {
+    fn find_ting();
+    fn switch_process(rsp: *const u64);
 }
