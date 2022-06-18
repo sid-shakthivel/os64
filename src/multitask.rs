@@ -17,6 +17,11 @@ use core::mem::size_of;
 use crate::spinlock::Lock;
 use crate::page_frame_allocator::FrameAllocator;
 
+/*
+    Processes are running programs with an individual address space, stack and data
+    There are kernel processes (run in kernel mode) and user processes (run in user mode)
+    Processes will be selected based on what priority they are
+*/
 #[derive(Debug, Copy, Clone)]
 pub struct Process {
     pid: u64,
@@ -39,6 +44,9 @@ pub enum ProcessPriority {
 
 pub const MAX_PROCESS_NUM: usize = (PAGE_SIZE / size_of::<Process>());
 
+/*
+    Processes schedular holds all tasks and decides which will be serviced
+*/
 pub struct ProcessSchedular {
     tasks: [Option<Process>; MAX_PROCESS_NUM],
     is_from_kernel: bool,
@@ -56,16 +64,25 @@ impl ProcessSchedular {
         }
     }
 
-    pub fn schedule_process(&mut self, old_rsp: *const u64) -> *const u64 {
+    /*
+        Round robin in which there is a single queue so when timer interrupt is triggered the next process is scheduled
+        TODO: Switch to priority based round robin
+    */
+    pub fn schedule_process(&mut self, mut old_rsp: *const u64) -> *const u64 {
         if self.is_from_kernel == true {
+            // If this is the first process to be called, it stems from kernel and that stack need not be saved
             self.is_from_kernel = false;
         } else {
-            let updated_process = Process { rsp: old_rsp, ..self.tasks[self.current_process_index].unwrap() };
+            // Save the old RSP into the process
+            old_rsp = unsafe { old_rsp.offset(5) }; // Adjust RSP by 5 bytes as RSP is pushed onto the stack
+            // TODO: Find more efficient way
+            let updated_process = Process { rsp: old_rsp, ..self.tasks[self.current_process_index].unwrap() }; 
             self.tasks[self.current_process_index] = Some(updated_process);
             self.current_process_index += 1;
         }
-        let mut current_task = self.tasks[self.current_process_index];
 
+        // Select next process and ensure it's not None
+        let mut current_task = self.tasks[self.current_process_index];
         if current_task.is_none() {
             self.current_process_index = 0;
             current_task = self.tasks[self.current_process_index];
@@ -113,10 +130,6 @@ impl Process {
                 process_type: process_type,
             }
         }
-    }
-
-    pub fn update(&mut self, rsp: *const u64) {
-        self.rsp = rsp;
     }
 }
 

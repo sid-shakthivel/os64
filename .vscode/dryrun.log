@@ -1,6 +1,7 @@
 make --dry-run --always-make --keep-going --print-directory
 make: Entering directory `/Users/siddharth/Code/rust/os64'
 nasm -f elf64  src/boot.asm -o object_files/src/boot.o
+ 
 nasm -f elf64  src/cpu.asm -o object_files/src/cpu.o
 nasm -f elf64  src/isr.asm -o object_files/src/isr.o
 nasm -f elf64  src/long_mode_init.asm -o object_files/src/long_mode_init.o

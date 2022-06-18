@@ -6,8 +6,11 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
+ 
+make: *** No rule to make target `all'.  Stop.
 
-# Make data base, printed on Sat Jun 18 19:27:27 2022
+
+# Make data base, printed on Sat Jun 18 22:00:28 2022
 
 # Variables
 
@@ -44,7 +47,7 @@ __CFBundleIdentifier = com.microsoft.VSCode
 # environment
 P9K_SSH = 0
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-95730d85-5b31-4ab9-adfc-3c5806773b4c.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/lf/8q7dbpnj4b3dc1drk4h187300000gn/T/vscode-ipc-c83310ec-02e6-4144-b971-6ca4ca0b44f3.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -168,7 +171,7 @@ LANG = C
 # environment
 TERM = xterm-256color
 # environment
-VSCODE_PID = 42982
+VSCODE_PID = 53087
 # makefile (from `Makefile', line 10)
 LINKER_FILE := src/linker.ld
 # makefile (from `Makefile', line 13)
@@ -194,7 +197,7 @@ ASSEMBLY_OBJECTS :=  object_files/src/boot.o  object_files/src/cpu.o  object_fil
 # x86_64-unknown-none.json (device 16777221, inode 65398582): could not be opened.
 # src (device 16777221, inode 65398396): 20 files, no impossibilities.
 # Dockerfile (device 16777221, inode 65267988): could not be opened.
-# kernel.bin (device 16777221, inode 69587774): could not be opened.
+# kernel.bin (device 16777221, inode 69661915): could not be opened.
 # bochsrc.txt (device 16777221, inode 67625097): could not be opened.
 # Cargo.lock (device 16777221, inode 65398690): could not be opened.
 
@@ -263,9 +266,6 @@ kernel.bin: object_files/src/boot.o object_files/src/cpu.o object_files/src/isr.
 	
 
 object_files/src/multiboot_header.o: src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.asm src/multiboot_header.asm
- 
-make: *** No rule to make target `all'.  Stop.
-
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -275,6 +275,7 @@ make: *** No rule to make target `all'.  Stop.
 
 # Not a target:
 .DEFAULT:
+ 
 #  Implicit rule search has not been done.
 #  Modification time never checked.
 #  File has not been updated.
@@ -362,6 +363,6 @@ object_files/src/cpu.o: src/boot.asm src/cpu.asm src/isr.asm src/long_mode_init.
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4087 / max = 4087 / min = 4087 / avg = 4087
 
-# Finished Make data base on Sat Jun 18 19:27:28 2022
+# Finished Make data base on Sat Jun 18 22:00:28 2022
 
  
