@@ -1,3 +1,4 @@
+
 // src/page_frame_allocator.rs
 
 /*
@@ -100,9 +101,13 @@ impl FrameAllocator for PageFrameAllocator {
 }
 
 impl PageFrameAllocator {
-    pub fn new(mut memory_start: u64, memory_end: u64) -> PageFrameAllocator {
-        memory_start += 512;
-        let mut page_frame_allocator = PageFrameAllocator { memory_start: memory_start, memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };
+    pub fn new(multiboot_information_address: usize) -> PageFrameAllocator {
+        let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
+        let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
+        let memory_start = boot_info.end_address() + 512;
+        let memory_end = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
+
+        let mut page_frame_allocator = PageFrameAllocator { memory_start: memory_start as u64, memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };
         page_frame_allocator.setup_stack();
         return page_frame_allocator;
     }
@@ -112,3 +117,5 @@ impl PageFrameAllocator {
         self.free_frames.current = None;
     }
 }
+
+pub const PAGE_SIZE: usize = 4096;

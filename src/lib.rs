@@ -1,6 +1,7 @@
 // src/lib.rs
 
 #![no_std] // Don't link with Rust standard library
+#![feature(const_mut_refs)]
 
 mod vga_text;
 mod page_frame_allocator;
@@ -12,6 +13,7 @@ mod keyboard;
 mod pit;
 mod gdt;
 mod multitask;
+mod spinlock;
 
 extern crate multiboot2;
 extern crate x86_64;
@@ -24,34 +26,26 @@ use crate::pic::PICS;
 use crate::pit::PIT;
 use core::arch::asm;
 use crate::ports::outb;
+use crate::multitask::PROCESS_SCHEDULAR;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     TERMINAL.lock().clear();        
-    let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
-    let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-    let memory_end = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
-
-    let mut PAGE_FRAME_ALLOCATOR = page_frame_allocator::PageFrameAllocator::new(boot_info.end_address() as u64, memory_end as u64);    
+    let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
 
     // TODO: Fix GDT
     // gdt::init(); 
-    unsafe { PIT.lock().init(); }
+    PIT.lock().init();
     PICS.lock().init();
     interrupts::init();
 
     print!("Finished execution\n");
 
-    unsafe {
-        let address1 = process_a as *const ()as u64;
-        let process1 = multitask::Process::init(address1, &mut PAGE_FRAME_ALLOCATOR, multitask::ProcessType::Kernel);
+    PROCESS_SCHEDULAR.lock().create_process(multitask::ProcessType::Kernel, process_a, &mut page_frame_allocator);
+    PROCESS_SCHEDULAR.free();
 
-        let address2 = process_b as *const ()as u64;
-        let process2 = multitask::Process::init(address2, &mut PAGE_FRAME_ALLOCATOR, multitask::ProcessType::Kernel);   
-        
-        multitask::a_process = Some(process1);
-        multitask::b_process = Some(process2); 
-    }
+    PROCESS_SCHEDULAR.lock().create_process(multitask::ProcessType::Kernel, process_b, &mut page_frame_allocator);
+    PROCESS_SCHEDULAR.free();
 
     interrupts::enable();
 
@@ -73,7 +67,7 @@ pub fn process_b() {
 #[panic_handler] // This function is called on panic.
 #[no_mangle]
 fn panic(info: &PanicInfo) -> ! {
-    print!("{}", info);
+    print!("Error: {}", info);
     loop {}
 }
 

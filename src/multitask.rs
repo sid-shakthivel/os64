@@ -5,35 +5,83 @@
 */
 
 use spin::Mutex;
-use crate::page_frame_allocator::PageFrameAllocator;
-use crate::page_frame_allocator::FrameAllocator;
 use crate::print;
 use crate::vga_text::TERMINAL;
 use core::prelude::v1::Some;
 use crate::pic::PICS;
 use crate::pic::pic_functions;
 use crate::ports::outb;
-
+use crate::page_frame_allocator::PageFrameAllocator;
+use crate::page_frame_allocator::PAGE_SIZE;
+use core::mem::size_of;
+use crate::spinlock::Lock;
+use crate::page_frame_allocator::FrameAllocator;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Process {
     pid: u64,
     pub rsp: *const u64,
+    process_type: ProcessType,
+    process_priority: ProcessPriority,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum ProcessType {
     Kernel,
     User,
 }
 
-static mut COUNTER: u64 = 0;
-pub static mut a_process: Option<Process> = None;
-pub static mut b_process: Option<Process> = None;
-static mut is_a_process: bool = false;
-static mut is_first: bool = true;
+#[derive(Debug, Copy, Clone)]
+pub enum ProcessPriority {
+    High,
+    Low,
+}
+
+pub const MAX_PROCESS_NUM: usize = (PAGE_SIZE / size_of::<Process>());
+
+pub struct ProcessSchedular {
+    tasks: [Option<Process>; MAX_PROCESS_NUM],
+    is_from_kernel: bool,
+    process_count: usize,
+    current_process_index: usize,
+}
+
+impl ProcessSchedular {
+    pub const fn new() -> ProcessSchedular {
+        ProcessSchedular {
+            tasks: [None; MAX_PROCESS_NUM],
+            is_from_kernel: true,
+            process_count: 0,
+            current_process_index: 0
+        }
+    }
+
+    pub fn schedule_process(&mut self, old_rsp: *const u64) -> *const u64 {
+        if self.is_from_kernel == true {
+            self.is_from_kernel = false;
+        } else {
+            let updated_process = Process { rsp: old_rsp, ..self.tasks[self.current_process_index].unwrap() };
+            self.tasks[self.current_process_index] = Some(updated_process);
+            self.current_process_index += 1;
+        }
+        let mut current_task = self.tasks[self.current_process_index];
+
+        if current_task.is_none() {
+            self.current_process_index = 0;
+            current_task = self.tasks[self.current_process_index];
+        }
+        return current_task.unwrap().rsp;
+    }
+
+    pub fn create_process(&mut self, process_type: ProcessType, entrypoint: fn(), page_frame_allocator: &mut PageFrameAllocator) {
+        let address = entrypoint as *const ()as u64;
+        self.tasks[self.process_count] = Some(Process::init(address, process_type, ProcessPriority::High, self.process_count as u64, page_frame_allocator));
+        self.process_count += 1;
+    }
+}
 
 impl Process {
-    pub fn init(func: u64, page_frame_allocator:  &mut PageFrameAllocator, is_kernel: ProcessType) -> Process {
+    pub fn init(func: u64, process_type: ProcessType, process_priority: ProcessPriority, pid: u64, page_frame_allocator: &mut PageFrameAllocator) -> Process {
         unsafe {
             let mut rsp = page_frame_allocator.alloc_frame().unwrap(); // Create a stack
             let stack_top = rsp.offset(511) as u64;
@@ -58,45 +106,18 @@ impl Process {
 
             rsp = rsp.offset(-13);
 
-            let new_process = Process {
-                pid: COUNTER,
+            Process {
+                pid: pid,
                 rsp: rsp,
-            };
-
-            COUNTER += 1;
-
-            if a_process.is_none() {
-                a_process = Some(new_process);
-            } else {
-                b_process = Some(new_process);
+                process_priority: process_priority,
+                process_type: process_type,
             }
-
-            return new_process;
         }
+    }
+
+    pub fn update(&mut self, rsp: *const u64) {
+        self.rsp = rsp;
     }
 }
 
-// Very primitive to begin with
-pub fn schedule_process(old_rsp: *const u64) -> *const u64 {
-    unsafe {
-        if is_a_process == false {
-            is_a_process = true;
-            if is_first == false {
-                let new_struct = Process { rsp: old_rsp, ..b_process.unwrap() };
-                b_process = Some(new_struct);
-            }
-            is_first = true;
-            return a_process.unwrap().rsp;
-        } else {
-            is_a_process = false;
-            a_process.unwrap().rsp = old_rsp;
-            let new_struct = Process { rsp: old_rsp, ..b_process.unwrap() };
-            a_process = Some(new_struct);
-            return b_process.unwrap().rsp;
-        }
-    }
-}
-
-extern "C" {
-    fn switch_process(rsp: *const u64);
-}
+pub static PROCESS_SCHEDULAR: Lock<ProcessSchedular> = Lock::new(ProcessSchedular::new());
