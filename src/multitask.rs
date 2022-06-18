@@ -30,6 +30,7 @@ static mut COUNTER: u64 = 0;
 pub static mut a_process: Option<Process> = None;
 pub static mut b_process: Option<Process> = None;
 static mut is_a_process: bool = false;
+static mut is_first: bool = true;
 
 impl Process {
     pub fn init(func: u64, page_frame_allocator:  &mut PageFrameAllocator, is_kernel: ProcessType) -> Process {
@@ -43,7 +44,7 @@ impl Process {
 
             *rsp.offset(-1) = 0x00; // SS (don't have kernel data yet)
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x202; // RFLAGS
+            *rsp.offset(-3) = 0x200; // RFLAGS
             *rsp.offset(-4) = 0x08; // CS
             *rsp.offset(-5) = func; // RIP
             *rsp.offset(-6) = 0x00; // RAX
@@ -76,14 +77,22 @@ impl Process {
 }
 
 // Very primitive to begin with
-pub fn schedule_process() {
+pub fn schedule_process(old_rsp: *const u64) -> *const u64 {
     unsafe {
         if is_a_process == false {
             is_a_process = true;
-            switch_process(a_process.unwrap().rsp);
+            if is_first == false {
+                let new_struct = Process { rsp: old_rsp, ..b_process.unwrap() };
+                b_process = Some(new_struct);
+            }
+            is_first = true;
+            return a_process.unwrap().rsp;
         } else {
             is_a_process = false;
-            switch_process(b_process.unwrap().rsp);
+            a_process.unwrap().rsp = old_rsp;
+            let new_struct = Process { rsp: old_rsp, ..b_process.unwrap() };
+            a_process = Some(new_struct);
+            return b_process.unwrap().rsp;
         }
     }
 }

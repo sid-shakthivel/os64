@@ -13,6 +13,8 @@ use crate::vga_text::TERMINAL;
 use spin::Mutex;
 use crate::multitask::Process;
 use crate::multitask;
+use crate::pic::PICS;
+use crate::pic::pic_functions;
 
 pub struct pit {
     divisor: u64,
@@ -35,18 +37,15 @@ impl pit {
     }
 
     pub fn init(&self) {
-        // Set command byte
-        outb(0x43, 0x36);
+        // Set command byte (0x36)
+        let mode = 0b00000000 | 0b00110000 | 0b00000000;
+        outb(0x43, mode);
         self.set_frequency();
     }
 
     pub fn handle_timer(&mut self) {
         self.ticks += 1;
-
-        if self.ticks % self.frequency == 0 {
-            print!("Here\n");
-            multitask::schedule_process();
-        }
+        self.set_frequency();
     }
 
     fn set_frequency(&self) {

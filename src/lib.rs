@@ -23,6 +23,7 @@ use crate::page_frame_allocator::FrameAllocator;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use core::arch::asm;
+use crate::ports::outb;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
@@ -49,7 +50,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
         let process2 = multitask::Process::init(address2, &mut PAGE_FRAME_ALLOCATOR, multitask::ProcessType::Kernel);   
         
         multitask::a_process = Some(process1);
-        multitask::b_process = Some(process2);
+        multitask::b_process = Some(process2); 
     }
 
     interrupts::enable();
@@ -60,14 +61,12 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 // This is an example process func - will eventually be embellished
 pub fn process_a() {
     print!("From task 1\n");
-    multitask::schedule_process();
     loop{}
 }
 
 // This is an example process func - will eventually be embellished
 pub fn process_b() {
     print!("From task 2\n");
-    multitask::schedule_process();
     loop{}
 }
 

@@ -17,6 +17,7 @@ use crate::pic::PICS;
 use crate::pic::pic_functions;
 use crate::keyboard::KEYBOARD;
 use crate::pit::PIT;
+use crate::multitask;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -59,7 +60,12 @@ pub struct Registers {
     rbx: u64,
     rax: u64,
     num: u64,
-    error_code: u64
+    error_code: u64,
+    rip: u64,
+    cs: u64,
+    rflags: u64,
+    rsp: u64,
+    ss: u64
 }
 
 #[no_mangle]
@@ -151,6 +157,10 @@ pub extern fn exception_handler(registers: Registers) {
     } else {
         print!("Reserved\n");
     }
+
+    unsafe {
+        asm!("hlt");
+    }
 }
 
 #[no_mangle]
@@ -167,6 +177,23 @@ pub extern fn interrupt_handler(registers: Registers) {
         0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
         _ => {}
     }
+}
+
+#[no_mangle]
+pub extern fn timer_handler(rsp: *const u64) -> *const u64 {
+    // let unaligned_registers = core::ptr::addr_of!(registers.rsp);
+    // let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
+
+    // print!("{:?}\n", aligned_registers);
+
+    // Switch back to mode 3
+    unsafe {
+        // print!("{:?}\n", rsp);
+    }
+    PICS.lock().acknowledge(0x20); 
+    PIT.lock().handle_timer();
+    let ting = multitask::schedule_process(rsp);
+    return ting;
 }
 
 pub extern fn enable() {

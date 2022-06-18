@@ -23,6 +23,8 @@ use crate::ports::inb;
 use crate::ports::io_wait;
 use core::arch::asm;
 use spin::Mutex;
+use crate::print;
+use crate::vga_text::TERMINAL;
 
 const PIC1_PORT_COMMAND: u16 = 0x20;
 const PIC2_PORT_COMMAND: u16 = 0xA0;
@@ -131,6 +133,7 @@ impl pic_functions for Pic {
 
     // Every interrupt from PIC must be acknowledged to confirm interrupt has been handled
     fn acknowledge(&self, interrupt: u8) {
+        // print!("Acknowleding interrupt\n");
         outb(self.command, PIC_ACK);
     }
 }
