@@ -25,17 +25,12 @@ global gdt_flush
 gdt_flush:
   extern GDTR
   lgdt  [GDTR]
-  
-  mov ax, 0
-  mov ss, ax
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-  
   ret
 
-global find_ting
-find_ting:
-  xchg bx, bx 
+global flush_tlb
+flush_tlb:
+  push rax
+  mov rax, cr3
+  mov cr3, rax
+  pop rax
   ret

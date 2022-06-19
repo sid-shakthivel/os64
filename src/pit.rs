@@ -7,31 +7,22 @@
 */
 
 use crate::ports::outb;
-use crate::ports::inb;
-use crate::print;
-use crate::vga_text::TERMINAL;
 use spin::Mutex;
-use crate::multitask::Process;
-use crate::multitask;
-use crate::pic::PICS;
-use crate::pic::pic_functions;
 
-pub struct pit {
+pub struct Pit {
     divisor: u64,
-    frequency: u64,
     ticks: u64,
 }
 
 const INPUT_CLOCK: u64 = 1193180;
 const FREQUENCY: u64  = 100;
 
-pub static PIT: Mutex<pit> = Mutex::new(pit::new(FREQUENCY));
+pub static PIT: Mutex<Pit> = Mutex::new(Pit::new(FREQUENCY));
 
-impl pit {
-    pub const fn new(frequency: u64) -> pit {
-        pit {
+impl Pit {
+    pub const fn new(frequency: u64) -> Pit {
+        Pit {
             ticks: 0,
-            frequency: frequency,
             divisor: INPUT_CLOCK / frequency,
         }
     }

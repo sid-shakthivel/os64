@@ -21,10 +21,7 @@
 use crate::ports::outb;
 use crate::ports::inb;
 use crate::ports::io_wait;
-use core::arch::asm;
 use spin::Mutex;
-use crate::print;
-use crate::vga_text::TERMINAL;
 
 const PIC1_PORT_COMMAND: u16 = 0x20;
 const PIC2_PORT_COMMAND: u16 = 0xA0;
@@ -48,7 +45,7 @@ pub struct ChainedPics {
     slave: Pic
 }
 
-pub trait pic_functions {
+pub trait PicFunctions {
     fn set_mask(&self, interrupt: u8);
     fn clean_mask(&self, interrupt: u8);
     fn acknowledge(&self, interrupt: u8);
@@ -74,25 +71,30 @@ impl ChainedPics {
         // Start initialization
         outb(self.master.command, 0x11);
         outb(self.slave.command, 0x11);
+        io_wait();
 
         outb(self.master.data, self.master.offset); // ICW2 (Offset Master PIC)
         outb(self.slave.data, self.slave.offset); // ICW2 (Offset Slave PIC)
+        io_wait();
 
         outb(self.master.data, 4); // ICW3 (Tell Master PIC Slave PIC Exists)
         outb(self.slave.data, 2); // ICW3 (Tell Slave PIC Cascade Identity)
+        io_wait();
 
         // ECW4 Enable 8086 Mode
         outb(self.master.data, 1); 
         outb(self.slave.data, 1);        
+        io_wait();
  
         // fc keyboard + timer
         // fd keyboard only
         outb(self.master.data, 0xfe); // Only enable keyboard and timer
         outb(self.slave.data, 0xff); // Disable Slave completely
+        io_wait();
     }
 }
 
-impl pic_functions for ChainedPics {
+impl PicFunctions for ChainedPics {
     fn set_mask(&self, interrupt: u8) {
         if interrupt < PIC2_START_INTERRUPT {
             self.master.set_mask(interrupt);
@@ -118,21 +120,23 @@ impl pic_functions for ChainedPics {
     }
 }
 
-impl pic_functions for Pic {
+impl PicFunctions for Pic {
     // Disable interrupt
-    fn set_mask(&self, interrupt: u8) {
+    fn set_mask(&self, mut interrupt: u8) {
+        interrupt -= 0x20;
         let value = inb(self.data) | (1 << interrupt);
         outb(self.data, value);
     }
 
     // Enable interrupt
-    fn clean_mask(&self, interrupt: u8) {
+    fn clean_mask(&self, mut interrupt: u8) {
+        interrupt -= 0x20;
         let value = inb(self.data) & !(1 << interrupt);
         outb(self.data, value);
     }
 
     // Every interrupt from PIC must be acknowledged to confirm interrupt has been handled
-    fn acknowledge(&self, interrupt: u8) {
+    fn acknowledge(&self, _interrupt: u8) {
         // print!("Acknowleding interrupt\n");
         outb(self.command, PIC_ACK);
     }

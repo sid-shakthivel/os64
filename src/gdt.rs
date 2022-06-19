@@ -6,11 +6,14 @@
     Entries are 8 bytes
 */
 
-use core::arch::asm;
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use core::mem::size_of;
-use crate::print;
-use crate::vga_text::TERMINAL;
 use crate::interrupts;
+use core::arch::asm;
+use x86_64::instructions::segmentation::set_cs;
+use x86_64::structures::gdt::SegmentSelector;
 
 /*
     Base: 32 bit address of where segment begins
@@ -62,24 +65,54 @@ impl gdt_entry {
 
 #[no_mangle]
 pub static mut GDTR: gdtr = gdtr { offset: 0, size: 0 };
-pub static mut GDT: [gdt_entry; GDT_MAX_DESCRIPTORS] = [gdt_entry { limit_low: 0, base_low: 0, base_middle: 0, access_byte: 0, attributes: 0, base_high: 0 }; GDT_MAX_DESCRIPTORS];
+// pub static mut GDT: [gdt_entry; GDT_MAX_DESCRIPTORS] = [gdt_entry { limit_low: 0, base_low: 0, base_middle: 0, access_byte: 0, attributes: 0, base_high: 0 }; GDT_MAX_DESCRIPTORS];
+pub static mut GDT: [u64; GDT_MAX_DESCRIPTORS] = [0; GDT_MAX_DESCRIPTORS];
+
+pub fn set_entry(is_code: bool, is_kernel: bool, is_present: bool) -> u64 {
+    let mut entry: u64 = 0;
+
+    if is_code {
+        entry |= (1 << 43);
+    }
+
+    entry |= (1 << 44); // Descriptor type
+
+    if is_present {
+        entry |= (1 << 47);
+    }
+
+    entry |= (1 << 53); // 64 Bit
+
+    if is_kernel == false {
+        // User mode segments
+        entry |= (1 << 45);
+        entry |= (1 << 46);
+    }
+    
+    return entry
+}
 
 pub fn init() {
+    interrupts::disable();
     unsafe {
-        interrupts::disable();
+        // GDT[0].edit(0, 0, 0, 0);
+        // GDT[1].edit(0, 0, 0b10011010, 0xF); // Kernel Code Segment
+        // GDT[2].edit(0, 0xFFFFF, 0b10010010, 0xC); // Kernel Data Segment
+        // GDT[3].edit(0, 0xFFFFF, 0b11111010, 0xA); // User Code Segment
+        // GDT[4].edit(0, 0xFFFFF, 0b11110010, 0xC); // User Data Segment
 
-        GDT[0].edit(0, 0, 0, 0);
-        GDT[1].edit(0, 0xFFFFF, 0b10011010, 0xA); // Kernel Code Segment
-        GDT[2].edit(0, 0xFFFFF, 0b10010010, 0xC); // Kernel Data Segment
-        GDT[3].edit(0, 0xFFFFF, 0b11111010, 0xA); // User Code Segment
-        GDT[4].edit(0, 0xFFFFF, 0b11110010, 0xC); // User Data Segment
+        GDT[0] = 0;
+        GDT[1] = set_entry(true, true, true);
+        GDT[2] = set_entry(false, true, true);
+        GDT[3] = set_entry(true, false, true);
+        GDT[4] = set_entry(false, false, true);
 
         // Set gdtr
-        let gdt_address = (&GDT[0] as *const gdt_entry) as u64;
-        GDTR.size = (size_of::<gdt_entry>() as u16) * (GDT_MAX_DESCRIPTORS as u16) - 1;
+        let gdt_address = (&GDT[0] as *const u64) as u64;
+        GDTR.size = (size_of::<u64>() as u16) * (GDT_MAX_DESCRIPTORS as u16) - 1;
         GDTR.offset = gdt_address;
 
-        gdt_flush();
+        gdt_flush(); 
     } 
 }
 

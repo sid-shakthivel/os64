@@ -37,7 +37,7 @@ impl Keyboard {
         match scancode {
             0x26 => print!("l"),
             0x2A => self.is_upper = true, // Left shift pressed
-            0x26 => self.is_upper = true, // Right shift pressed
+            0x36 => self.is_upper = true, // Right shift pressed
             0xAA => self.is_upper= false, // Left shift released
             0xB6 => self.is_upper = false, // Right shift released
             0x3A => { self.is_upper = !self.is_upper }, // Caps lock pressed

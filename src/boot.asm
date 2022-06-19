@@ -20,7 +20,7 @@ start:
     call enable_paging
 
     lgdt [gdt64.pointer] ; Load the new GDT
-    jmp gdt64.code:long_mode_start
+    jmp 0x08:long_mode_start
 
     hlt
 

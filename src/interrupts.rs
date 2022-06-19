@@ -11,10 +11,8 @@ use crate::print;
 use crate::vga_text::TERMINAL;
 use core::mem::size_of;
 use core::arch::asm;
-use crate::pic;
-use crate::ports::inb;
 use crate::pic::PICS;
-use crate::pic::pic_functions;
+use crate::pic::PicFunctions;
 use crate::keyboard::KEYBOARD;
 use crate::pit::PIT;
 use crate::multitask::PROCESS_SCHEDULAR;
@@ -142,9 +140,6 @@ pub extern fn exception_handler(registers: Registers) {
     // Since registers is a packed struct, it must be aligned correctly
     let unaligned_registers = core::ptr::addr_of!(registers);
     let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
-
-    let ting = core::ptr::addr_of!(registers.num);
-    let bing = unsafe { core::ptr::read_unaligned(ting) };
     
     // Print a suitable error message
     if aligned_registers.num < 22 {
@@ -185,7 +180,12 @@ pub extern fn timer_handler(old_stack: *const u64) -> *const u64 {
     PIT.lock().handle_timer();
     let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(old_stack);
     PROCESS_SCHEDULAR.free();
-    return new_stack;
+
+    if new_stack.is_none() {
+        return old_stack;
+    } else {
+        return new_stack.unwrap();
+    }
 }
 
 pub extern fn enable() {

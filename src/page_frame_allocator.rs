@@ -25,7 +25,6 @@ pub struct Stack {
 
 // TODO: Remove memory_start
 pub struct PageFrameAllocator {
-    memory_start: u64,
     memory_end: u64,
     pub free_frames: &'static mut Stack,
     pub current_page: *mut u64,
@@ -80,8 +79,14 @@ impl FrameAllocator for PageFrameAllocator {
     fn alloc_frame(&mut self) -> Option<*mut u64> {
         if self.free_frames.is_empty() {
             // Current Page is a 64 bit address thus 1 page is 512 64 bits (4096 bytes in a page)
-            self.current_page = unsafe { self.current_page.offset(512) };
-            return Some(self.current_page);
+            unsafe {
+                if (self.current_page.offset(512) as u64) < self.memory_end {
+                    self.current_page = unsafe { self.current_page.offset(512) };
+                    return Some(self.current_page);
+                } else {
+                    return None;
+                }
+            }
         } else {
             return  match self.free_frames.pop() {
                 Some(frame) => unsafe { Some(&mut *(frame as *mut u64)) }, 
@@ -107,7 +112,7 @@ impl PageFrameAllocator {
         let memory_start = boot_info.end_address() + 512;
         let memory_end = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
 
-        let mut page_frame_allocator = PageFrameAllocator { memory_start: memory_start as u64, memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };
+        let mut page_frame_allocator = PageFrameAllocator { memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };
         page_frame_allocator.setup_stack();
         return page_frame_allocator;
     }

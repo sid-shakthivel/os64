@@ -21,14 +21,14 @@ Page table entries have a certain 64 bit format which looks like this:
 +---------+-----------+------------------+---------------+---------------+-------+-----------+--------+-----------+------------------+-----------+------------+
 */
 
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use crate::print;
 use crate::vga_text::TERMINAL;
 use crate::page_frame_allocator;
 use page_frame_allocator::PageFrameAllocator;
 use crate::page_frame_allocator::FrameAllocator;
-
-use x86_64::instructions::tlb;
-use x86_64::addr::VirtAddr;
 
 #[allow(dead_code)]
 enum Flags {
@@ -42,7 +42,7 @@ enum Flags {
     Global,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Page {
     entry: u64
 }
@@ -193,14 +193,18 @@ pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
         allocator.free_frame(frame.get_physical_address());
         p1.entries[get_p1_index(virtual_address)].set_unused();
 
-        tlb::flush(VirtAddr::new(virtual_address));
+        flush_tlb();
     }
 }
 
-pub fn identity_map(starting_address: u64, b: u64, allocator: &mut PageFrameAllocator) {
-    let page_size = 4096;
+// pub fn identity_map(starting_address: u64, b: u64, allocator: &mut PageFrameAllocator) {
+//     let page_size = 4096;
 
-    for i in 0..b {
-        map_page(i, i, allocator);
-    }
+//     for i in 0..b {
+//         map_page(i, i, allocator);
+//     }
+// }
+
+extern "C" {
+    fn flush_tlb();
 }

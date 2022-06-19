@@ -2,8 +2,6 @@
 
 // Manages all functions related to input/output 
 
-use core::arch::asm;
-
 pub fn outb(port: u16, value: u8) {
     unsafe { outb_raw(port, value); }
 }
