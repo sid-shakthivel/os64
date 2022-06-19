@@ -22,12 +22,7 @@ RUN apt-get install nasm -y
 # Install Make
 RUN apt-get install make -y
 
-# Install Rust
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-# RUN cargo install xargo
-
 WORKDIR /
 
 # Compile and create ISO
-CMD cd code && make
+CMD cd code/kernel && make

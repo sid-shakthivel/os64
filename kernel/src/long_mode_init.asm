@@ -5,8 +5,7 @@ global long_mode_start
 section .text
 bits 64
 long_mode_start:
-  mov ax, 0
-  mov ss, ax
+  mov ax, 0x10
   mov ds, ax
   mov es, ax
   mov fs, ax

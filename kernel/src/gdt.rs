@@ -12,8 +12,6 @@
 use core::mem::size_of;
 use crate::interrupts;
 use core::arch::asm;
-use x86_64::instructions::segmentation::set_cs;
-use x86_64::structures::gdt::SegmentSelector;
 
 /*
     Base: 32 bit address of where segment begins
@@ -31,6 +29,8 @@ use x86_64::structures::gdt::SegmentSelector;
     | Granularity | Size | Long Mode | Reserved |
     +-------------+------+-----------+----------+
 */
+
+// TODO: Fix GDT
 
 const GDT_MAX_DESCRIPTORS: usize = 5;
 
@@ -112,7 +112,7 @@ pub fn init() {
         GDTR.size = (size_of::<u64>() as u16) * (GDT_MAX_DESCRIPTORS as u16) - 1;
         GDTR.offset = gdt_address;
 
-        gdt_flush(); 
+        // gdt_flush(); 
     } 
 }
 

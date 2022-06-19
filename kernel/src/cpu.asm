@@ -25,6 +25,18 @@ global gdt_flush
 gdt_flush:
   extern GDTR
   lgdt  [GDTR]
+
+  push 0x08
+  lea rax, [rel reload_cs]
+  push rax
+  retfq
+
+reload_cs:
+  mov ax, 0x10
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov gs, ax
   ret
 
 global flush_tlb
@@ -34,3 +46,7 @@ flush_tlb:
   mov cr3, rax
   pop rax
   ret
+
+global jump_usermode
+jump_usermode:
+  cli

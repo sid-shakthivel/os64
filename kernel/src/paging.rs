@@ -175,7 +175,7 @@ pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut Pag
         Translation lookaside buffer
         This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
     */
-    tlb::flush(VirtAddr::new(virtual_address));
+    unsafe { flush_tlb(); }
 }
 
 pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
@@ -193,7 +193,7 @@ pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
         allocator.free_frame(frame.get_physical_address());
         p1.entries[get_p1_index(virtual_address)].set_unused();
 
-        flush_tlb();
+        unsafe { flush_tlb(); }
     }
 }
 
