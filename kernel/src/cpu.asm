@@ -47,6 +47,36 @@ flush_tlb:
   pop rax
   ret
 
-global jump_usermode
-jump_usermode:
-  cli
+global switch_process
+switch_process:
+  ; ; Write address of P4 table to CR3 register
+  ; mov rax, rsi
+  ; xchg bx, bx
+  ; mov cr3, rax
+  
+  ; ; Enable pAE paging
+  ; mov rax, cr4
+  ; or rax, 1 << 5,
+  ; mov cr4, rax
+
+  ; ; Set long mode bit in EFER MSR
+  ; mov rcx, 0xC0000080
+  ; rdmsr
+  ; or rax, 1 << 8
+  ; wrmsr
+
+  ; ; Enable paging
+  ; mov rax, cr0
+  ; or rax, 1 << 31 | 1 << 0
+  ; mov cr0, rax
+
+  ; Switch stacks and then pop registers and iret
+  mov rsp, rdi
+  pop rdi
+  pop rsi
+  pop rdx
+  pop rcx
+  pop rbx
+  pop rax
+  add rsp, 0x10 
+  iretq 

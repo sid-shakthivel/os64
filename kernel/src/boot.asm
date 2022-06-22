@@ -53,7 +53,7 @@ setup_paging:
 .map_p1_table_1
     mov eax, 0x1000
     mul ecx
-    or eax, 0b11 ; Present, Writable
+or eax, 0b11 ; Present, Writable
     mov [p1_table_1 + ecx * 8], eax ; 8 bit entries
 
     inc ecx
@@ -124,6 +124,7 @@ gdt64:
     dw $ - gdt64 - 1
     dq gdt64
 
+; Identity map function 
 section .bss
 align 4096
 p4_table:
@@ -137,6 +138,8 @@ p1_table_1:
 p1_table_2:
     resb 4096
 p1_table_3:
+    resb 4096
+p1_table_4:
     resb 4096
 stack_bottom:
     resb 16384

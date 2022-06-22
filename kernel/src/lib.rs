@@ -14,6 +14,7 @@ mod pit;
 mod gdt;
 mod multitask;
 mod spinlock;
+mod grub;
 
 extern crate multiboot2;
 
@@ -22,36 +23,32 @@ use crate::vga_text::TERMINAL;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::multitask::PROCESS_SCHEDULAR;
+use crate::multitask::ProcessType;
+use crate::multitask::ProcessPriority;
 use crate::pic::PicFunctions;
 use core::arch::asm;
+use crate::paging::Table;
+use crate::page_frame_allocator::FrameAllocator;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     TERMINAL.lock().clear();    
 
-    // let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
-
     let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
-
-    // for module in boot_info.module_tag() {
-        // print!("Module 1: {:?}\n", module);
-//
-        // let ptr = module.start_address() as *const ();
-        // let code: fn() = unsafe { core::mem::transmute(ptr) };
-    // }
 
     // gdt::init();
     PIT.lock().init();
     PICS.lock().init();
     interrupts::init();
+    let mapped_module = grub::map_modules(multiboot_information_address, &mut page_frame_allocator).unwrap();
 
-    PROCESS_SCHEDULAR.lock().create_process(multitask::ProcessType::Kernel, process_a, &mut page_frame_allocator);
-    PROCESS_SCHEDULAR.free();
+    let user_process = multitask::Process::init(mapped_module, ProcessType::User, ProcessPriority::High, 0, &mut page_frame_allocator);
 
-    PROCESS_SCHEDULAR.lock().create_process(multitask::ProcessType::Kernel, process_b, &mut page_frame_allocator);
-    PROCESS_SCHEDULAR.free();
+    unsafe {
+        switch_process(user_process.rsp, user_process.cr3);
+    }
 
-    interrupts::enable();
+    // interrupts::enable();
     // PICS.lock().set_mask(0x20);
 
     loop {}
@@ -77,5 +74,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 extern "C" {
-    fn jump_usermode();
+    fn switch_process(rsp: *const u64, p4: *const Table);
 }
+
+// Bochs magic breakpoint is xchg bx, bx

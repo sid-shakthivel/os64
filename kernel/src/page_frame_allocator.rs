@@ -81,7 +81,7 @@ impl FrameAllocator for PageFrameAllocator {
             // Current Page is a 64 bit address thus 1 page is 512 64 bits (4096 bytes in a page)
             unsafe {
                 if (self.current_page.offset(512) as u64) < self.memory_end {
-                    self.current_page = unsafe { self.current_page.offset(512) };
+                    self.current_page = self.current_page.offset(512);
                     return Some(self.current_page);
                 } else {
                     return None;

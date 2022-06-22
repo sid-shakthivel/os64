@@ -29,6 +29,7 @@ use crate::vga_text::TERMINAL;
 use crate::page_frame_allocator;
 use page_frame_allocator::PageFrameAllocator;
 use crate::page_frame_allocator::FrameAllocator;
+use core::prelude::v1::Some;
 
 #[allow(dead_code)]
 enum Flags {
@@ -43,13 +44,14 @@ enum Flags {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct Page {
-    entry: u64
+#[repr(C, packed)]
+pub struct Page {
+    pub entry: u64
 }
 
 impl Page {
     pub fn new(physical_address: u64) -> Page {
-        Page { entry: 0x000fffff_fffff000 & (physical_address) }
+        Page { entry: (0x000fffff_fffff000 & (physical_address) | 0 | 1)  }
     }
 
     fn set_flag(&mut self, flag: Flags) {
@@ -78,8 +80,9 @@ impl Page {
     }
 }
 
+#[repr(C, packed)]
 pub struct Table {
-    entries: [Page; 512]
+    pub entries: [Page; 512]
 }
 
 impl Table {
@@ -105,12 +108,11 @@ impl Table {
     */
     fn create_next_table(&mut self, index: usize, allocator: &mut PageFrameAllocator) -> &mut Table {
         if self.get_table(index).is_none() {
-            print!("Building new table\n");
             let page_frame = allocator.alloc_frame();
             self.entries[index] = Page::new(page_frame.unwrap() as u64);
             self.entries[index].set_flag(Flags::Present);
             self.entries[index].set_flag(Flags::Writable);
-        }
+        } 
         return self.get_table(index).expect("why not working");
     }
 
@@ -121,8 +123,6 @@ impl Table {
 
     // Each table from the level of hierarchy can be accessed via this formula: next_table_address = (table_address << 9) | (index << 12) in which index refers to certain sections of a virtual address
     fn get_table_address(&mut self, index: usize) -> Option<u64> {
-        // print!("Address: {:x}\n", (self as *const _ as u64));
-        // print!("Entry Val: {:x}\n", self.entries[index].entry);
         if self.entries[index].entry & 1 > 0 {
             return Some(((self as *const _ as u64) << 9) | ((index as u64) >> 12));
         } else {
@@ -139,6 +139,8 @@ pub const P4: *mut Table = 0xffffffff_fffff000 as *mut _;
     XXX is the index for P3
     YYY is the index for P2
     ZZZ is the index for P1
+
+    TODO: make these methods not global functions
 */
 fn get_p4_index(virtual_address: u64) -> usize {
     return ((virtual_address >> 39) & 0x1ff) as usize;
@@ -157,10 +159,15 @@ fn get_p1_index(virtual_address: u64) -> usize {
 }
 
 // The index from the address is used to go to or create tables
-pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator) {   
+// TODO: swap is_user bool for enum
+pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator, optional_p4: Option<*mut Table>, is_user: bool) {   
     assert!(virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000, "invalid address: 0x{:x}", virtual_address);
 
-    let p4 = unsafe { &mut *P4 };
+    let mut p4 = unsafe { &mut *P4 };
+
+    if optional_p4.is_none() == false {
+        p4 = unsafe { &mut *(optional_p4.unwrap()) };
+    }
 
     let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
     let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
@@ -170,6 +177,9 @@ pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut Pag
     p1.entries[p1_index] = Page::new(physical_address);
     p1.entries[p1_index].set_flag(Flags::Present);
     p1.entries[p1_index].set_flag(Flags::Writable);
+
+    // Add option for kernel only pages
+    p1.entries[p1_index].set_flag(Flags::UserAccessible);
 
     /*
         Translation lookaside buffer
@@ -196,14 +206,6 @@ pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
         unsafe { flush_tlb(); }
     }
 }
-
-// pub fn identity_map(starting_address: u64, b: u64, allocator: &mut PageFrameAllocator) {
-//     let page_size = 4096;
-
-//     for i in 0..b {
-//         map_page(i, i, allocator);
-//     }
-// }
 
 extern "C" {
     fn flush_tlb();

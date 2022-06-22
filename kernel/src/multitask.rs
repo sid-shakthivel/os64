@@ -1,7 +1,7 @@
 // src/multitask.rs
 
 /*
-    Preemptive multitasking is when the CPU splits up it's time between various processes to give the illusion they are happening simultaneously
+    Preemptive multitasking is when the CPU splits up its time between various processes to give the illusion they are happening simultaneously
 */
 
 use core::prelude::v1::Some;
@@ -10,6 +10,12 @@ use crate::page_frame_allocator::PAGE_SIZE;
 use core::mem::size_of;
 use crate::spinlock::Lock;
 use crate::page_frame_allocator::FrameAllocator;
+use crate::paging::Table;
+use crate::paging;
+use crate::paging::P4;
+use crate::print;
+use crate::vga_text::TERMINAL;
+use crate::paging::Page;
 
 /*
     Processes are running programs with an individual address space, stack and data
@@ -22,9 +28,10 @@ pub struct Process {
     pub rsp: *const u64,
     process_type: ProcessType,
     process_priority: ProcessPriority,
+    pub cr3: *mut Table,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum ProcessType {
     Kernel,
@@ -42,6 +49,7 @@ pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
 
 /*
     Processes schedular holds all tasks and decides which will be serviced
+    TODO: Set next task based on priority
 */
 pub struct ProcessSchedular {
     tasks: [Option<Process>; MAX_PROCESS_NUM],
@@ -97,19 +105,30 @@ impl ProcessSchedular {
 
 impl Process {
     pub fn init(func: u64, process_type: ProcessType, process_priority: ProcessPriority, pid: u64, page_frame_allocator: &mut PageFrameAllocator) -> Process {
+        let mut rsp = page_frame_allocator.alloc_frame().unwrap(); // Create a stack
+
+        // Setup stack for interrupt
         unsafe {
-            let mut rsp = page_frame_allocator.alloc_frame().unwrap(); // Create a stack
             let stack_top = rsp.offset(511) as u64;
             rsp = rsp.offset(511); // Stack grows downwards towards decreasing memory addresses
             
             // These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
             // When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
 
-            *rsp.offset(-1) = 0; // SS (don't have kernel data yet)
+            // Setup SS and CS registers
+            if process_type == ProcessType::Kernel {
+                *rsp.offset(-1) = 0x10; // SS 
+                *rsp.offset(-4) = 0x08; // CS
+                //  TODO: Fix and test this
+                *rsp.offset(-5) = func; // RIP
+            } else if process_type == ProcessType::User {
+                *rsp.offset(-1) = 0x18; // SS
+                *rsp.offset(-4) = 0x20; // CS
+                *rsp.offset(-5) = 0xC0000000; // RIP
+            }
+
             *rsp.offset(-2) = stack_top; // RSP
             *rsp.offset(-3) = 0x200; // RFLAGS
-            *rsp.offset(-4) = 0x08; // CS
-            *rsp.offset(-5) = func; // RIP
             *rsp.offset(-6) = 0x00; // RAX
             *rsp.offset(-7) = 0x00; // RBX
             *rsp.offset(-8) = 0x00; // RBC
@@ -120,12 +139,63 @@ impl Process {
             *rsp.offset(-13) = 0x00; // Dummy error thing
 
             rsp = rsp.offset(-13);
+        }
+
+        // User pages must have independent address spaces
+        if process_type == ProcessType::User {
+             // Convert physical addresses of process into virtual address to use when switching cr3
+             for i in 0..0 {
+                let v_address = 0xA0000000 + i; // this address is purely for testing
+                let p_address = func + i;
+                paging::map_page(p_address, v_address, page_frame_allocator, None, true);
+            }
+
+            // Copy current address space
+            let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+            let new_p3: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+            let new_p2: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+
+            let new_p1_1: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+            let new_p1_2: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+            let new_p1_3: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+
+            unsafe {
+                (*new_p4).entries[0] = Page::new(new_p3 as u64);
+                (*new_p3).entries[0] = Page::new(new_p2 as u64);
+
+                (*new_p2).entries[0] = Page::new(new_p1_1 as u64);
+                (*new_p2).entries[1] = Page::new(new_p1_2 as u64);
+                // (*new_p2).entries[2] = Page::new(new_p1_3 as u64);
+
+                for i in 0..512 {
+                    (*new_p1_1).entries[0] = Page::new((0 * 0x1000));
+                }
+
+                for i in 0..512 {
+                    (*new_p1_2).entries[0] = Page::new((512 * 0x1000));
+                }
+
+                for i in 0..512 {
+                    (*new_p1_3).entries[0] = Page::new((1024 * 0x1000));
+                }
+
+                (*new_p4).entries[511] = Page::new(new_p4 as u64); // Recursive mapping
+            }
 
             Process {
                 pid: pid,
                 rsp: rsp,
                 process_priority: process_priority,
                 process_type: process_type,
+                cr3: new_p4
+            }
+        } else {
+            Process {
+                pid: pid,
+                rsp: rsp,
+                process_priority: process_priority,
+                process_type: process_type,
+                cr3: P4
             }
         }
     }

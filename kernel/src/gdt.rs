@@ -11,7 +11,6 @@
 
 use core::mem::size_of;
 use crate::interrupts;
-use core::arch::asm;
 
 /*
     Base: 32 bit address of where segment begins
@@ -72,21 +71,21 @@ pub fn set_entry(is_code: bool, is_kernel: bool, is_present: bool) -> u64 {
     let mut entry: u64 = 0;
 
     if is_code {
-        entry |= (1 << 43);
+        entry |= 1 << 43;
     }
 
-    entry |= (1 << 44); // Descriptor type
+    entry |= 1 << 44; // Descriptor type
 
     if is_present {
-        entry |= (1 << 47);
+        entry |= 1 << 47;
     }
 
-    entry |= (1 << 53); // 64 Bit
+    entry |= 1 << 53; // 64 Bit
 
     if is_kernel == false {
         // User mode segments
-        entry |= (1 << 45);
-        entry |= (1 << 46);
+        entry |= 1 << 45;
+        entry |= 1 << 46;
     }
     
     return entry
