@@ -3,7 +3,7 @@ ENTRY(start)
 SECTIONS {
     . = 1M;
 
-    .boot :
+	.boot :
     {
         /* ensure that the multiboot header is at the beginning */
         KEEP(*(.multiboot_header))

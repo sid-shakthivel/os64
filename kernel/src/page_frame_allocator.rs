@@ -9,6 +9,8 @@ A stack of free pages along with a pointer to the first page will be used in ord
 */
 
 use core::prelude::v1::Some;
+use crate::print;
+use crate::vga_text::TERMINAL;
 
 /*
 Each frame must store a reference to the next frame along with physical meta data (value is for testing)
@@ -109,8 +111,9 @@ impl PageFrameAllocator {
     pub fn new(multiboot_information_address: usize) -> PageFrameAllocator {
         let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
         let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-        let memory_start = boot_info.end_address() + 512;
-        let memory_end = memory_map_tag.memory_areas().last().expect("Unknown Length").length;
+
+        let memory_start: u64 = (boot_info.end_address() as u64) + (512 as u64) & 0x000fffff_fffff000;
+        let memory_end: u64 = memory_map_tag.memory_areas().last().expect("Unknown Length").length & 0x000fffff_fffff000;
 
         let mut page_frame_allocator = PageFrameAllocator { memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };
         page_frame_allocator.setup_stack();

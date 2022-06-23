@@ -44,14 +44,14 @@ enum Flags {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)]
+// #[repr(C, packed)]
 pub struct Page {
     pub entry: u64
 }
 
 impl Page {
     pub fn new(physical_address: u64) -> Page {
-        Page { entry: (0x000fffff_fffff000 & (physical_address) | 0 | 1)  }
+        Page { entry: (0x000fffff_fffff000 & (physical_address) | (1 << 0) | (1 << 1))  }
     }
 
     fn set_flag(&mut self, flag: Flags) {
@@ -76,11 +76,12 @@ impl Page {
     }
 
     pub fn get_physical_address(&self) -> *mut u64 {
-        return (self.entry & 0x000fffff_fffff000) as *mut u64;
+        let p_address = (self.entry & 0x000fffff_fffff000);
+        return p_address as *mut u64;
     }
 }
 
-#[repr(C, packed)]
+// #[repr(C, packed)]
 pub struct Table {
     pub entries: [Page; 512]
 }
@@ -108,10 +109,10 @@ impl Table {
     */
     fn create_next_table(&mut self, index: usize, allocator: &mut PageFrameAllocator) -> &mut Table {
         if self.get_table(index).is_none() {
+            print!("building new table\n");
             let page_frame = allocator.alloc_frame();
             self.entries[index] = Page::new(page_frame.unwrap() as u64);
-            self.entries[index].set_flag(Flags::Present);
-            self.entries[index].set_flag(Flags::Writable);
+            print!("{}\n", self.entries[index].entry);
         } 
         return self.get_table(index).expect("why not working");
     }
@@ -171,20 +172,30 @@ pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut Pag
 
     let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
     let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
-    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
+    // let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
 
-    let p1_index = get_p1_index(virtual_address);
-    p1.entries[p1_index] = Page::new(physical_address);
-    p1.entries[p1_index].set_flag(Flags::Present);
-    p1.entries[p1_index].set_flag(Flags::Writable);
+    unsafe {
+        let page_frame = allocator.alloc_frame();
+        p2.entries[4] = Page::new(page_frame.unwrap() as u64);
 
-    // Add option for kernel only pages
-    p1.entries[p1_index].set_flag(Flags::UserAccessible);
+        let test = p2.entries[4].entry & 0x000fffff_fffff000;
+
+        let p1: *mut Table = test as *mut _;
+
+        let p1_index = get_p1_index(virtual_address);
+        (*p1).entries[p1_index] = Page::new(physical_address);
+
+        // Add option for kernel only pages
+        (*p1).entries[p1_index].set_flag(Flags::UserAccessible);
+
+        print!("{:p} {}\n", page_frame.unwrap(), p2.entries[4].entry);
+    }
 
     /*
         Translation lookaside buffer
         This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
     */
+
     unsafe { flush_tlb(); }
 }
 

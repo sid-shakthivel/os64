@@ -34,9 +34,6 @@ pub fn map_modules(multiboot_information_address: usize, page_frame_allocator: &
             }
         }
 
-        let test = frame as u64;
-        // print!("GRUB: {:p} {}\n", frame, test);
-
         // Only 1 module for now thus we can return a pointer to the new frame (if needed)
         // TODO: Implement support for multiple modules
         return Some(frame as u64);

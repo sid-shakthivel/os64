@@ -144,42 +144,22 @@ impl Process {
         // User pages must have independent address spaces
         if process_type == ProcessType::User {
              // Convert physical addresses of process into virtual address to use when switching cr3
-             for i in 0..0 {
-                let v_address = 0xA0000000 + i; // this address is purely for testing
+            //  TODO: add support for multiple pages
+             for i in 0..1 {
+                let v_address = 0x800000 + i; // this address is purely for testing
                 let p_address = func + i;
                 paging::map_page(p_address, v_address, page_frame_allocator, None, true);
             }
 
             // Copy current address space
             let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
-            let new_p3: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
-            let new_p2: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
-
-            let new_p1_1: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
-            let new_p1_2: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
-            let new_p1_3: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
 
             unsafe {
-                (*new_p4).entries[0] = Page::new(new_p3 as u64);
-                (*new_p3).entries[0] = Page::new(new_p2 as u64);
-
-                (*new_p2).entries[0] = Page::new(new_p1_1 as u64);
-                (*new_p2).entries[1] = Page::new(new_p1_2 as u64);
-                // (*new_p2).entries[2] = Page::new(new_p1_3 as u64);
-
-                for i in 0..512 {
-                    (*new_p1_1).entries[0] = Page::new((0 * 0x1000));
+                for i in 0..(*new_p4).entries.len() {
+                    (*new_p4).entries[i] = (*P4).entries[i];
                 }
-
-                for i in 0..512 {
-                    (*new_p1_2).entries[0] = Page::new((512 * 0x1000));
-                }
-
-                for i in 0..512 {
-                    (*new_p1_3).entries[0] = Page::new((1024 * 0x1000));
-                }
-
-                (*new_p4).entries[511] = Page::new(new_p4 as u64); // Recursive mapping
+                
+                (*new_p4).entries[511] = Page::new(new_p4 as u64);
             }
 
             Process {
