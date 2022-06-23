@@ -22,9 +22,6 @@ use core::panic::PanicInfo;
 use crate::vga_text::TERMINAL;
 use crate::pic::PICS;
 use crate::pit::PIT;
-use crate::multitask::PROCESS_SCHEDULAR;
-use crate::multitask::ProcessType;
-use crate::multitask::ProcessPriority;
 use crate::pic::PicFunctions;
 use core::arch::asm;
 use crate::paging::Table;
@@ -40,32 +37,13 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     PIT.lock().init();
     PICS.lock().init();
     interrupts::init();
-    let mapped_module = grub::map_modules(multiboot_information_address, &mut page_frame_allocator).unwrap();
+    grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
-    // let mapped_module = grub::map_modules(multiboot_information_address, &mut page_frame_allocator).unwrap();
 
-    // let user_process = multitask::Process::init(mapped_module, ProcessType::User, ProcessPriority::High, 0, &mut page_frame_allocator);
-
-    // unsafe {
-    //     switch_process(user_process.rsp, user_process.cr3);
-    // }
-
-    // interrupts::enable();
-    // PICS.lock().set_mask(0x20);
+    interrupts::enable();
+    PICS.lock().set_mask(0x20);
 
     loop {}
-}
-
-// This is an example process func - will eventually be embellished
-pub fn process_a() {
-    print!("From task 1\n");
-    loop{}
-}
-
-// This is an example process func - will eventually be embellished
-pub fn process_b() {
-    print!("From task 2\n");
-    loop{}
 }
 
 #[panic_handler] // This function is called on panic.

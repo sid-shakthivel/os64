@@ -26,16 +26,8 @@ use crate::paging::Page;
 pub struct Process {
     pid: u64,
     pub rsp: *const u64,
-    process_type: ProcessType,
     process_priority: ProcessPriority,
     pub cr3: *mut Table,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-#[allow(dead_code)]
-pub enum ProcessType {
-    Kernel,
-    User,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -46,6 +38,7 @@ pub enum ProcessPriority {
 }
 
 pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
+static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
 
 /*
     Processes schedular holds all tasks and decides which will be serviced
@@ -81,13 +74,13 @@ impl ProcessSchedular {
         } else {
             // Save the old RSP into the process
             old_rsp = unsafe { old_rsp.offset(5) }; // Adjust RSP by 5 bytes as RSP is pushed onto the stack
-            // TODO: Find more efficient wayp
+            // TODO: Find more efficient way
             let updated_process = Process { rsp: old_rsp, ..self.tasks[self.current_process_index].unwrap() }; 
             self.tasks[self.current_process_index] = Some(updated_process);
             self.current_process_index += 1;
         }
 
-        // Select next process and ensure it's not None
+        // Select next process and ensure it's not empty
         let mut current_task = self.tasks[self.current_process_index];
         if current_task.is_none() {
             self.current_process_index = 0;
@@ -96,15 +89,32 @@ impl ProcessSchedular {
         return Some(current_task.unwrap().rsp);
     }
 
-    pub fn create_process(&mut self, process_type: ProcessType, entrypoint: fn(), page_frame_allocator: &mut PageFrameAllocator) {
-        let address = entrypoint as *const ()as u64;
-        self.tasks[self.process_count] = Some(Process::init(address, process_type, ProcessPriority::High, self.process_count as u64, page_frame_allocator));
+    pub fn add_process(&mut self, process: Process) {
+        if self.process_count > MAX_PROCESS_NUM { panic!("Memory maxed") }
+        self.tasks[self.process_count] = Some(process);
         self.process_count += 1;
     }
 }
 
 impl Process {
-    pub fn init(func: u64, process_type: ProcessType, process_priority: ProcessPriority, pid: u64, page_frame_allocator: &mut PageFrameAllocator) -> Process {
+    pub fn init(entrypoint: u64, process_priority: ProcessPriority, pid: u64, page_frame_allocator: &mut PageFrameAllocator) -> Process {
+        // Convert physical addresses of process into virtual address to use when switching cr3
+        // TODO: add support for multiple pages
+        let v_address = USER_PROCESS_START_ADDRESS; 
+        let p_address = entrypoint;
+        paging::map_page(p_address, v_address, page_frame_allocator, true);
+
+        // Copy current address space
+        let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+
+        unsafe {
+            for i in 0..(*new_p4).entries.len() {
+                (*new_p4).entries[i] = (*P4).entries[i];
+            }
+            
+            (*new_p4).entries[511] = Page::new(new_p4 as u64);
+        }
+        
         let mut rsp = page_frame_allocator.alloc_frame().unwrap(); // Create a stack
 
         // Setup stack for interrupt
@@ -115,68 +125,27 @@ impl Process {
             // These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
             // When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
 
+            *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x000; // RFLAGS
+            *rsp.offset(-3) = 0x200; // RFLAGS
+            *rsp.offset(-4) = 0x18 | 0x3; // CS
+            *rsp.offset(-5) = USER_PROCESS_START_ADDRESS; // RIP
             *rsp.offset(-6) = 0x00; // RAX
             *rsp.offset(-7) = 0x00; // RBX
             *rsp.offset(-8) = 0x00; // RBC
             *rsp.offset(-9) = 0x00; // RDX
             *rsp.offset(-10) = 0x00; // RSI
             *rsp.offset(-11) = 0x00; // RDI
-            *rsp.offset(-12) = 0x00; // IRQ Number (0)
-            *rsp.offset(-13) = 0x00; // Dummy error thing
+            *rsp.offset(-12) = new_p4; // CR3
 
-            // Setup SS and CS registers
-            if process_type == ProcessType::Kernel {
-                *rsp.offset(-1) = 0x10; // SS 
-                *rsp.offset(-4) = 0x08; // CS
-                //  TODO: Fix and test this
-                *rsp.offset(-5) = func; // RIP
-            } else if process_type == ProcessType::User {
-                *rsp.offset(-1) = 0x20 | 0x3; // SS
-                *rsp.offset(-4) = 0x18 | 0x3; // CS
-                *rsp.offset(-5) = 0x800000; // RIP
-            }
-
-            rsp = rsp.offset(-13);
+            rsp = rsp.offset(-12);
         }
 
-        // User pages must have independent address spaces
-        if process_type == ProcessType::User {
-             // Convert physical addresses of process into virtual address to use when switching cr3
-            //  TODO: add support for multiple pages
-             for i in 0..1 {
-                let v_address = 0x800000 + i; // this address is purely for testing
-                let p_address = func + i;
-                paging::map_page(p_address, v_address, page_frame_allocator, true);
-            }
-
-            // Copy current address space
-            let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
-
-            unsafe {
-                for i in 0..(*new_p4).entries.len() {
-                    (*new_p4).entries[i] = (*P4).entries[i];
-                }
-                
-                (*new_p4).entries[511] = Page::new(new_p4 as u64);
-            }
-
-            Process {
-                pid: pid,
-                rsp: rsp,
-                process_priority: process_priority,
-                process_type: process_type,
-                cr3: new_p4
-            }
-        } else {
-            Process {
-                pid: pid,
-                rsp: rsp,
-                process_priority: process_priority,
-                process_type: process_type,
-                cr3: P4
-            }
+        Process {
+            pid: pid,
+            rsp: rsp,
+            process_priority: process_priority,
+            cr3: new_p4
         }
     }
 }

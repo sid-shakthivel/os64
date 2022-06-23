@@ -101,13 +101,9 @@ global handle_interrupt32
 extern timer_handler
 handle_interrupt32:
     push qword 0 
-    push qword 0x20
     pushaq
-    ; xchg bx, bx
     push rsp
-    ; xchg bx, bx
     call timer_handler
-    ; xchg bx, bx
     mov rsp, rax
     popaq
     add rsp, 0x10 

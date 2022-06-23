@@ -8,9 +8,11 @@
 use crate::page_frame_allocator::FrameAllocator;
 use crate::page_frame_allocator::PageFrameAllocator;
 use crate::vga_text::TERMINAL;
+use crate::multitask;
 use crate::print;
+use crate::paging::Table;
 
-pub fn map_modules(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) -> Option<u64> {
+pub fn initialise_userland(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {
     let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
 
     for module in boot_info.module_tag() {
@@ -20,9 +22,7 @@ pub fn map_modules(multiboot_information_address: usize, page_frame_allocator: &
         let module_size: isize =  (module.end_address() as isize) - (module.start_address() as isize);
 
         // TODO: implement method to map over multiple pages
-        if module_size > 1024 {
-            panic!("Module is too big and requires more then 1 page!")
-        } 
+        if module_size > 1024 { panic!("Module is too big and requires more then 1 page!") } 
 
         let frame = page_frame_allocator.alloc_frame().unwrap();
         let module_address = module.start_address() as *mut u64;
@@ -34,9 +34,18 @@ pub fn map_modules(multiboot_information_address: usize, page_frame_allocator: &
             }
         }
 
-        // Only 1 module for now thus we can return a pointer to the new frame (if needed)
-        // TODO: Implement support for multiple modules
-        return Some(frame as u64);
+        // Add process to list of processes
+        let user_process = multitask::Process::init(frame as u64, multitask::ProcessPriority::High, 0, page_frame_allocator);
+
+        unsafe {
+            // switch_process(user_process.rsp, user_process.cr3);
+        }
+
+        multitask::PROCESS_SCHEDULAR.lock().add_process(user_process);
+        multitask::PROCESS_SCHEDULAR.free();
     }
-    return None;
+}
+
+extern "C" {
+    fn switch_process(rsp: *const u64, p4: *const Table);
 }

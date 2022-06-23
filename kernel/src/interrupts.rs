@@ -176,16 +176,20 @@ pub extern fn interrupt_handler(registers: Registers) {
 
 #[no_mangle]
 pub extern fn timer_handler(old_stack: *const u64) -> *const u64 {
+    // Acknowledge interrupt
     PICS.lock().acknowledge(0x20); 
     PIT.lock().handle_timer();
-    let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(old_stack);
-    PROCESS_SCHEDULAR.free();
 
-    if new_stack.is_none() {
-        return old_stack;
-    } else {
-        return new_stack.unwrap();
-    }
+    // let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(old_stack);
+    // PROCESS_SCHEDULAR.free();
+
+    // if new_stack.is_none() {
+    //     return old_stack;
+    // } else {
+    //     return new_stack.unwrap();
+    // }
+
+    return old_stack;
 }
 
 pub extern fn enable() {
