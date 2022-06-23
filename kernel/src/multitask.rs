@@ -115,20 +115,8 @@ impl Process {
             // These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
             // When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
 
-            // Setup SS and CS registers
-            if process_type == ProcessType::Kernel {
-                *rsp.offset(-1) = 0x10; // SS 
-                *rsp.offset(-4) = 0x08; // CS
-                //  TODO: Fix and test this
-                *rsp.offset(-5) = func; // RIP
-            } else if process_type == ProcessType::User {
-                *rsp.offset(-1) = 0x18; // SS
-                *rsp.offset(-4) = 0x20; // CS
-                *rsp.offset(-5) = 0xC0000000; // RIP
-            }
-
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x200; // RFLAGS
+            *rsp.offset(-3) = 0x000; // RFLAGS
             *rsp.offset(-6) = 0x00; // RAX
             *rsp.offset(-7) = 0x00; // RBX
             *rsp.offset(-8) = 0x00; // RBC
@@ -137,6 +125,18 @@ impl Process {
             *rsp.offset(-11) = 0x00; // RDI
             *rsp.offset(-12) = 0x00; // IRQ Number (0)
             *rsp.offset(-13) = 0x00; // Dummy error thing
+
+            // Setup SS and CS registers
+            if process_type == ProcessType::Kernel {
+                *rsp.offset(-1) = 0x10; // SS 
+                *rsp.offset(-4) = 0x08; // CS
+                //  TODO: Fix and test this
+                *rsp.offset(-5) = func; // RIP
+            } else if process_type == ProcessType::User {
+                *rsp.offset(-1) = 0x20 | 0x3; // SS
+                *rsp.offset(-4) = 0x18 | 0x3; // CS
+                *rsp.offset(-5) = 0x800000; // RIP
+            }
 
             rsp = rsp.offset(-13);
         }

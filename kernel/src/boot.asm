@@ -116,10 +116,10 @@ enable_paging:
 section .rodata
 gdt64:
     dq 0 ; null entry
-    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) ; kernel code segment
-    dq (1<<44) | (1<<47) | (1<<53) ; kernel data segment
-    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) | (1 << 45) | (1 << 46) ; user code segment
-    dq (1<<44) | (1<<47) | (1<<53) | (1 << 45) | (1 << 46) ; user data segment
+    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) | (1 << 41) ; kernel code segment
+    dq (1<<44) | (1<<47) | (1<<53) | (1 << 41) ; kernel data segment
+    dq (1<<43) | (1<<44) | (1<<47) | (1<<53) | (1 << 45) | (1 << 46) | (1 << 41) ; user code segment
+    dq (1<<44) | (1<<47) | (1<<53) | (1 << 45) | (1 << 46) | (1 << 41) | (1 << 41); user data segment
 .pointer:
     dw $ - gdt64 - 1
     dq gdt64

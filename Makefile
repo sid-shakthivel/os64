@@ -1,9 +1,9 @@
 all:
-	# Kernel
-	cd kernel && make run
-	
 	# Userspace modules
 	cd modules/program && make
+
+	# Kernel
+	cd kernel && make run
 	
 run: all
 	bochs -f bochs/bochsrc.txt -q

@@ -1,3 +1,3 @@
 bits 64
-mov rax, 0xCAFEBABE
+mov rax, 0xcafebabe
 jmp $

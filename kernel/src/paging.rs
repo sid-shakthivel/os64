@@ -44,7 +44,7 @@ enum Flags {
 }
 
 #[derive(Copy, Clone, Debug)]
-// #[repr(C, packed)]
+#[repr(C, packed)]
 pub struct Page {
     pub entry: u64
 }
@@ -79,9 +79,13 @@ impl Page {
         let p_address = (self.entry & 0x000fffff_fffff000);
         return p_address as *mut u64;
     }
+
+    pub fn entry(&self) -> u64 {
+        return self.entry & 0x000fffff_fffff000;
+    }
 }
 
-// #[repr(C, packed)]
+#[repr(C, packed)]
 pub struct Table {
     pub entries: [Page; 512]
 }
@@ -112,7 +116,6 @@ impl Table {
             print!("building new table\n");
             let page_frame = allocator.alloc_frame();
             self.entries[index] = Page::new(page_frame.unwrap() as u64);
-            print!("{}\n", self.entries[index].entry);
         } 
         return self.get_table(index).expect("why not working");
     }
@@ -187,8 +190,6 @@ pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut Pag
 
         // Add option for kernel only pages
         (*p1).entries[p1_index].set_flag(Flags::UserAccessible);
-
-        print!("{:p} {}\n", page_frame.unwrap(), p2.entries[4].entry);
     }
 
     /*
