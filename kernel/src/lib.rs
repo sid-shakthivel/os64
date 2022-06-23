@@ -42,11 +42,13 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     interrupts::init();
     let mapped_module = grub::map_modules(multiboot_information_address, &mut page_frame_allocator).unwrap();
 
-    let user_process = multitask::Process::init(mapped_module, ProcessType::User, ProcessPriority::High, 0, &mut page_frame_allocator);
+    // let mapped_module = grub::map_modules(multiboot_information_address, &mut page_frame_allocator).unwrap();
 
-    unsafe {
-        switch_process(user_process.rsp, user_process.cr3);
-    }
+    // let user_process = multitask::Process::init(mapped_module, ProcessType::User, ProcessPriority::High, 0, &mut page_frame_allocator);
+
+    // unsafe {
+    //     switch_process(user_process.rsp, user_process.cr3);
+    // }
 
     // interrupts::enable();
     // PICS.lock().set_mask(0x20);

@@ -148,7 +148,7 @@ impl Process {
              for i in 0..1 {
                 let v_address = 0x800000 + i; // this address is purely for testing
                 let p_address = func + i;
-                paging::map_page(p_address, v_address, page_frame_allocator, None, true);
+                paging::map_page(p_address, v_address, page_frame_allocator, true);
             }
 
             // Copy current address space

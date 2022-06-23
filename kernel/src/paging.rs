@@ -51,7 +51,8 @@ pub struct Page {
 
 impl Page {
     pub fn new(physical_address: u64) -> Page {
-        Page { entry: (0x000fffff_fffff000 & (physical_address) | (1 << 0) | (1 << 1))  }
+        let mut entry = (0x000fffff_fffff000 & physical_address) | 0b11;
+        Page { entry: entry }
     }
 
     fn set_flag(&mut self, flag: Flags) {
@@ -113,22 +114,17 @@ impl Table {
     */
     fn create_next_table(&mut self, index: usize, allocator: &mut PageFrameAllocator) -> &mut Table {
         if self.get_table(index).is_none() {
-            print!("building new table\n");
             let page_frame = allocator.alloc_frame();
-            self.entries[index] = Page::new(page_frame.unwrap() as u64);
+            self.entries[index] = Page::new((page_frame.unwrap() as u64));
         } 
         return self.get_table(index).expect("why not working");
     }
 
-    // A reference to the actual table is needed instead of an address
+    // Return address of table
     fn get_table<'a>(&'a mut self, index: usize) -> Option<&'a mut Table> {
-        return self.get_table_address(index).map(|address| unsafe { &mut *(address as *mut _) });
-    }
-
-    // Each table from the level of hierarchy can be accessed via this formula: next_table_address = (table_address << 9) | (index << 12) in which index refers to certain sections of a virtual address
-    fn get_table_address(&mut self, index: usize) -> Option<u64> {
         if self.entries[index].entry & 1 > 0 {
-            return Some(((self as *const _ as u64) << 9) | ((index as u64) >> 12));
+            let table_address = self.entries[index].entry & 0x000fffff_fffff000;
+            return unsafe { Some(&mut *(table_address as *mut _)) }
         } else {
             None
         }
@@ -164,39 +160,22 @@ fn get_p1_index(virtual_address: u64) -> usize {
 
 // The index from the address is used to go to or create tables
 // TODO: swap is_user bool for enum
-pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator, optional_p4: Option<*mut Table>, is_user: bool) {   
+pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator, is_user: bool) {   
     assert!(virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000, "invalid address: 0x{:x}", virtual_address);
 
     let mut p4 = unsafe { &mut *P4 };
 
-    if optional_p4.is_none() == false {
-        p4 = unsafe { &mut *(optional_p4.unwrap()) };
-    }
-
     let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
     let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
-    // let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
+    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
 
-    unsafe {
-        let page_frame = allocator.alloc_frame();
-        p2.entries[4] = Page::new(page_frame.unwrap() as u64);
+    p1.entries[0] = Page::new(physical_address);
 
-        let test = p2.entries[4].entry & 0x000fffff_fffff000;
-
-        let p1: *mut Table = test as *mut _;
-
-        let p1_index = get_p1_index(virtual_address);
-        (*p1).entries[p1_index] = Page::new(physical_address);
-
-        // Add option for kernel only pages
-        (*p1).entries[p1_index].set_flag(Flags::UserAccessible);
+    if is_user {
+        p1.entries[0].set_flag(Flags::UserAccessible);
     }
 
-    /*
-        Translation lookaside buffer
-        This buffer cashes the translation of virtual to physical addresses and needs to be updated manually
-    */
-
+    // Translation lookaside buffer - cashes the translation of virtual to physical addresses and needs to be updated manually
     unsafe { flush_tlb(); }
 }
 
