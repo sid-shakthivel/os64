@@ -127,16 +127,16 @@ impl Process {
 
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x200; // RFLAGS
+            *rsp.offset(-3) = 0x202; // RFLAGS TODO: Change to 0x200
             *rsp.offset(-4) = 0x18 | 0x3; // CS
             *rsp.offset(-5) = USER_PROCESS_START_ADDRESS; // RIP
-            *rsp.offset(-6) = 0x00; // RAX
-            *rsp.offset(-7) = 0x00; // RBX
-            *rsp.offset(-8) = 0x00; // RBC
-            *rsp.offset(-9) = 0x00; // RDX
-            *rsp.offset(-10) = 0x00; // RSI
-            *rsp.offset(-11) = 0x00; // RDI
-            *rsp.offset(-12) = new_p4; // CR3
+            *rsp.offset(-6) = new_p4 as u64; // CR3
+            *rsp.offset(-7) = 0x00; // RAX
+            *rsp.offset(-8) = 0x00; // RBX
+            *rsp.offset(-9) = 0x00; // RBC
+            *rsp.offset(-10) = 0x00; // RDX
+            *rsp.offset(-11) = 0x00; // RSI
+            *rsp.offset(-12) = 0x00; // RDI
 
             rsp = rsp.offset(-12);
         }

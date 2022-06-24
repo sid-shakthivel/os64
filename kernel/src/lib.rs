@@ -39,9 +39,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     interrupts::init();
     grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
-
     interrupts::enable();
-    PICS.lock().set_mask(0x20);
 
     loop {}
 }

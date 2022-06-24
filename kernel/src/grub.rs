@@ -11,11 +11,13 @@ use crate::vga_text::TERMINAL;
 use crate::multitask;
 use crate::print;
 use crate::paging::Table;
+use multiboot2::load;
 
 pub fn initialise_userland(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {
-    let boot_info = unsafe{ multiboot2::load(multiboot_information_address) };
+    let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
 
-    for module in boot_info.module_tag() {
+    for module in boot_info.module_tags() {
+        print!("Here\n");
         // let ptr = module.start_address() as *const ();
         // let code: fn() = unsafe { core::mem::transmute(ptr) };
 

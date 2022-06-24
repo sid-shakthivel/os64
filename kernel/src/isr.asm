@@ -100,11 +100,24 @@ handle_interrupt 33
 global handle_interrupt32
 extern timer_handler
 handle_interrupt32:
-    push qword 0 
-    pushaq
+    ; Save cr3
+    mov rax, cr3
+    push rax
+
+    ; push qword 0 ; Save cr3
+    pushaq ; Save registers
     push rsp
-    call timer_handler
-    mov rsp, rax
+    call timer_handler ; Call handler
+    mov rsp, rax ; Switch stacks
     popaq
-    add rsp, 0x10 
+
+    ; Swap cr3 register
+    push rax
+    mov rax, [rsp + 0x08]
+    mov cr3, rax
+    pop rax
+
+    ; add rsp, 0x08
+    pop rax
+
     iretq

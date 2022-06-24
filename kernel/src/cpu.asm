@@ -49,7 +49,7 @@ flush_tlb:
 
 global switch_process
 switch_process:
-  ; ; Write address of P4 table to CR3 register
+  ; Write address of P4 table to CR3 register
   ; mov rax, rsi
   ; mov cr3, rax
   

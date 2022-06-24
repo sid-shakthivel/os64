@@ -1,6 +1,7 @@
 all:
 	# Userspace modules
 	cd modules/program && make
+	cd modules/program2 && make
 
 	# Kernel
 	cd kernel && make run
