@@ -11,6 +11,8 @@ crate-type = ["staticlib"]
 [dependencies]
 spin = "0.9.3"
 multiboot2 = "0.13.3"
+bitflags = "0.9.1"
+bit_field = "0.7.0"
 
 [dependencies.lazy_static]
 version = "1.0"

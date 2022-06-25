@@ -17,6 +17,8 @@ mod spinlock;
 mod grub;
 
 extern crate multiboot2;
+extern crate bitflags;
+extern crate bit_field;
 
 use core::panic::PanicInfo;
 use crate::vga_text::TERMINAL;
@@ -27,19 +29,24 @@ use core::arch::asm;
 use crate::paging::Table;
 use crate::page_frame_allocator::FrameAllocator;
 
+
+extern "C" {
+    pub(crate) static __kernel_end: usize;
+}
+
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     TERMINAL.lock().clear();    
 
     let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
 
-    // gdt::init();
+    gdt::init();
     PIT.lock().init();
     PICS.lock().init();
     interrupts::init();
     grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
-    interrupts::enable();
+    // interrupts::enable();
 
     loop {}
 }

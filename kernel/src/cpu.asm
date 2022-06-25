@@ -25,25 +25,22 @@ global gdt_flush
 gdt_flush:
   extern GDTR
   lgdt  [GDTR]
-
-  push 0x08
-  lea rax, [rel reload_cs]
-  push rax
-  retfq
-
-reload_cs:
-  mov ax, 0x10
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-  ret
-
+  ret 
+  
 global flush_tlb
 flush_tlb:
   push rax
   mov rax, cr3
   mov cr3, rax
+  pop rax
+  ret
+
+global flush_tss
+flush_tss:
+  extern TSS_OFFSET
+  push rax
+  mov rax, TSS_OFFSET
+  ltr [rax]
   pop rax
   ret
 

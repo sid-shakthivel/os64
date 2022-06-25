@@ -113,7 +113,7 @@ impl PageFrameAllocator {
         let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
         let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
 
-        let memory_start: u64 = (boot_info.end_address() as u64) + (512 as u64) & 0x000fffff_fffff000;
+        let memory_start: u64 = (boot_info.end_address() as u64) + (2000000 as u64) & 0x000fffff_fffff000;
         let memory_end: u64 = memory_map_tag.memory_areas().last().expect("Unknown Length").end_address() & 0x000fffff_fffff000;
 
         let mut page_frame_allocator = PageFrameAllocator { memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };

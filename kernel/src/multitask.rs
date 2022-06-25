@@ -45,7 +45,7 @@ static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
     TODO: Set next task based on priority
 */
 pub struct ProcessSchedular {
-    tasks: [Option<Process>; MAX_PROCESS_NUM],
+    pub tasks: [Option<Process>; MAX_PROCESS_NUM],
     is_from_kernel: bool,
     process_count: usize,
     current_process_index: usize,
@@ -68,24 +68,26 @@ impl ProcessSchedular {
     pub fn schedule_process(&mut self, mut old_rsp: *const u64) -> Option<*const u64> {
         if self.tasks[0].is_none() { return None; }
 
-        if self.is_from_kernel == true {
-            // If this is the first process to be called, it stems from kernel and that stack need not be saved
-            self.is_from_kernel = false;
-        } else {
-            // Save the old RSP into the process
-            old_rsp = unsafe { old_rsp.offset(5) }; // Adjust RSP by 5 bytes as RSP is pushed onto the stack
-            // TODO: Find more efficient way
-            let updated_process = Process { rsp: old_rsp, ..self.tasks[self.current_process_index].unwrap() }; 
-            self.tasks[self.current_process_index] = Some(updated_process);
-            self.current_process_index += 1;
-        }
+        // if self.is_from_kernel == true {
+        //     // If this is the first process to be called, it stems from kernel and that stack need not be saved
+        //     self.is_from_kernel = false;
+        // } else {
+        //     // Save the old RSP into the process
+        //     old_rsp = unsafe { old_rsp.offset(5) }; // Adjust RSP by 5 bytes as RSP is pushed onto the stack
+        //     // TODO: Find more efficient way
+        //     let updated_process = Process { rsp: old_rsp, ..self.tasks[self.current_process_index].unwrap() }; 
+        //     self.tasks[self.current_process_index] = Some(updated_process);
+        //     self.current_process_index += 1;
+        // }
 
-        // Select next process and ensure it's not empty
-        let mut current_task = self.tasks[self.current_process_index];
-        if current_task.is_none() {
-            self.current_process_index = 0;
-            current_task = self.tasks[self.current_process_index];
-        }
+        // // Select next process and ensure it's not empty
+        // let mut current_task = self.tasks[self.current_process_index];
+        // if current_task.is_none() {
+        //     self.current_process_index = 0;
+        //     current_task = self.tasks[self.current_process_index];
+        // }
+        self.current_process_index = 0;
+        let current_task = self.tasks[self.current_process_index];
         return Some(current_task.unwrap().rsp);
     }
 
@@ -93,6 +95,8 @@ impl ProcessSchedular {
         if self.process_count > MAX_PROCESS_NUM { panic!("Memory maxed") }
         self.tasks[self.process_count] = Some(process);
         self.process_count += 1;
+
+        // print!("{:?}\n", self.tasks);
     }
 }
 
@@ -127,7 +131,7 @@ impl Process {
 
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x202; // RFLAGS TODO: Change to 0x200
+            *rsp.offset(-3) = 0x202; // RFLAGS 
             *rsp.offset(-4) = 0x18 | 0x3; // CS
             *rsp.offset(-5) = USER_PROCESS_START_ADDRESS; // RIP
             *rsp.offset(-6) = new_p4 as u64; // CR3

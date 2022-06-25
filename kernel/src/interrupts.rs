@@ -79,6 +79,8 @@ impl idt_entry {
                 GateType::Trap => 0x8F,
                 GateType::Interrupt => 0x8E
             };
+            IDT[vector].attributes |= (1 << 5);
+            IDT[vector].attributes |= (1 << 6);
             IDT[vector].isr_low = (func_address & 0xFFFF) as u16;
             IDT[vector].isr_mid = ((func_address >> 16) & 0xFFFF) as u16;
             IDT[vector].isr_high = (func_address >> 32) as u32;

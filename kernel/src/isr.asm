@@ -100,6 +100,7 @@ handle_interrupt 33
 global handle_interrupt32
 extern timer_handler
 handle_interrupt32:
+    cli
     ; Save cr3
     mov rax, cr3
     push rax
@@ -117,7 +118,8 @@ handle_interrupt32:
     mov cr3, rax
     pop rax
 
-    ; add rsp, 0x08
     pop rax
+
+    xchg bx, bx
 
     iretq
