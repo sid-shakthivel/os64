@@ -13,6 +13,7 @@ spin = "0.9.3"
 multiboot2 = "0.13.3"
 bitflags = "0.9.1"
 bit_field = "0.7.0"
+x86_64 = "0.14.9"
 
 [dependencies.lazy_static]
 version = "1.0"

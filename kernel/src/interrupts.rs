@@ -16,6 +16,9 @@ use crate::pic::PicFunctions;
 use crate::keyboard::KEYBOARD;
 use crate::pit::PIT;
 use crate::multitask::PROCESS_SCHEDULAR;
+use crate::gdt::TSS;
+use crate::multitask;
+use x86_64::addr::VirtAddr;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -176,22 +179,62 @@ pub extern fn interrupt_handler(registers: Registers) {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct ProcessRegisters {
+    rip: u64,
+    cs: u64,
+    rflags: u64,
+    rsp: u64,
+    ss: u64
+}
+
+impl ProcessRegisters {
+    pub const fn new() -> ProcessRegisters {
+        ProcessRegisters {
+            rip: 0,
+            cs: 0,
+            rflags: 0,
+            rsp: 0,
+            ss: 0
+        }
+    }
+}
+
 #[no_mangle]
-pub extern fn timer_handler(old_stack: *const u64) -> *const u64 {
-    // Acknowledge interrupt
+pub static mut old_process: ProcessRegisters = ProcessRegisters::new();
+
+#[no_mangle]
+pub static mut new_process_rsp: u64 = 0;
+
+#[no_mangle]
+pub extern fn timer_handler(registers: ProcessRegisters) -> *const u64 {
+    // let unaligned_registers = core::ptr::addr_of!(registers);
+    // let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
+
+    let unaligned_rsp = core::ptr::addr_of!(registers.rsp);
+    let aligned_rsp = unsafe { core::ptr::read_unaligned(unaligned_rsp) };
+    
+    // // Acknowledge interrupt
     PICS.lock().acknowledge(0x20); 
     PIT.lock().handle_timer();
 
     print!("Tick\n");
 
-    let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(old_stack);
+    let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(aligned_rsp);
     PROCESS_SCHEDULAR.free();
 
-    if new_stack.is_none() {
-        return old_stack;
-    } else {
-        return new_stack.unwrap();
+    unsafe {
+         TSS.privilege_stack_table[0] = VirtAddr::new(multitask::KERNEL_STACK as u64);
+         TSS.privilege_stack_table[1] = VirtAddr::new(multitask::KERNEL_STACK as u64);
+         TSS.privilege_stack_table[2] = VirtAddr::new(multitask::KERNEL_STACK as u64);
     }
+
+    unsafe {
+        old_process = registers;
+        new_process_rsp = new_stack.unwrap() as u64;
+    }
+
+    return new_stack.unwrap();
 }
 
 pub extern fn enable() {

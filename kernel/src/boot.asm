@@ -29,23 +29,23 @@ setup_paging:
     ; Fill P2 with 512 entries 
 
     mov eax, p3_table
-    or eax, 0b11 ; Present, Writeable
+    or eax, 0b111 ; Present, Writeable
     mov [p4_table], eax
 
     mov eax, p2_table
-    or eax, 0b11 ; Present, Writeable
+    or eax, 0b111 ; Present, Writeable
     mov [p3_table], eax
 
     mov eax, p1_table_1
-    or eax, 0b11 ; Present, Writeable
+    or eax, 0b111 ; Present, Writeable
     mov [p2_table + 0 * 8], eax
 
     mov eax, p1_table_2
-    or eax, 0b11
+    or eax, 0b111
     mov [p2_table + 1 * 8], eax
 
     mov eax, p1_table_3
-    or eax, 0b11
+    or eax, 0b111
     mov [p2_table + 2 * 8], eax
 
     mov ecx, 0
@@ -53,7 +53,7 @@ setup_paging:
 .map_p1_table_1
     mov eax, 0x1000
     mul ecx
-or eax, 0b11 ; Present, Writable
+or eax, 0b111 ; Present, Writable
     mov [p1_table_1 + ecx * 8], eax ; 8 bit entries
 
     inc ecx
@@ -65,7 +65,7 @@ or eax, 0b11 ; Present, Writable
 .map_p1_table_2
     mov eax, 0x1000
     mul ecx
-    or eax, 0b11 ; Present, Writable
+    or eax, 0b111 ; Present, Writable
     mov [p1_table_2 + ebx * 8], eax ; 8 bit entries
 
     inc ebx
@@ -78,7 +78,7 @@ or eax, 0b11 ; Present, Writable
 .map_p1_table_3
     mov eax, 0x1000
     mul ecx
-    or eax, 0b11 ; Present, Writable
+    or eax, 0b111 ; Present, Writable
     mov [p1_table_3 + ebx * 8], eax ; 8 bit entries
 
     inc ebx
@@ -117,10 +117,6 @@ section .rodata
 gdt64:
     dq 0 ; null entry
     dq 0x002098000000ffff ; kernel code segment
-    dq 0x008092000000ffff ; kernel data segment
-    dq 0x0020f8000000ffff ; user code segment 
-    dq 0x0080f2000000ffff ; user data segment
-    dq 0x000089000000006a ; TSS
 .pointer:
     dw $ - gdt64 - 1
     dq gdt64

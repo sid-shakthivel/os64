@@ -1,5 +1,7 @@
 ; src/isr.asm
 
+section .text
+
 extern exception_handler
 extern interrupt_handler
 
@@ -96,30 +98,24 @@ handle_no_err_exception 31
 ; handle_interrupt 32
 handle_interrupt 33
 
-
 global handle_interrupt32
 extern timer_handler
+extern old_process
+extern new_process_rsp
 handle_interrupt32:
-    cli
-    ; Save cr3
-    mov rax, cr3
-    push rax
+    call timer_handler
+    mov rsp, [old_process + 24]
+    push qword [old_process + 32]
+    push qword [old_process + 24]
+    push qword [old_process + 16]
+    push qword [old_process + 8]
+    push qword [old_process]
 
-    ; push qword 0 ; Save cr3
-    pushaq ; Save registers
-    push rsp
-    call timer_handler ; Call handler
-    mov rsp, rax ; Switch stacks
+    pushaq
+
+    mov rsp, [new_process_rsp]
     popaq
-
-    ; Swap cr3 register
-    push rax
-    mov rax, [rsp + 0x08]
-    mov cr3, rax
-    pop rax
-
-    pop rax
-
-    xchg bx, bx
-
     iretq
+
+    ; rax is return
+    ; rdi is first argument

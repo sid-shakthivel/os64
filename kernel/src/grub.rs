@@ -17,7 +17,6 @@ pub fn initialise_userland(multiboot_information_address: usize, page_frame_allo
     let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
 
     for module in boot_info.module_tags() {
-        print!("Here\n");
         // let ptr = module.start_address() as *const ();
         // let code: fn() = unsafe { core::mem::transmute(ptr) };
 

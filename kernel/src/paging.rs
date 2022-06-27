@@ -51,7 +51,7 @@ pub struct Page {
 
 impl Page {
     pub fn new(physical_address: u64) -> Page {
-        let mut entry = (0x000fffff_fffff000 & physical_address) | 0b11;
+        let mut entry = (0x000fffff_fffff000 & physical_address) | 0b111;
         Page { entry: entry }
     }
 

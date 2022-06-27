@@ -16,17 +16,11 @@ outb_raw:
 ; Load IDT
 global idt_flush    
 idt_flush:
-  ; cli ; Disable interrupts
+  ; cli ; Disable interruptsp
   extern IDTR
   lidt [IDTR]
   ret
 
-global gdt_flush
-gdt_flush:
-  extern GDTR
-  lgdt  [GDTR]
-  ret 
-  
 global flush_tlb
 flush_tlb:
   push rax
@@ -35,37 +29,8 @@ flush_tlb:
   pop rax
   ret
 
-global flush_tss
-flush_tss:
-  extern TSS_OFFSET
-  push rax
-  mov rax, TSS_OFFSET
-  ltr [rax]
-  pop rax
-  ret
-
 global switch_process
-switch_process:
-  ; Write address of P4 table to CR3 register
-  ; mov rax, rsi
-  ; mov cr3, rax
-  
-  ; ; Enable pAE paging
-  ; mov rax, cr4
-  ; or rax, 1 << 5,
-  ; mov cr4, rax
-
-  ; ; Set long mode bit in EFER MSR
-  ; mov rcx, 0xC0000080
-  ; rdmsr
-  ; or rax, 1 << 8
-  ; wrmsr
-
-  ; ; Enable paging
-  ; mov rax, cr0
-  ; or rax, 1 << 31 | 1 << 0
-  ; mov cr0, rax
-
+switch_process: 
   mov ax, 0x20 | 0x3 ; All segment registers must be equal to ss (user data segment)
   mov ds, ax
   mov es, ax
