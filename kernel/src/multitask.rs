@@ -77,9 +77,8 @@ impl ProcessSchedular {
             }
             self.is_from_kernel = false;
         } else {
-            // print!("Old rsp is {:x}, adjusted rsp is {:x}\n", old_rsp_copy, new_rsp);
-            // Save the old RSP into the process
-            old_rsp -= 0x58; // Adjust RSP by 5 bytes as RSP is pushed onto the stack
+            // Save the old RSP into the process but adjust the value as certain values are pushed
+            old_rsp -= 0x60; 
             // TODO: Find more efficient way
             let updated_process = Process { rsp: old_rsp as *const _, ..self.tasks[self.current_process_index].unwrap() }; 
             self.tasks[self.current_process_index] = Some(updated_process);
@@ -99,17 +98,19 @@ impl ProcessSchedular {
         if self.process_count > MAX_PROCESS_NUM { panic!("Memory maxed") }
         self.tasks[self.process_count] = Some(process);
         self.process_count += 1;
-
-        // print!("{:?}\n", self.tasks);
     }
 }
 
 impl Process {
-    pub fn init(entrypoint: u64, process_priority: ProcessPriority, pid: u64, page_frame_allocator: &mut PageFrameAllocator) -> Process {
+    pub fn init(entrypoint: u64, process_priority: ProcessPriority, page_frame_allocator: &mut PageFrameAllocator) -> Process {
         // Convert physical addresses of process into virtual address to use when switching cr3
         // TODO: add support for multiple pages
-        let v_address = USER_PROCESS_START_ADDRESS; 
+        let pid = PROCESS_SCHEDULAR.lock().process_count as u64;
+        PROCESS_SCHEDULAR.free();
+        let v_address = USER_PROCESS_START_ADDRESS;
         let p_address = entrypoint;
+        print!("ENTRYPOINT: {}\n", entrypoint);
+
         paging::map_page(p_address, v_address, page_frame_allocator, true);
 
         // Copy current address space
@@ -117,7 +118,7 @@ impl Process {
 
         unsafe {
             for i in 0..(*new_p4).entries.len() {
-                (*new_p4).entries[i] = (*P4).entries[i];
+                (*new_p4).entries[i] = ((*P4).entries[i]).clone();
             }
             
             (*new_p4).entries[511] = Page::new(new_p4 as u64);
@@ -137,15 +138,18 @@ impl Process {
             *rsp.offset(-2) = stack_top; // RSP
             *rsp.offset(-3) = 0x202; // RFLAGS 
             *rsp.offset(-4) = 0x18 | 0x3; // CS
-            *rsp.offset(-5) = USER_PROCESS_START_ADDRESS; // RIP
+            *rsp.offset(-5) = entrypoint; // RIP
             *rsp.offset(-6) = 0x00; // RAX
             *rsp.offset(-7) = 0x00; // RBX
             *rsp.offset(-8) = 0x00; // RBC
             *rsp.offset(-9) = 0x00; // RDX
             *rsp.offset(-10) = 0x00; // RSI
             *rsp.offset(-11) = 0x00; // RDI
+            *rsp.offset(-12) = new_p4 as u64; // CR3
 
-            rsp = rsp.offset(-11);
+            print!("P4 is {:x}\n", new_p4 as u64);
+
+            rsp = rsp.offset(-12);
         }
 
         Process {

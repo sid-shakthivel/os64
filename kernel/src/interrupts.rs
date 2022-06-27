@@ -218,7 +218,7 @@ pub extern fn timer_handler(registers: ProcessRegisters) -> *const u64 {
     PICS.lock().acknowledge(0x20); 
     PIT.lock().handle_timer();
 
-    print!("Tick\n");
+    // print!("Tick\n");
 
     let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(aligned_rsp);
     PROCESS_SCHEDULAR.free();

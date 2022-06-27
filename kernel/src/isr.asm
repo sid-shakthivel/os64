@@ -113,8 +113,16 @@ handle_interrupt32:
 
     pushaq
 
+    mov rax, cr3
+    push rax
+
     mov rsp, [new_process_rsp]
+    
+    pop rax
+    ; mov cr3, rax
+    xchg bx, bx
     popaq
+
     iretq
 
     ; rax is return

@@ -36,7 +36,7 @@ pub fn initialise_userland(multiboot_information_address: usize, page_frame_allo
         }
 
         // Add process to list of processes
-        let user_process = multitask::Process::init(frame as u64, multitask::ProcessPriority::High, 0, page_frame_allocator);
+        let user_process = multitask::Process::init(frame as u64, multitask::ProcessPriority::High, page_frame_allocator);
 
         multitask::PROCESS_SCHEDULAR.lock().add_process(user_process);
         multitask::PROCESS_SCHEDULAR.free();
