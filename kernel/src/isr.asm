@@ -119,8 +119,8 @@ handle_interrupt32:
     mov rsp, [new_process_rsp]
     
     pop rax
-    ; mov cr3, rax
-    xchg bx, bx
+    mov cr3, rax
+    ; xchg bx, bx
     popaq
 
     iretq

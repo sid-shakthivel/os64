@@ -38,7 +38,7 @@ pub enum ProcessPriority {
 }
 
 pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
-static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
+static USER_PROCESS_START_ADDRESS: u64 = 0xC0000000;
 
 /*
     Processes schedular holds all tasks and decides which will be serviced
@@ -109,9 +109,6 @@ impl Process {
         PROCESS_SCHEDULAR.free();
         let v_address = USER_PROCESS_START_ADDRESS;
         let p_address = entrypoint;
-        print!("ENTRYPOINT: {}\n", entrypoint);
-
-        paging::map_page(p_address, v_address, page_frame_allocator, true);
 
         // Copy current address space
         let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
@@ -123,6 +120,8 @@ impl Process {
             
             (*new_p4).entries[511] = Page::new(new_p4 as u64);
         }
+
+        paging::map_page(p_address, v_address, page_frame_allocator, true, Some(new_p4));
         
         let mut rsp = page_frame_allocator.alloc_frame().unwrap(); // Create a stack
 
@@ -138,7 +137,7 @@ impl Process {
             *rsp.offset(-2) = stack_top; // RSP
             *rsp.offset(-3) = 0x202; // RFLAGS 
             *rsp.offset(-4) = 0x18 | 0x3; // CS
-            *rsp.offset(-5) = entrypoint; // RIP
+            *rsp.offset(-5) = v_address; // RIP
             *rsp.offset(-6) = 0x00; // RAX
             *rsp.offset(-7) = 0x00; // RBX
             *rsp.offset(-8) = 0x00; // RBC

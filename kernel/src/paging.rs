@@ -160,16 +160,20 @@ fn get_p1_index(virtual_address: u64) -> usize {
 
 // The index from the address is used to go to or create tables
 // TODO: swap is_user bool for enum
-pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator, is_user: bool) {   
+pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator, is_user: bool, optional_p4: Option<*mut Table>) {   
     assert!(virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000, "invalid address: 0x{:x}", virtual_address);
 
     let mut p4 = unsafe { &mut *P4 };
+
+    if optional_p4.is_none() == false {
+        p4 = unsafe { &mut *(optional_p4.unwrap()) };
+    }
 
     let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
     let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
     let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
 
-    p1.entries[0] = Page::new(physical_address);
+    p1.entries[get_p1_index(virtual_address)] = Page::new(physical_address);
 
     if is_user {
         p1.entries[0].set_flag(Flags::UserAccessible);
