@@ -2,7 +2,13 @@
 
 Features:
 - VGA text mode
-- Interrups
+- Interrupts
 - Paging
 - Multitasking
 - Userland
+- Syscalls
+
+TODO:
+- [ ] File system
+- [ ] C Standard library 
+- [ ] GUI

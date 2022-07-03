@@ -23,12 +23,9 @@ use x86_64::addr::VirtAddr;
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
 
-/*
-    Each entry in IDT is 16 bytes
-    Two gates include trap (handles exceptions) and interrupt for other interrupts
-*/
+// Each entry in IDT is 16 bytes
 #[derive(Copy, Clone, Debug)]
-#[repr(C, packed)] // By default structs are given padding - this should be disabled
+#[repr(C, packed)]
 pub struct idt_entry {
     isr_low: u16, // Low 16 bits of ISR address
     kernel_cs: u16, // GDT segment CPU loads before calling ISR
@@ -46,144 +43,40 @@ pub struct idtr {
 }
 
 pub enum GateType {
-    Trap, // For exceptions 
-    Interrupt // To call specific exceptions
+    Trap, // For exceptions only
+    Interrupt // For others
 }
 
-// The ISR will return a stack frame which consists of the following data
+pub enum PrivilegeLevel {
+    Ring0, // Kernel mode
+    Ring1, // Device driver mode
+    Ring2, // Device driver mode
+    Ring3, // Userspace
+}
+
+// These registers are pushed onto the stack on an interrupt
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct Registers {
-    rdi: u64,
-    rsi: u64,
-    rdx: u64,
-    rcx: u64,
-    rbx: u64,
-    rax: u64,
-    num: u64,
-    error_code: u64,
-    rip: u64,
-    cs: u64,
-    rflags: u64,
+    pub rdi: u64,
+    pub rsi: u64,
+    pub rdx: u64,
+    pub rcx: u64,
+    pub rbx: u64,
+    pub rax: u64,
+    pub num: u64,
+    pub error_code: u64,
+    pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
     pub rsp: u64,
-    ss: u64
+    pub ss: u64
 }
 
-#[no_mangle]
-pub static mut IDTR: idtr = idtr { limit: 0, base: 0 };
-pub static mut IDT: [idt_entry; 256] = [idt_entry { isr_low: 0, kernel_cs: 0x08, ist: 0, attributes: 0, isr_mid: 0, isr_high: 0, reserved: 0}; 256];
-
-const EXCEPTION_MESSAGES: &'static [&'static str] = &["Divide By Zero", "Debug", "Non-maskable Interrupt", "Breakpoint", "Overflow", "Bound Range Exceeded", "Invalid Opcode", "Device not Available", "Double Fault", "Coprocessor Segment Overrun", "Invalid TSS", "Segment Not Present", "Stack-Segment Fault", "General Protection Fault", "Page Fault", "Reserved", "x87 Floating Point Exception", "Alignment Check", "Machine Check", "SIMD Floating Point Exception", "Virtualisation Exception", "Control Exception", "Hypervisor Injection Exception", "Security Exception", "Reserved"];
-
-impl idt_entry {
-    pub fn edit_entry(vector: usize, func_address: u64, gate_type: GateType) {
-        unsafe {
-            IDT[vector].attributes = match gate_type {
-                GateType::Trap => 0x8F,
-                GateType::Interrupt => 0x8E
-            };
-            IDT[vector].attributes |= (1 << 5);
-            IDT[vector].attributes |= (1 << 6);
-            IDT[vector].isr_low = (func_address & 0xFFFF) as u16;
-            IDT[vector].isr_mid = ((func_address >> 16) & 0xFFFF) as u16;
-            IDT[vector].isr_high = (func_address >> 32) as u32;
-        } 
-    }
-}
-
-pub fn init() {
-    unsafe {
-        let idt_address = (&IDT[0] as *const idt_entry) as u64;
-        IDTR.limit = (size_of::<idt_entry>() as u16) * (IDT_MAX_DESCRIPTIONS as u16 - 1);
-        IDTR.base = idt_address;
-
-        // Exceptions
-        idt_entry::edit_entry(0, (handle_no_err_exception0 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(1, (handle_no_err_exception1 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(2, (handle_no_err_exception2 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(3, (handle_no_err_exception3 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(4, (handle_no_err_exception4 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(5, (handle_no_err_exception5 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(6, (handle_no_err_exception6 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(7, (handle_no_err_exception7 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(8, (handle_err_exception8 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(9, (handle_no_err_exception9 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(10, (handle_err_exception10 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(11, (handle_err_exception11 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(12, (handle_err_exception12 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(13, (handle_err_exception13 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(14, (handle_err_exception14 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(15, (handle_no_err_exception15 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(16, (handle_no_err_exception16 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(17, (handle_err_exception17 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(18, (handle_no_err_exception18 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(19, (handle_no_err_exception19 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(20, (handle_no_err_exception20 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(21, (handle_err_exception21 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(22, (handle_no_err_exception22 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(23, (handle_no_err_exception23 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(24, (handle_no_err_exception24 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(25, (handle_no_err_exception25 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(26, (handle_no_err_exception26 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(27, (handle_no_err_exception27 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(28, (handle_no_err_exception28 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(29, (handle_err_exception29 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(30, (handle_err_exception30 as *const u64) as u64, GateType::Trap);
-        idt_entry::edit_entry(31, (handle_no_err_exception31 as *const u64) as u64, GateType::Trap);
-
-        // Interrupts
-        idt_entry::edit_entry(33, (handle_interrupt33 as *const u64) as u64, GateType::Interrupt);
-        idt_entry::edit_entry(32, (handle_interrupt32 as *const u64) as u64, GateType::Interrupt);
-
-        // Syscalls
-        idt_entry::edit_entry(0x80, (handle_interrupt80 as *const u64) as u64, GateType::Interrupt);
-
-        // Load idt
-        idt_flush();
-    }
-}
-
-#[no_mangle]
-pub extern fn exception_handler(registers: Registers) {
-    // Since registers is a packed struct, it must be aligned correctly
-    let unaligned_registers = core::ptr::addr_of!(registers);
-    let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
-    
-    // Print a suitable error message
-    if aligned_registers.num < 22 {
-        // print!("{}\n", EXCEPTION_MESSAGES[aligned_registers.num as usize]);
-    } else if aligned_registers.num > 27 { 
-        // print!("{}\n", EXCEPTION_MESSAGES[(aligned_registers.num as usize) - 6]);
-    } else {
-        print!("Reserved\n");
-    }
-
-    // Print registers
-    // print!("{:?}\n", aligned_registers);
-
-    unsafe {
-        asm!("hlt");
-    }
-}
-
-#[no_mangle]
-pub extern fn interrupt_handler(registers: Registers) {
-    let unaligned_register_num = core::ptr::addr_of!(registers.num);
-    let aligned_register_num = unsafe { core::ptr::read_unaligned(unaligned_register_num) };
-
-    PICS.lock().acknowledge(aligned_register_num as u8);
-
-    match aligned_register_num {
-        0x20 => {
-            PIT.lock().handle_timer()
-        }, // Timer
-        0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
-        _ => {}
-    }
-}
-
+// These registers are pushed on an int 
 #[derive(Debug, Copy, Clone)]
-pub struct ProcessRegisters {
+#[repr(C, packed)]
+pub struct IretStack {
     rip: u64,
     cs: u64,
     rflags: u64,
@@ -191,9 +84,46 @@ pub struct ProcessRegisters {
     ss: u64
 }
 
-impl ProcessRegisters {
-    pub const fn new() -> ProcessRegisters {
-        ProcessRegisters {
+// TODO: Swap these global statics to a mutex or similar
+#[no_mangle]
+pub static mut IDTR: idtr = idtr { limit: 0, base: 0 };
+pub static mut IDT: [idt_entry; 256] = [idt_entry { isr_low: 0, kernel_cs: 0x08, ist: 0, attributes: 0, isr_mid: 0, isr_high: 0, reserved: 0}; 256];
+
+const EXCEPTION_MESSAGES: &'static [&'static str] = &["Divide By Zero", "Debug", "Non-maskable Interrupt", "Breakpoint", "Overflow", "Bound Range Exceeded", "Invalid Opcode", "Device not Available", "Double Fault", "Coprocessor Segment Overrun", "Invalid TSS", "Segment Not Present", "Stack-Segment Fault", "General Protection Fault", "Page Fault", "Reserved", "x87 Floating Point Exception", "Alignment Check", "Machine Check", "SIMD Floating Point Exception", "Virtualisation Exception", "Control Exception", "Hypervisor Injection Exception", "Security Exception", "Reserved"];
+
+#[no_mangle]
+pub static mut old_process: IretStack = IretStack::new();
+
+#[no_mangle]
+pub static mut new_process_rsp: u64 = 0;
+
+impl idt_entry {
+    pub fn edit_entry(vector: usize, raw_func: unsafe extern "C" fn(), gate_type: GateType, privilege_level: PrivilegeLevel) {
+        let func_address = (raw_func as *const u64) as u64;
+        unsafe {
+            IDT[vector].attributes = match gate_type {
+                GateType::Trap => 0x8F,
+                GateType::Interrupt => 0x8E
+            };
+
+            match privilege_level {
+                PrivilegeLevel::Ring3 => {
+                    IDT[vector].attributes |= 1 << 5; 
+                    IDT[vector].attributes |= 1 << 6;
+                },
+                _ => {}
+            }
+
+            IDT[vector].isr_low = (func_address & 0xFFFF) as u16;
+            IDT[vector].isr_mid = ((func_address >> 16) & 0xFFFF) as u16;
+            IDT[vector].isr_high = (func_address >> 32) as u32;
+        }
+    }
+}
+
+impl IretStack {
+    pub const fn new() -> IretStack {
+        IretStack {
             rip: 0,
             cs: 0,
             rflags: 0,
@@ -204,69 +134,56 @@ impl ProcessRegisters {
 }
 
 #[no_mangle]
-pub static mut old_process: ProcessRegisters = ProcessRegisters::new();
-
-#[no_mangle]
-pub static mut new_process_rsp: u64 = 0;
-
-// Clean up this messy code
-#[no_mangle]
-pub extern fn timer_handler(registers: ProcessRegisters) -> *const u64 {
-    let unaligned_rsp = core::ptr::addr_of!(registers.rsp);
-    let aligned_rsp = unsafe { core::ptr::read_unaligned(unaligned_rsp) };
+pub extern fn exception_handler(registers: Registers) {
+    let unaligned_error_code = core::ptr::addr_of!(registers.error_code); // Packed structs must be aligned properly
+    let aligned_error_code = unsafe { core::ptr::read_unaligned(unaligned_error_code) };
     
+    // Print a suitable error messages 
+    match registers.num {
+        0..=22 =>  print!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
+        27..=31 => print!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
+        _ => print!("Reserved\n"),
+    }
+
+    print!("Error Code: {:b}\n", aligned_error_code);
+
+    disable();
+    unsafe { asm!("hlt"); }
+}
+
+#[no_mangle]
+pub extern fn interrupt_handler(registers: Registers) {
+    PICS.lock().acknowledge(registers.num as u8); // To allow further interrupts, an acknowledgement must be sent
+
+    match registers.num {
+        0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
+        _ => panic!("Unknown Interrupt!"),
+    }
+}
+
+// TODO: Clean and refactor this
+#[no_mangle]
+pub extern fn pit_handler(iret_stack: IretStack) -> *const u64 {
     // // Acknowledge interrupt
     PICS.lock().acknowledge(0x20); 
     PIT.lock().handle_timer();
 
-    let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(aligned_rsp);
+    let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(iret_stack.rsp);
     PROCESS_SCHEDULAR.free();
 
     unsafe {
+        // TODO: Test which of these are actually needed
          TSS.privilege_stack_table[0] = VirtAddr::new(multitask::KERNEL_STACK as u64);
          TSS.privilege_stack_table[1] = VirtAddr::new(multitask::KERNEL_STACK as u64);
          TSS.privilege_stack_table[2] = VirtAddr::new(multitask::KERNEL_STACK as u64);
     }
 
     unsafe {
-        old_process = registers;
+        old_process = iret_stack;
         new_process_rsp = new_stack.unwrap() as u64;
     }
 
     return new_stack.unwrap();
-}
-
-#[no_mangle]
-pub extern fn test_handler(registers: Registers) {
-    let unaligned_registers = core::ptr::addr_of!(registers);
-    let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
-
-    print!("{:?}\n", aligned_registers);
-
-    let syscall_id = registers.rax;
-
-    // match syscall_id {
-    //     4 => {
-    //         // sys_write
-
-    //         let message_length = registers.rdx;
-    //         let message: *const char = (0x3f3000) as _;
-
-    //         unsafe {
-    //             for i in 0..message_length {
-    //                 print!("{}", *(message.offset(i as isize)));
-    //             }
-    //         }
-    //     }
-    //     _ => panic!("Unknown Syscall\n");
-    // }
-
-    let message_length = registers.rdx;
-
-    for i in 0..message_length {
-        let char = unsafe { *((0x3f3000 + i) as *const u8) };
-        print!("{}", char as char);
-    }
 }
 
 pub extern fn enable() {
@@ -277,43 +194,96 @@ pub extern fn disable() {
     unsafe { asm!("cli"); }
 }
 
+pub fn init() {
+    // Setup the idtr structure
+    unsafe {
+        let idt_address = (&IDT[0] as *const idt_entry) as u64;
+        IDTR.limit = (size_of::<idt_entry>() as u16) * (IDT_MAX_DESCRIPTIONS as u16 - 1);
+        IDTR.base = idt_address;
+    }
+
+    // Exceptions
+    idt_entry::edit_entry(0x00, handle_no_err_exception0, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x01, handle_no_err_exception1, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x02, handle_no_err_exception2, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x03, handle_no_err_exception3, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x04, handle_no_err_exception4, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x05, handle_no_err_exception5, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x06, handle_no_err_exception6, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x07, handle_no_err_exception7, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x08, handle_err_exception8, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x09, handle_no_err_exception9, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x0A, handle_err_exception10, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x0B, handle_err_exception11, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x0C, handle_err_exception12, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x0D, handle_err_exception13, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x0E, handle_err_exception14, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x0F, handle_no_err_exception15, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x10, handle_no_err_exception16, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x11, handle_err_exception17, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x12, handle_no_err_exception18, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x13, handle_no_err_exception19, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x14, handle_no_err_exception20, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x15, handle_err_exception21, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x16, handle_no_err_exception22, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x17, handle_no_err_exception23, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x18, handle_no_err_exception24, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x19, handle_no_err_exception25, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x1A, handle_no_err_exception26, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x1B, handle_no_err_exception27, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x1C, handle_no_err_exception28, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x1D, handle_err_exception29, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x1E, handle_err_exception30, GateType::Trap, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x1F, handle_no_err_exception31 , GateType::Trap, PrivilegeLevel::Ring3);
+
+    // Interrupts
+    idt_entry::edit_entry(0x20, handle_pit_interrupt, GateType::Interrupt, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x21, handle_interrupt33, GateType::Interrupt, PrivilegeLevel::Ring3);
+
+    // Syscall
+    idt_entry::edit_entry(0x80, handle_syscall, GateType::Interrupt, PrivilegeLevel::Ring3);
+
+    // Load idt
+    unsafe { idt_flush(); }
+}
+
 extern "C" {
     // All assembly functions
-    // TODO: Find way to reduce code here
-    fn handle_no_err_exception0(registers: Registers);
-    fn handle_no_err_exception1(registers: Registers);
-    fn handle_no_err_exception2(registers: Registers);
-    fn handle_no_err_exception3(registers: Registers);
-    fn handle_no_err_exception4(registers: Registers);
-    fn handle_no_err_exception5(registers: Registers);
-    fn handle_no_err_exception6(registers: Registers);
-    fn handle_no_err_exception7(registers: Registers);
-    fn handle_err_exception8(registers: Registers);
-    fn handle_no_err_exception9(registers: Registers);
-    fn handle_err_exception10(registers: Registers);
-    fn handle_err_exception11(registers: Registers);
-    fn handle_err_exception12(registers: Registers);
-    fn handle_err_exception13(registers: Registers);
-    fn handle_err_exception14(registers: Registers);
-    fn handle_no_err_exception15(registers: Registers);
-    fn handle_no_err_exception16(registers: Registers);
-    fn handle_err_exception17(registers: Registers);
-    fn handle_no_err_exception18(registers: Registers);
-    fn handle_no_err_exception19(registers: Registers);
-    fn handle_no_err_exception20(registers: Registers);
-    fn handle_err_exception21(registers: Registers);
-    fn handle_no_err_exception22(registers: Registers);
-    fn handle_no_err_exception23(registers: Registers);
-    fn handle_no_err_exception24(registers: Registers);
-    fn handle_no_err_exception25(registers: Registers);
-    fn handle_no_err_exception26(registers: Registers);
-    fn handle_no_err_exception27(registers: Registers);
-    fn handle_no_err_exception28(registers: Registers);
-    fn handle_err_exception29(registers: Registers);
-    fn handle_err_exception30(registers: Registers);
-    fn handle_no_err_exception31(registers: Registers);
-    fn handle_interrupt32(registers: Registers); // Timer
-    fn handle_interrupt33(registers: Registers); // Keyboard
-    fn handle_interrupt80(registers: Registers); // Syscalls
+    // TODO: Find way to reduce this
+    fn handle_no_err_exception0();
+    fn handle_no_err_exception1();
+    fn handle_no_err_exception2();
+    fn handle_no_err_exception3();
+    fn handle_no_err_exception4();
+    fn handle_no_err_exception5();
+    fn handle_no_err_exception6();
+    fn handle_no_err_exception7();
+    fn handle_err_exception8();
+    fn handle_no_err_exception9();
+    fn handle_err_exception10();
+    fn handle_err_exception11();
+    fn handle_err_exception12();
+    fn handle_err_exception13();
+    fn handle_err_exception14();
+    fn handle_no_err_exception15();
+    fn handle_no_err_exception16();
+    fn handle_err_exception17();
+    fn handle_no_err_exception18();
+    fn handle_no_err_exception19();
+    fn handle_no_err_exception20();
+    fn handle_err_exception21();
+    fn handle_no_err_exception22();
+    fn handle_no_err_exception23();
+    fn handle_no_err_exception24();
+    fn handle_no_err_exception25();
+    fn handle_no_err_exception26();
+    fn handle_no_err_exception27();
+    fn handle_no_err_exception28();
+    fn handle_err_exception29();
+    fn handle_err_exception30();
+    fn handle_no_err_exception31();
+    fn handle_pit_interrupt(); // Timer
+    fn handle_interrupt33(); // Keyboard
+    fn handle_syscall(); // Syscall
     fn idt_flush();
 }

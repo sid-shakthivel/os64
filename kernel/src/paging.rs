@@ -51,7 +51,7 @@ pub struct Page {
 
 impl Page {
     pub fn new(physical_address: u64) -> Page {
-        let mut entry = (0x000fffff_fffff000 & physical_address) | 0b111;
+        let entry = (0x000fffff_fffff000 & physical_address) | 0b111;
         Page { entry: entry }
     }
 
@@ -77,12 +77,8 @@ impl Page {
     }
 
     pub fn get_physical_address(&self) -> *mut u64 {
-        let p_address = (self.entry & 0x000fffff_fffff000);
+        let p_address = self.entry & 0x000fffff_fffff000;
         return p_address as *mut u64;
-    }
-
-    pub fn entry(&self) -> u64 {
-        return self.entry & 0x000fffff_fffff000;
     }
 }
 
@@ -115,7 +111,7 @@ impl Table {
     fn create_next_table(&mut self, index: usize, allocator: &mut PageFrameAllocator) -> &mut Table {
         if self.get_table(index).is_none() {
             let page_frame = allocator.alloc_frame();
-            self.entries[index] = Page::new((page_frame.unwrap() as u64));
+            self.entries[index] = Page::new(page_frame.unwrap() as u64);
         } 
         return self.get_table(index).expect("why not working");
     }

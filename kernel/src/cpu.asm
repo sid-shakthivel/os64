@@ -16,7 +16,7 @@ outb_raw:
 ; Load IDT
 global idt_flush    
 idt_flush:
-  ; cli ; Disable interruptsp
+  cli ; Disable interrupts
   extern IDTR
   lidt [IDTR]
   ret
@@ -28,22 +28,3 @@ flush_tlb:
   mov cr3, rax
   pop rax
   ret
-
-global switch_process
-switch_process: 
-  mov ax, 0x20 | 0x3 ; All segment registers must be equal to ss (user data segment)
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-
-  ; Switch stacks and then pop registers and iret
-  mov rsp, rdi
-  pop rdi
-  pop rsi
-  pop rdx
-  pop rcx
-  pop rbx
-  pop rax
-  add rsp, 0x08 
-  iretq 

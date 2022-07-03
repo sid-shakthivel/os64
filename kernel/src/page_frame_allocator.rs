@@ -9,10 +9,7 @@ A stack of free pages along with a pointer to the first page will be used in ord
 */
 
 use core::prelude::v1::Some;
-use crate::print;
-use crate::vga_text::TERMINAL;
 use multiboot2::load;
-use core::ptr;
 
 /*
 Each frame must store a reference to the next frame along with physical meta data (value is for testing)
@@ -123,7 +120,6 @@ impl FrameAllocator for PageFrameAllocator {
             }
             return Some(address);
         }
-        None
     }
 }
 

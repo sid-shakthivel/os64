@@ -28,12 +28,6 @@ use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::pic::PicFunctions;
 use core::arch::asm;
-use crate::paging::Table;
-use crate::page_frame_allocator::FrameAllocator;
-
-extern "C" {
-    pub(crate) static __kernel_end: usize;
-}
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
@@ -62,10 +56,6 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 fn panic(info: &PanicInfo) -> ! {
     print!("Error: {}", info);
     loop {}
-}
-
-extern "C" {
-    fn switch_process(rsp: *const u64, p4: *const Table);
 }
 
 // Bochs magic breakpoint is xchg bx, bx
