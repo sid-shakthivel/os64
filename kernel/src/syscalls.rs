@@ -1,8 +1,26 @@
 // /src/syscalls.rs
 
+/*
+    Syscalls are used to call a kernel service from userland - certain actions must be done with privilege
+    They are invoked with software interrupts
+
+    +-----+-----------+
+    | RAX |   Name    |
+    +-----+-----------+
+    |   1 | sys_exit  |
+    |   2 | sys_fork  |
+    |   3 | sys_read  |
+    |   4 | sys_write |
+    |   5 | sys_open  |
+    |   6 | sys_close |
+    +-----+-----------+
+*/
+
 use crate::interrupts::Registers;
 use crate::print;
 use crate::TERMINAL;
+
+// TODO: Refactor this and add more support for more syscalls
 
 #[no_mangle]
 pub extern fn syscall_handler(registers: Registers) {
