@@ -12,6 +12,7 @@ use core::prelude::v1::Some;
 use crate::print;
 use crate::vga_text::TERMINAL;
 use multiboot2::load;
+use core::ptr;
 
 /*
 Each frame must store a reference to the next frame along with physical meta data (value is for testing)
@@ -71,6 +72,7 @@ impl Operations for Stack {
 pub trait FrameAllocator {
     fn alloc_frame(&mut self) -> Option<*mut u64>;
     fn free_frame(&mut self, frame_address: *mut u64) -> ();
+    fn alloc_with_address(&mut self, source: usize, size: usize) -> Option<*mut u64>;
 }
 
 impl FrameAllocator for PageFrameAllocator {
@@ -106,14 +108,31 @@ impl FrameAllocator for PageFrameAllocator {
         let new_free_frame = unsafe { &mut *(frame_address as *mut Frame) };
         self.free_frames.push(new_free_frame);
     }
+
+    fn alloc_with_address(&mut self, source: usize, size: usize) -> Option<*mut u64> {
+        if size > 4096 {
+            // Implement support for multiple pages
+            panic!("Too big\n");
+        } else {
+            let address = self.alloc_frame().unwrap();
+            unsafe {
+                let test = source as *mut u64;
+                for i in 0..1024 {
+                    *address.offset(i) = *test.offset(i);
+                }
+            }
+            return Some(address);
+        }
+        None
+    }
 }
 
 impl PageFrameAllocator {
     pub fn new(multiboot_information_address: usize) -> PageFrameAllocator {
         let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
-        let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
+        let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");  
 
-        let memory_start: u64 = (boot_info.end_address() as u64) + (1000000 as u64) & 0x000fffff_fffff000;
+        let memory_start: u64 = (boot_info.end_address() as u64) + (500000 as u64) & 0x000fffff_fffff000;
         let memory_end: u64 = memory_map_tag.memory_areas().last().expect("Unknown Length").end_address() & 0x000fffff_fffff000;
 
         let mut page_frame_allocator = PageFrameAllocator { memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };

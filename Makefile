@@ -1,7 +1,7 @@
 all:
 	# Userspace modules
-	cd modules/program && make
-	cd modules/program2 && make
+	docker run --rm -v /Users/siddharth/Code/rust/os64/:/code os64/toolchain bash -c "cd code/modules/program && make all"
+	cd modules/program2 && make 
 
 	# Kernel
 	cd kernel && make run

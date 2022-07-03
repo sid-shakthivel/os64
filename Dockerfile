@@ -25,4 +25,4 @@ RUN apt-get install make -y
 WORKDIR /
 
 # Compile and create ISO
-CMD cd code/kernel && make
+# CMD cd code/kernel && make

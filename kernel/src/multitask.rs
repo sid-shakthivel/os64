@@ -38,7 +38,7 @@ pub enum ProcessPriority {
 }
 
 pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
-static USER_PROCESS_START_ADDRESS: u64 = 0xC0000000;
+static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
 
 /*
     Processes schedular holds all tasks and decides which will be serviced
@@ -107,21 +107,22 @@ impl Process {
         // TODO: add support for multiple pages
         let pid = PROCESS_SCHEDULAR.lock().process_count as u64;
         PROCESS_SCHEDULAR.free();
-        let v_address = USER_PROCESS_START_ADDRESS;
+        // let v_address = USER_PROCESS_START_ADDRESS;
+        let v_address = entrypoint;
         let p_address = entrypoint;
 
         // Copy current address space
         let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
 
-        unsafe {
-            for i in 0..(*new_p4).entries.len() {
-                (*new_p4).entries[i] = ((*P4).entries[i]).clone();
-            }
+        // unsafe {
+        //     for i in 0..(*new_p4).entries.len() {
+        //         (*new_p4).entries[i] = ((*P4).entries[i]).clone();
+        //     }
             
-            (*new_p4).entries[511] = Page::new(new_p4 as u64);
-        }
+        //     (*new_p4).entries[511] = Page::new(new_p4 as u64);
+        // }
 
-        paging::map_page(p_address, v_address, page_frame_allocator, true, Some(new_p4));
+        // paging::map_page(p_address, v_address, page_frame_allocator, true, Some(new_p4));
         
         let mut rsp = page_frame_allocator.alloc_frame().unwrap(); // Create a stack
 
@@ -146,7 +147,7 @@ impl Process {
             *rsp.offset(-11) = 0x00; // RDI
             *rsp.offset(-12) = new_p4 as u64; // CR3
 
-            print!("P4 is {:x}\n", new_p4 as u64);
+            // print!("P4 is {:x}\n", new_p4 as u64);
 
             rsp = rsp.offset(-12);
         }

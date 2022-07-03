@@ -15,6 +15,7 @@ mod gdt;
 mod multitask;
 mod spinlock;
 mod grub;
+mod syscalls;
 
 extern crate multiboot2;
 extern crate bitflags;
@@ -38,12 +39,17 @@ extern "C" {
 pub extern fn rust_main(multiboot_information_address: usize) {
     TERMINAL.lock().clear();    
 
-    let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
-
     interrupts::init();
     gdt::init();
     PIT.lock().init();
     PICS.lock().init();
+
+    let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
+
+    paging::identity_map(12, &mut page_frame_allocator);
+
+    print!("Welcome!\n");
+
     grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
     interrupts::enable();
@@ -63,3 +69,4 @@ extern "C" {
 }
 
 // Bochs magic breakpoint is xchg bx, bx
+

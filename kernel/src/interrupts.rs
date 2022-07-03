@@ -65,7 +65,7 @@ pub struct Registers {
     rip: u64,
     cs: u64,
     rflags: u64,
-    rsp: u64,
+    pub rsp: u64,
     ss: u64
 }
 
@@ -135,6 +135,9 @@ pub fn init() {
         idt_entry::edit_entry(33, (handle_interrupt33 as *const u64) as u64, GateType::Interrupt);
         idt_entry::edit_entry(32, (handle_interrupt32 as *const u64) as u64, GateType::Interrupt);
 
+        // Syscalls
+        idt_entry::edit_entry(0x80, (handle_interrupt80 as *const u64) as u64, GateType::Interrupt);
+
         // Load idt
         idt_flush();
     }
@@ -148,15 +151,15 @@ pub extern fn exception_handler(registers: Registers) {
     
     // Print a suitable error message
     if aligned_registers.num < 22 {
-        print!("{}\n", EXCEPTION_MESSAGES[aligned_registers.num as usize]);
+        // print!("{}\n", EXCEPTION_MESSAGES[aligned_registers.num as usize]);
     } else if aligned_registers.num > 27 { 
-        print!("{}\n", EXCEPTION_MESSAGES[(aligned_registers.num as usize) - 6]);
+        // print!("{}\n", EXCEPTION_MESSAGES[(aligned_registers.num as usize) - 6]);
     } else {
         print!("Reserved\n");
     }
 
     // Print registers
-    print!("{:?}\n", aligned_registers);
+    // print!("{:?}\n", aligned_registers);
 
     unsafe {
         asm!("hlt");
@@ -206,19 +209,15 @@ pub static mut old_process: ProcessRegisters = ProcessRegisters::new();
 #[no_mangle]
 pub static mut new_process_rsp: u64 = 0;
 
+// Clean up this messy code
 #[no_mangle]
 pub extern fn timer_handler(registers: ProcessRegisters) -> *const u64 {
-    // let unaligned_registers = core::ptr::addr_of!(registers);
-    // let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
-
     let unaligned_rsp = core::ptr::addr_of!(registers.rsp);
     let aligned_rsp = unsafe { core::ptr::read_unaligned(unaligned_rsp) };
     
     // // Acknowledge interrupt
     PICS.lock().acknowledge(0x20); 
     PIT.lock().handle_timer();
-
-    // print!("Tick\n");
 
     let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(aligned_rsp);
     PROCESS_SCHEDULAR.free();
@@ -235,6 +234,39 @@ pub extern fn timer_handler(registers: ProcessRegisters) -> *const u64 {
     }
 
     return new_stack.unwrap();
+}
+
+#[no_mangle]
+pub extern fn test_handler(registers: Registers) {
+    let unaligned_registers = core::ptr::addr_of!(registers);
+    let aligned_registers = unsafe { core::ptr::read_unaligned(unaligned_registers) };
+
+    print!("{:?}\n", aligned_registers);
+
+    let syscall_id = registers.rax;
+
+    // match syscall_id {
+    //     4 => {
+    //         // sys_write
+
+    //         let message_length = registers.rdx;
+    //         let message: *const char = (0x3f3000) as _;
+
+    //         unsafe {
+    //             for i in 0..message_length {
+    //                 print!("{}", *(message.offset(i as isize)));
+    //             }
+    //         }
+    //     }
+    //     _ => panic!("Unknown Syscall\n");
+    // }
+
+    let message_length = registers.rdx;
+
+    for i in 0..message_length {
+        let char = unsafe { *((0x3f3000 + i) as *const u8) };
+        print!("{}", char as char);
+    }
 }
 
 pub extern fn enable() {
@@ -282,5 +314,6 @@ extern "C" {
     fn handle_no_err_exception31(registers: Registers);
     fn handle_interrupt32(registers: Registers); // Timer
     fn handle_interrupt33(registers: Registers); // Keyboard
+    fn handle_interrupt80(registers: Registers); // Syscalls
     fn idt_flush();
 }

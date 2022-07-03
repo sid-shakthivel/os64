@@ -88,7 +88,8 @@ impl ChainedPics {
  
         // fc keyboard + timer
         // fd keyboard only
-        outb(self.master.data, 0xfe); // Only enable keyboard and timer
+        // fe timer only
+        outb(self.master.data, 0xfe); 
         outb(self.slave.data, 0xff); // Disable Slave completely
         io_wait();
     }

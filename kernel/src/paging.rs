@@ -202,6 +202,12 @@ pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
     }
 }
 
+pub fn identity_map(megabytes: u64, page_frame_allocator: &mut PageFrameAllocator) {
+    for address in 0..(megabytes * 256) {
+        map_page(address * 4096, address * 4096, page_frame_allocator, true, None);
+    }
+}
+
 extern "C" {
     fn flush_tlb();
 }

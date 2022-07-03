@@ -4,6 +4,11 @@ section .text
 
 extern exception_handler
 extern interrupt_handler
+extern timer_handler
+extern old_process
+extern new_process_rsp
+extern on_syscall
+extern test_handler
 
 %macro handle_no_err_exception 1
 global handle_no_err_exception%1
@@ -95,13 +100,9 @@ handle_err_exception 29
 handle_err_exception 30
 handle_no_err_exception 31
 
-; handle_interrupt 32
 handle_interrupt 33
 
 global handle_interrupt32
-extern timer_handler
-extern old_process
-extern new_process_rsp
 handle_interrupt32:
     call timer_handler
     mov rsp, [old_process + 24]
@@ -113,17 +114,28 @@ handle_interrupt32:
 
     pushaq
 
-    mov rax, cr3
+    ; mov rax, cr3
     push rax
 
     mov rsp, [new_process_rsp]
     
     pop rax
-    mov cr3, rax
-    ; xchg bx, bx
+    ; mov cr3, rax
     popaq
 
-    iretq
+    iretq 
 
-    ; rax is return
-    ; rdi is first argument
+
+global handle_interrupt80
+handle_interrupt80:
+    cld
+    push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    call test_handler
+    xchg bx, bx
+    popq
+    iretq
