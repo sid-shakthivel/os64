@@ -32,6 +32,7 @@ use core::arch::asm;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
+    // TODO: Fix the horrific auto formatting in vscode
     TERMINAL.lock().clear();    
 
     interrupts::init();
@@ -41,7 +42,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
 
-    paging::identity_map(12, &mut page_frame_allocator);
+    paging::identity_map(12, &mut page_frame_allocator, None);
 
     grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 

@@ -3,7 +3,7 @@
 /*
 Interrupts are signal which stop the operation flow of a computer in order to perform a set action (pressing a key)
 After the CPU performs the action it returns to whatever it was doing
-This is far more efficient then the CPU polling a device
+Interrupts are far more efficient then the CPU polling a device
 An interrupt descriptor table defines what each interrupt will do
 */
 
@@ -171,12 +171,8 @@ pub extern fn pit_handler(iret_stack: IretStack) -> *const u64 {
     let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(iret_stack.rsp);
     PROCESS_SCHEDULAR.free();
 
-    unsafe {
-        // TODO: Test which of these are actually needed
-         TSS.privilege_stack_table[0] = VirtAddr::new(multitask::KERNEL_STACK as u64);
-         TSS.privilege_stack_table[1] = VirtAddr::new(multitask::KERNEL_STACK as u64);
-         TSS.privilege_stack_table[2] = VirtAddr::new(multitask::KERNEL_STACK as u64);
-    }
+    // Update TSS to have a clean stack when coming from user to kernel
+    unsafe { TSS.privilege_stack_table[0] = VirtAddr::new(multitask::KERNEL_STACK as u64); }
 
     unsafe {
         old_process = iret_stack;

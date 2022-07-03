@@ -24,7 +24,6 @@ pub struct Stack {
     pub length: u64,
 }
 
-// TODO: Remove memory_start
 pub struct PageFrameAllocator {
     memory_end: u64,
     pub free_frames: &'static mut Stack,
@@ -69,14 +68,12 @@ impl Operations for Stack {
 pub trait FrameAllocator {
     fn alloc_frame(&mut self) -> Option<*mut u64>;
     fn free_frame(&mut self, frame_address: *mut u64) -> ();
-    fn alloc_with_address(&mut self, source: usize, size: usize) -> Option<*mut u64>;
 }
 
 impl FrameAllocator for PageFrameAllocator {
     /*
     Check the stack for any known free frames and pop it
     If there are no free frames, increment the pointer to the next frame and return that
-    TODO: If beyond memory_end, should end + return error
     */
     fn alloc_frame(&mut self) -> Option<*mut u64> {
         if self.free_frames.is_empty() {
@@ -86,6 +83,7 @@ impl FrameAllocator for PageFrameAllocator {
                     self.current_page = self.current_page.offset(512);
                     return Some(self.current_page);
                 } else {
+                    // Ran out of memory
                     return None;
                 }
             }
@@ -104,22 +102,6 @@ impl FrameAllocator for PageFrameAllocator {
     fn free_frame(&mut self, frame_address: *mut u64) {
         let new_free_frame = unsafe { &mut *(frame_address as *mut Frame) };
         self.free_frames.push(new_free_frame);
-    }
-
-    fn alloc_with_address(&mut self, source: usize, size: usize) -> Option<*mut u64> {
-        if size > 4096 {
-            // Implement support for multiple pages
-            panic!("Too big\n");
-        } else {
-            let address = self.alloc_frame().unwrap();
-            unsafe {
-                let test = source as *mut u64;
-                for i in 0..1024 {
-                    *address.offset(i) = *test.offset(i);
-                }
-            }
-            return Some(address);
-        }
     }
 }
 

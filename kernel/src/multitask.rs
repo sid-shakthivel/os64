@@ -11,6 +11,11 @@ use core::mem::size_of;
 use crate::spinlock::Lock;
 use crate::page_frame_allocator::FrameAllocator;
 use crate::paging::Table;
+use crate::paging::P4;
+use crate::paging::Page;
+use crate::print;
+use crate::vga_text::TERMINAL;
+use crate::paging;
 
 /*
     Processes are running programs with an individual address space, stack and data
@@ -35,10 +40,7 @@ pub enum ProcessPriority {
 pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
 static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
 
-/*
-    Processes schedular holds all tasks and decides which will be serviced
-    TODO: Set next task based on priority
-*/
+// Processes schedular holds all tasks and decides which will be serviced
 pub struct ProcessSchedular {
     pub tasks: [Option<Process>; MAX_PROCESS_NUM],
     is_from_kernel: bool,
@@ -67,14 +69,12 @@ impl ProcessSchedular {
 
         if self.is_from_kernel == true {
             // If this is the first process to be called, it stems from kernel and that stack need not be saved
-            unsafe {
-                KERNEL_STACK = old_rsp;
-            }
+            unsafe { KERNEL_STACK = old_rsp; }
             self.is_from_kernel = false;
         } else {
+            // TODO: Find more efficient way
             // Save the old RSP into the process but adjust the value as certain values are pushed
             old_rsp -= 0x60; 
-            // TODO: Find more efficient way
             let updated_process = Process { rsp: old_rsp as *const _, ..self.tasks[self.current_process_index].unwrap() }; 
             self.tasks[self.current_process_index] = Some(updated_process);
             self.current_process_index += 1;
@@ -86,6 +86,7 @@ impl ProcessSchedular {
             self.current_process_index = 0;
             current_task = self.tasks[self.current_process_index];
         }
+
         return Some(current_task.unwrap().rsp);
     }
 
@@ -97,31 +98,18 @@ impl ProcessSchedular {
 }
 
 impl Process {
-    pub fn init(entrypoint: u64, process_priority: ProcessPriority, page_frame_allocator: &mut PageFrameAllocator) -> Process {
-        // Convert physical addresses of process into virtual address to use when switching cr3
-        // TODO: add support for multiple pages
-        let pid = PROCESS_SCHEDULAR.lock().process_count as u64;
-        PROCESS_SCHEDULAR.free();
-        // let v_address = USER_PROCESS_START_ADDRESS;
-        let v_address = entrypoint;
-        let p_address = entrypoint;
+    // The entrypoint for each process is 0x800000 which has already been mapped into memory
+    pub fn init(process_priority: ProcessPriority, page_frame_allocator: &mut PageFrameAllocator) -> Process {
+        // TODO: Allow 2 processes to use the same memory and be able to swap between them
+        let v_address = USER_PROCESS_START_ADDRESS;
 
-        // Copy current address space
-        let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
-
-        // unsafe {
-        //     for i in 0..(*new_p4).entries.len() {
-        //         (*new_p4).entries[i] = ((*P4).entries[i]).clone();
-        //     }
-            
-        //     (*new_p4).entries[511] = Page::new(new_p4 as u64);
-        // }
-
-        // paging::map_page(p_address, v_address, page_frame_allocator, true, Some(new_p4));
+        // Copy current address space by creating a new P4
+        // let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+        let new_p4: *mut Table = paging::deep_clone(page_frame_allocator);
         
-        let mut rsp = page_frame_allocator.alloc_frame().unwrap(); // Create a stack
+        // Create and setup a stack as though an interrupt has been fired
+        let mut rsp = page_frame_allocator.alloc_frame().unwrap(); 
 
-        // Setup stack for interrupt
         unsafe {
             let stack_top = rsp.offset(511) as u64;
             rsp = rsp.offset(511); // Stack grows downwards towards decreasing memory addresses
@@ -131,7 +119,7 @@ impl Process {
 
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x202; // RFLAGS 
+            *rsp.offset(-3) = 0x202; // RFLAGS which enable interrupts
             *rsp.offset(-4) = 0x18 | 0x3; // CS
             *rsp.offset(-5) = v_address; // RIP
             *rsp.offset(-6) = 0x00; // RAX
@@ -142,13 +130,11 @@ impl Process {
             *rsp.offset(-11) = 0x00; // RDI
             *rsp.offset(-12) = new_p4 as u64; // CR3
 
-            // print!("P4 is {:x}\n", new_p4 as u64);
-
             rsp = rsp.offset(-12);
         }
 
         Process {
-            pid: pid,
+            pid: 0,
             rsp: rsp,
             process_priority: process_priority,
             cr3: new_p4

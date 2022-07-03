@@ -125,55 +125,41 @@ impl Table {
             None
         }
     }
+
+    /*
+        A p1 address looks like this in ocal: 0o177777_777_WWWW_XXX_YYY_ZZZ	
+        WWW is the index for P4
+        XXX is the index for P3
+        YYY is the index for P2
+        ZZZ is the index for P1
+    */
+
+    fn get_indexes(virtual_address: u64) -> (usize, usize, usize, usize) {
+        let p1_index = ((virtual_address >> 12) & 0x1ff) as usize;
+        let p2_index = ((virtual_address >> 21) & 0x1ff) as usize;
+        let p3_index = ((virtual_address >> 30) & 0x1ff) as usize;
+        let p4_index = ((virtual_address >> 39) & 0x1ff) as usize;
+        return (p1_index, p2_index, p3_index, p4_index);
+    }
 }
 
 pub const P4: *mut Table = 0xffffffff_fffff000 as *mut _;
 
-/*
-    A p1 address looks like this in ocal: 0o177777_777_WWWW_XXX_YYY_ZZZ	
-    WWW is the index for P4
-    XXX is the index for P3
-    YYY is the index for P2
-    ZZZ is the index for P1
-
-    TODO: make these methods not global functions
-*/
-fn get_p4_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 39) & 0x1ff) as usize;
-}
-
-fn get_p3_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 30) & 0x1ff) as usize;
-}
-
-fn get_p2_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 21) & 0x1ff) as usize;
-}
-
-fn get_p1_index(virtual_address: u64) -> usize {
-    return ((virtual_address >> 12) & 0x1ff) as usize;
-}
-
 // The index from the address is used to go to or create tables
-// TODO: swap is_user bool for enum
 pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator, is_user: bool, optional_p4: Option<*mut Table>) {   
     assert!(virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000, "invalid address: 0x{:x}", virtual_address);
 
     let mut p4 = unsafe { &mut *P4 };
 
-    if optional_p4.is_none() == false {
-        p4 = unsafe { &mut *(optional_p4.unwrap()) };
-    }
+    if optional_p4.is_none() == false { p4 = unsafe { &mut *(optional_p4.unwrap()) }; }
 
-    let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
-    let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
-    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
+    let (p1_index, p2_index, p3_index, p4_index) = Table::get_indexes(virtual_address);
 
-    p1.entries[get_p1_index(virtual_address)] = Page::new(physical_address);
+    let p3 = p4.create_next_table(p4_index,  allocator);
+    let p2 = p3.create_next_table(p3_index, allocator);
+    let p1 = p2.create_next_table(p2_index, allocator);
 
-    if is_user {
-        p1.entries[0].set_flag(Flags::UserAccessible);
-    }
+    p1.entries[p1_index] = Page::new(physical_address);
 
     // Translation lookaside buffer - cashes the translation of virtual to physical addresses and needs to be updated manually
     unsafe { flush_tlb(); }
@@ -182,25 +168,71 @@ pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut Pag
 pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
     // Loop through each table and if empty drop it
     let p4 = unsafe { &mut *P4 };
-    let p3 = p4.create_next_table(get_p4_index(virtual_address),  allocator);
+
+    let (p1_index, p2_index, p3_index, p4_index) = Table::get_indexes(virtual_address);
+
+    let p3 = p4.create_next_table(p4_index,  allocator);
     p3.drop_table(allocator);
-    let p2 = p3.create_next_table(get_p3_index(virtual_address), allocator);
+    let p2 = p3.create_next_table(p3_index, allocator);
     p2.drop_table(allocator);
-    let p1 = p2.create_next_table(get_p2_index(virtual_address), allocator);
+    let p1 = p2.create_next_table(p2_index, allocator);
     p1.drop_table(allocator);
 
-    let frame = p1.entries[get_p1_index(virtual_address)];
+    let frame = p1.entries[p1_index];
     if frame.is_unused() == false {
         allocator.free_frame(frame.get_physical_address());
-        p1.entries[get_p1_index(virtual_address)].set_unused();
+        p1.entries[p1_index].set_unused();
 
         unsafe { flush_tlb(); }
     }
 }
 
-pub fn identity_map(megabytes: u64, page_frame_allocator: &mut PageFrameAllocator) {
+pub fn identity_map(megabytes: u64, page_frame_allocator: &mut PageFrameAllocator, optional_p4: Option<*mut Table>) {
     for address in 0..(megabytes * 256) {
-        map_page(address * 4096, address * 4096, page_frame_allocator, true, None);
+        map_page(address * 4096, address * 4096, page_frame_allocator, true, optional_p4);
+    }
+}
+
+// Creates a deep clone of the paging system 
+pub fn deep_clone(page_frame_allocator: &mut PageFrameAllocator) -> *mut Table {
+    unsafe {
+        let p4 = &mut *P4;
+        let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+        for i in 0..(*p4).entries.len() - 1 {
+            if (*p4).entries[i].entry != 0 {
+                let new_p3: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+                let p3 = p4.get_table(i).unwrap();
+
+                for j in 0..(*p3).entries.len() {
+                    if (*p3).entries[j].entry != 0 {
+                        let new_p2: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+                        let p2 = p3.get_table(j).unwrap();
+
+                        for k in 0..(*p2).entries.len() {
+                            if (*p2).entries[k].entry != 0 {
+                                let new_p1: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+                                let p1 = p2.get_table(k).unwrap();
+
+                                for l in 0..(*p1).entries.len() {
+                                    if (*p1).entries[l].entry != 0 {
+                                        (*new_p1).entries[l] = Page::new((*p1).entries[l].entry as u64);
+                                    }
+                                }
+
+                                (*new_p2).entries[k] = Page::new(new_p1 as u64);
+                            }
+                        }
+
+                        (*new_p3).entries[j] = Page::new(new_p2 as u64);
+                    }
+                }
+
+                (*new_p4).entries[i] = Page::new(new_p3 as u64);
+            }
+
+            (*new_p4).entries[511] = Page::new(new_p4 as u64); // Recursive mapping
+        }
+        return new_p4;
     }
 }
 

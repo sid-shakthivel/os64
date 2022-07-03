@@ -28,6 +28,7 @@ use x86_64::structures::tss::TaskStateSegment;
 use lazy_static::lazy_static;
 use x86_64::structures::gdt::SegmentSelector;
 
+// TODO: Switch to a mutex
 pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
 
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor};
@@ -38,8 +39,8 @@ lazy_static! {
             let mut gdt = GlobalDescriptorTable::new();
             let kernel_code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
             let kernel_data_selector = gdt.add_entry(Descriptor::kernel_data_segment());
-            let user_code_selector = gdt.add_entry(Descriptor::user_code_segment());
-            let user_data_selector = gdt.add_entry(Descriptor::user_data_segment());
+            let _user_code_selector = gdt.add_entry(Descriptor::user_code_segment());
+            let _user_data_selector = gdt.add_entry(Descriptor::user_data_segment());
             let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
             (gdt, Selectors { kernel_code_selector, kernel_data_selector, tss_selector })
         }
