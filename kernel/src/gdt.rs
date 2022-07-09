@@ -28,7 +28,6 @@ use x86_64::structures::tss::TaskStateSegment;
 use lazy_static::lazy_static;
 use x86_64::structures::gdt::SegmentSelector;
 
-// TODO: Switch to a mutex
 pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
 
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor};

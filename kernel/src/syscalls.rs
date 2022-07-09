@@ -25,7 +25,7 @@ use crate::TERMINAL;
 #[no_mangle]
 pub extern fn syscall_handler(registers: Registers) {
     let syscall_id = registers.rax;
-
+    
     match syscall_id {
         4 => {
             // sys_write

@@ -100,7 +100,6 @@ impl ProcessSchedular {
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
     pub fn init(process_priority: ProcessPriority, page_frame_allocator: &mut PageFrameAllocator) -> Process {
-        // TODO: Allow 2 processes to use the same memory and be able to swap between them
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4

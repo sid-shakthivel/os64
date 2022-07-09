@@ -46,7 +46,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
-    print!("Welcome!\n");
+    print!("Welcome Yo!\n");
 
     interrupts::enable();
 
@@ -61,4 +61,21 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 // Bochs magic breakpoint is xchg bx, bx
+// Dart: git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash 
 
+// section .data
+// message:
+    // db "Hello world"
+
+// Example user space    
+// section .text
+// global start
+// start:
+//     bits 64
+//     mov rdx, 11
+//     mov rcx, message
+//     mov rbx, 1
+//     mov rax, 4
+//     ; xchg bx, bx
+//     int 0x80
+//     jmp $ 
