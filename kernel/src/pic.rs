@@ -138,7 +138,7 @@ impl PicFunctions for Pic {
 
     // Every interrupt from PIC must be acknowledged to confirm interrupt has been handled
     fn acknowledge(&self, _interrupt: u8) {
-        // print!("Acknowleding interrupt\n");
+        // print!("Acknowledging interrupt\n");
         outb(self.command, PIC_ACK);
     }
 }

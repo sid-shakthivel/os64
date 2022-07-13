@@ -17,6 +17,7 @@ mod spinlock;
 mod grub;
 mod syscalls;
 mod elf;
+mod filesystem;
 
 extern crate multiboot2;
 extern crate bitflags;
@@ -30,6 +31,8 @@ use crate::pit::PIT;
 use crate::pic::PicFunctions;
 use core::arch::asm;
 
+use multiboot2::load;
+
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     // TODO: Fix the horrific auto formatting in vscode
@@ -40,15 +43,15 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     PIT.lock().init();
     PICS.lock().init();
 
+    print!("Hello World\n");
+
     let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
 
-    paging::identity_map(12, &mut page_frame_allocator, None);
+    // paging::identity_map(12, &mut page_frame_allocator, None);
 
-    grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
+    filesystem::init(multiboot_information_address);
 
-    print!("Welcome Yo!\n");
-
-    interrupts::enable();
+    // grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
     loop {}
 }
@@ -63,19 +66,5 @@ fn panic(info: &PanicInfo) -> ! {
 // Bochs magic breakpoint is xchg bx, bx
 // Dart: git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash 
 
-// section .data
-// message:
-    // db "Hello world"
-
-// Example user space    
-// section .text
-// global start
-// start:
-//     bits 64
-//     mov rdx, 11
-//     mov rcx, message
-//     mov rbx, 1
-//     mov rax, 4
-//     ; xchg bx, bx
-//     int 0x80
-//     jmp $ 
+// https://fejlesztek.hu/create-a-fat-file-system-image-on-linux/
+// https://stackoverflow.com/questions/22385189/add-files-to-vfat-image-without-mounting/29798605#29798605
