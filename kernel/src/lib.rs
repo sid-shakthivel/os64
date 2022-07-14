@@ -43,8 +43,6 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     PIT.lock().init();
     PICS.lock().init();
 
-    print!("Hello World\n");
-
     let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
 
     // paging::identity_map(12, &mut page_frame_allocator, None);

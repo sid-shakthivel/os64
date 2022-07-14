@@ -13,6 +13,7 @@ use crate::print;
 use crate::vga_text::TERMINAL;
 use multiboot2::load;
 use spin::Mutex;
+use core::mem;
 
 // Boot record occupies one sector and is at the start
 
@@ -27,7 +28,7 @@ impl Fat16 {
         Fat16 {
             bpb: None,
             start_address: 0,
-            fat_address: 0,
+            fat_address: 0
         }
     }
 }
@@ -51,7 +52,9 @@ struct BiosParameterBlock {
     sector_count_32: u32
 }
 
-struct EBR {
+#[derive(Debug, Copy, Clone)]
+#[repr(C, packed)]
+struct ExtendedBootRecord {
     drive_number: u8,
     nt_flags: u8,
     signature: u8,
@@ -97,6 +100,13 @@ pub fn init(multiboot_information_address: usize) {
     for module in boot_info.module_tags() {
         let bpb = unsafe { &*((module.start_address()) as *const BiosParameterBlock) };
 
+        let ebr_address = module.start_address() + (mem::size_of::<BiosParameterBlock>() as u32);
+        let ebr = unsafe { &*(ebr_address as *const ExtendedBootRecord) };
+
+        // print!("{:?}\n", bpb);
+
+        validate_fs(ebr);
+
         let first_fat = module.start_address() + (512 * bpb.reserved_sector_count as u32);
         let fat_size: u32 = bpb.table_size_16 as u32;
 
@@ -106,6 +116,8 @@ pub fn init(multiboot_information_address: usize) {
         let root_directory_size: u32 = (((bpb.root_entry_count * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector).into();
         let first_data_sector = (root_directory_size * 512) + root_directory_address;
 
+        // print!("{}\n", 44 + root_directory_size);
+
         FS.lock().bpb = Some(*bpb);
         FS.lock().start_address = module.start_address();
         FS.lock().fat_address = first_fat;
@@ -114,49 +126,74 @@ pub fn init(multiboot_information_address: usize) {
     }
 }
 
-// Should ensure it's FAT16
-// fn validate_fs() -> bool {
-//     let data_sectors = bpb.sector_count_16;
-//     let total_clusters = data_sectors / (bpb.sectors_per_cluster as u16);
+// Should ensure it's FAT16 and check certain values
+fn validate_fs(ebr: &ExtendedBootRecord) -> bool {
+    // TODO: Calculate number of clusters and check whether smaller then 65525 and expand
 
-//     print!("{}\n", total_clusters);
-// }
+    if (ebr.signature != 0x28 && ebr.signature != 0x29) { panic!("Invalid signature, {:x}", ebr.signature); }
+    // if (ebr.bootable_partition_signature != 0xAA55) { panic!("Invalid partition signature"); }
 
+    return true;
+}
+
+// Clusters represent linear addresses, sectors use segment addresses
+// LBA represents an indexed location on the disk
 fn get_lba(cluster_num: u32) -> u32 {
     return (cluster_num - 2) * (FS.lock().bpb.unwrap().sectors_per_cluster) as u32;
 }
 
-fn get_next_cluster(cluster_num: u32) {
-    let fat_offset = cluster_num * 32;
+// Uses 16 bits to address clusters
+fn read_fat(sector_num: u32, byte_offset: usize) -> u16 {
+    let fat =  unsafe { &*((FS.lock().fat_address + sector_num * 512) as *const [u8; 512]) };
+    return ((fat[byte_offset] as u16) << 8) | (fat[byte_offset+1] as u16);
+}
+
+fn get_next_cluster(cluster_num: u32) -> Option<u32> {
+    let fat_offset = cluster_num * 2;
     let sector_number = fat_offset / 512;
     let byte_offset = fat_offset % 512;
 
-    print!("{} {}\n", sector_number, byte_offset);
+    let next_cluster = read_fat(sector_number, byte_offset as usize);
 
-    // TODO: Check value to get next cluster, etc
-    let fat = FS.lock().fat_address as *const u8;
+    print!("Next cluster: {:x}\n", next_cluster);
 
-    unsafe {
-        print!("{:x}\n", *(fat.offset(0)));
-        print!("{:x}\n", *(fat.offset(1)));
-        print!("{:x}\n", *(fat.offset(2)));
+    return match next_cluster {
+        0xFFF7 => panic!("Bad cluster!"), // Indicates bad cluster
+        0xFFF8..=0xFFFF => None, // Indicates the whole file has been read
+        _ => Some(next_cluster as u32) // Gives next cluster number
     }
 }
 
 fn create_vfs(mut root_directory_address: u32, root_directory_size: u32, first_data_sector: u32) {
     let limit = root_directory_size / 0x20; // Each entry in root directory is 0x20 bytes
-    for i in 0..limit {
-        let entry = unsafe { &*(root_directory_address as *const StandardDirectoryEntry) };
-        print!("{:?}\n", entry);
+    // for i in 0..limit {
+        
+    // }
 
-        let mut data_address = 0;
-        data_address = (512 * get_lba(entry.cluster_low as u32)) + first_data_sector;
+    // let mut entry = unsafe { &*(root_directory_address as *const StandardDirectoryEntry) };
+    // print!("{:?}\n", entry);
 
-        let data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
-        print!("{:?}\n", data);
+    // let mut data_address = (512 * get_lba(entry.cluster_low as u32)) + first_data_sector;
+    // let mut data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
 
-        root_directory_address += 0x20;
+    root_directory_address += 0x20;
 
-        get_next_cluster(entry.cluster_low as u32);
-    }
+    let entry = unsafe { &*(root_directory_address as *const StandardDirectoryEntry) };
+    // print!("{:?}\n", entry);
+
+    print!("{:?}\n", entry.attributes & 0x10);
+
+    let mut data_address = (512 * get_lba(entry.cluster_low as u32)) + first_data_sector + 0x20 + 0x20;
+    let mut data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
+
+    get_next_cluster(entry.cluster_low as u32);
+
+    print!("{:?}\n", data.attributes & 0x10);
+
+    data_address = (512 * get_lba(data.cluster_low as u32)) + first_data_sector;
+    data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
+
+    get_next_cluster(data.cluster_low as u32);
+
+    print!("{:?}\n", data);
 }
