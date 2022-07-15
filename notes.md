@@ -14,3 +14,5 @@ Tomorrow:
 Make methods to write files
 
 Each cluster is 2048B
+2 nodes - file node which stores cluster number
+        - folder node which stores folders

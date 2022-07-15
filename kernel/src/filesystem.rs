@@ -113,7 +113,7 @@ pub fn init(multiboot_information_address: usize) {
         let mut root_directory_address: u32 = (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
         root_directory_address = module.start_address() + (root_directory_address * 512);
 
-        let root_directory_size: u32 = (bpb.root_entry_count * 32) as u32;
+        let root_directory_size: u32 = ((((bpb.root_entry_count) * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector) as u32;
         let first_data_sector = (root_directory_size * 512) + root_directory_address;
 
         FS.lock().bpb = Some(*bpb);
@@ -137,14 +137,13 @@ fn validate_fs(ebr: &ExtendedBootRecord) -> bool {
 
 // Loops through the root directory
 fn create_vfs(mut root_directory_address: u32, root_directory_size: u32, first_data_sector: u32) {
-    parse_folder_cluster(root_directory_address, (root_directory_size / 0x20));
+    parse_folder_cluster(root_directory_address, 512);
 }
 
 // Directories contain folders and files 
 fn parse_folder_cluster(mut cluster_address: u32, size: u32) {
     for i in 0..size {
         let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
-        print!("{:?}\n", directory_entry);
 
         match directory_entry.filename[0] {
             0x00 => return, // No more files/directories
@@ -152,13 +151,19 @@ fn parse_folder_cluster(mut cluster_address: u32, size: u32) {
             _ => {}
         }
 
+        print!("{:?}\n", directory_entry);
+
         if directory_entry.attributes & 0x10 > 0 {
             // Is directory
-            let next_cluster_address: u32 = ((512 * directory_entry.cluster_low) as u32) + FS.lock().first_data_sector_address;
-            parse_folder_cluster(next_cluster_address, 64);
+            if (directory_entry.filename[0] != 0x2E) {
+                let next_cluster_address: u32 = ((512 * get_lba(directory_entry.cluster_low as u32))) + FS.lock().first_data_sector_address;
+                parse_folder_cluster(next_cluster_address, 64);
+            }
         } else {
             // Is File
-            parse_file_clusters(directory_entry.cluster_low as u32, directory_entry);
+            if (directory_entry.filename[0] != 0x2E) {
+                parse_file_clusters(directory_entry.cluster_low as u32, directory_entry);
+            }
         }
 
         cluster_address += 0x20;
@@ -166,8 +171,11 @@ fn parse_folder_cluster(mut cluster_address: u32, size: u32) {
 }
 
 fn parse_file_clusters(cluster_num: u32, file_entry: &StandardDirectoryEntry) {
-    let cluster_address = (512 * cluster_num) + FS.lock().first_data_sector_address;
+    let cluster_address = (512 * get_lba(cluster_num)) + FS.lock().first_data_sector_address;
     let file_contents = unsafe { (cluster_address as *const u8) }; // Pointer to this in 
+    unsafe {
+        print!("Character : {}\n", *file_contents.offset(0));
+    }
     match get_next_cluster(cluster_num) {
         None => return, // End of file
         Some(cluster_num) => {
