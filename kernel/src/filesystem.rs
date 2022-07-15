@@ -29,7 +29,7 @@ impl Fat16 {
         Fat16 {
             bpb: None,
             start_address: 0,
-            fat_address: 0
+            fat_address: 0,
             first_data_sector_address: 0,
         }
     }
@@ -113,7 +113,7 @@ pub fn init(multiboot_information_address: usize) {
         let mut root_directory_address: u32 = (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
         root_directory_address = module.start_address() + (root_directory_address * 512);
 
-        let root_directory_size: u32 = (bpb.root_entry_count * 32);
+        let root_directory_size: u32 = (bpb.root_entry_count * 32) as u32;
         let first_data_sector = (root_directory_size * 512) + root_directory_address;
 
         FS.lock().bpb = Some(*bpb);
@@ -137,36 +137,14 @@ fn validate_fs(ebr: &ExtendedBootRecord) -> bool {
 
 // Loops through the root directory
 fn create_vfs(mut root_directory_address: u32, root_directory_size: u32, first_data_sector: u32) {
-    // let mut entry = unsafe { &*(root_directory_address as *const StandardDirectoryEntry) };
-    // print!("{:?}\n", entry);
-
-    // let mut data_address = (512 * get_lba(entry.cluster_low as u32)) + first_data_sector;
-    // let mut data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
-
-    let entry = unsafe { &*(root_directory_address as *const StandardDirectoryEntry) };
-    // print!("{:?}\n", entry);
-
-    print!("{:?}\n", entry.attributes & 0x10);
-
-    let mut data_address = (512 * get_lba(entry.cluster_low as u32)) + first_data_sector + 0x20 + 0x20;
-    let mut data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
-
-    get_next_cluster(entry.cluster_low as u32);
-
-    print!("{:?}\n", data.attributes & 0x10);
-
-    data_address = (512 * get_lba(data.cluster_low as u32)) + first_data_sector;
-    data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
-
-    get_next_cluster(data.cluster_low as u32);
-
-    print!("{:?}\n", data);
+    parse_folder_cluster(root_directory_address, (root_directory_size / 0x20));
 }
 
 // Directories contain folders and files 
-fn parse_folder_cluster(cluster_address: u32, size: u32) {
+fn parse_folder_cluster(mut cluster_address: u32, size: u32) {
     for i in 0..size {
-        let directory_entry = unsafe { &*(data_address as *const StandardDirectoryEntry) };
+        let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
+        print!("{:?}\n", directory_entry);
 
         match directory_entry.filename[0] {
             0x00 => return, // No more files/directories
@@ -174,26 +152,26 @@ fn parse_folder_cluster(cluster_address: u32, size: u32) {
             _ => {}
         }
 
-        if directory_entry.attributes & (1 << 0x10) != 0 {
+        if directory_entry.attributes & 0x10 > 0 {
             // Is directory
-            let next_cluster_address = (512 * directory_entry.cluster_low) + FS.lock().first_data_sector_address;
+            let next_cluster_address: u32 = ((512 * directory_entry.cluster_low) as u32) + FS.lock().first_data_sector_address;
             parse_folder_cluster(next_cluster_address, 64);
         } else {
             // Is File
-            parse_file_clusters();
+            parse_file_clusters(directory_entry.cluster_low as u32, directory_entry);
         }
 
         cluster_address += 0x20;
     }
 }
 
-fn parse_file_clusters(cluster_num: u32, file_entry: StandardDirectoryEntry) {
+fn parse_file_clusters(cluster_num: u32, file_entry: &StandardDirectoryEntry) {
     let cluster_address = (512 * cluster_num) + FS.lock().first_data_sector_address;
     let file_contents = unsafe { (cluster_address as *const u8) }; // Pointer to this in 
     match get_next_cluster(cluster_num) {
         None => return, // End of file
         Some(cluster_num) => {
-            parse_file_clusters(next_cluster_address, file_size: u32, cluster_num: u32)
+            parse_file_clusters(cluster_num, file_entry);
         }
     }
 }
@@ -204,8 +182,6 @@ fn get_next_cluster(cluster_num: u32) -> Option<u32> {
     let byte_offset = fat_offset % 512;
 
     let next_cluster = read_fat(sector_number, byte_offset as usize);
-
-    print!("Next cluster: {:x}\n", next_cluster);
 
     return match next_cluster {
         0xFFF7 => panic!("Bad cluster!"), // Indicates bad cluster
