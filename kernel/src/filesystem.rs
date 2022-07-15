@@ -20,7 +20,8 @@ use core::mem;
 struct Fat16 {
     bpb: Option<BiosParameterBlock>,
     start_address: u32,
-    fat_address: u32
+    fat_address: u32,
+    first_data_sector_address: u32,
 }
 
 impl Fat16 {
@@ -29,6 +30,7 @@ impl Fat16 {
             bpb: None,
             start_address: 0,
             fat_address: 0
+            first_data_sector_address: 0,
         }
     }
 }
@@ -103,8 +105,6 @@ pub fn init(multiboot_information_address: usize) {
         let ebr_address = module.start_address() + (mem::size_of::<BiosParameterBlock>() as u32);
         let ebr = unsafe { &*(ebr_address as *const ExtendedBootRecord) };
 
-        // print!("{:?}\n", bpb);
-
         validate_fs(ebr);
 
         let first_fat = module.start_address() + (512 * bpb.reserved_sector_count as u32);
@@ -113,14 +113,13 @@ pub fn init(multiboot_information_address: usize) {
         let mut root_directory_address: u32 = (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
         root_directory_address = module.start_address() + (root_directory_address * 512);
 
-        let root_directory_size: u32 = (((bpb.root_entry_count * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector).into();
+        let root_directory_size: u32 = (bpb.root_entry_count * 32);
         let first_data_sector = (root_directory_size * 512) + root_directory_address;
-
-        // print!("{}\n", 44 + root_directory_size);
 
         FS.lock().bpb = Some(*bpb);
         FS.lock().start_address = module.start_address();
         FS.lock().fat_address = first_fat;
+        FS.lock().first_data_sector_address = first_data_sector;
 
         create_vfs(root_directory_address, root_directory_size, first_data_sector);
     }
@@ -136,47 +135,13 @@ fn validate_fs(ebr: &ExtendedBootRecord) -> bool {
     return true;
 }
 
-// Clusters represent linear addresses, sectors use segment addresses
-// LBA represents an indexed location on the disk
-fn get_lba(cluster_num: u32) -> u32 {
-    return (cluster_num - 2) * (FS.lock().bpb.unwrap().sectors_per_cluster) as u32;
-}
-
-// Uses 16 bits to address clusters
-fn read_fat(sector_num: u32, byte_offset: usize) -> u16 {
-    let fat =  unsafe { &*((FS.lock().fat_address + sector_num * 512) as *const [u8; 512]) };
-    return ((fat[byte_offset] as u16) << 8) | (fat[byte_offset+1] as u16);
-}
-
-fn get_next_cluster(cluster_num: u32) -> Option<u32> {
-    let fat_offset = cluster_num * 2;
-    let sector_number = fat_offset / 512;
-    let byte_offset = fat_offset % 512;
-
-    let next_cluster = read_fat(sector_number, byte_offset as usize);
-
-    print!("Next cluster: {:x}\n", next_cluster);
-
-    return match next_cluster {
-        0xFFF7 => panic!("Bad cluster!"), // Indicates bad cluster
-        0xFFF8..=0xFFFF => None, // Indicates the whole file has been read
-        _ => Some(next_cluster as u32) // Gives next cluster number
-    }
-}
-
+// Loops through the root directory
 fn create_vfs(mut root_directory_address: u32, root_directory_size: u32, first_data_sector: u32) {
-    let limit = root_directory_size / 0x20; // Each entry in root directory is 0x20 bytes
-    // for i in 0..limit {
-        
-    // }
-
     // let mut entry = unsafe { &*(root_directory_address as *const StandardDirectoryEntry) };
     // print!("{:?}\n", entry);
 
     // let mut data_address = (512 * get_lba(entry.cluster_low as u32)) + first_data_sector;
     // let mut data = unsafe { &*(data_address as *const StandardDirectoryEntry) };
-
-    root_directory_address += 0x20;
 
     let entry = unsafe { &*(root_directory_address as *const StandardDirectoryEntry) };
     // print!("{:?}\n", entry);
@@ -196,4 +161,67 @@ fn create_vfs(mut root_directory_address: u32, root_directory_size: u32, first_d
     get_next_cluster(data.cluster_low as u32);
 
     print!("{:?}\n", data);
+}
+
+// Directories contain folders and files 
+fn parse_folder_cluster(cluster_address: u32, size: u32) {
+    for i in 0..size {
+        let directory_entry = unsafe { &*(data_address as *const StandardDirectoryEntry) };
+
+        match directory_entry.filename[0] {
+            0x00 => return, // No more files/directories
+            0xE5 => panic!("Unused entry"),
+            _ => {}
+        }
+
+        if directory_entry.attributes & (1 << 0x10) != 0 {
+            // Is directory
+            let next_cluster_address = (512 * directory_entry.cluster_low) + FS.lock().first_data_sector_address;
+            parse_folder_cluster(next_cluster_address, 64);
+        } else {
+            // Is File
+            parse_file_clusters();
+        }
+
+        cluster_address += 0x20;
+    }
+}
+
+fn parse_file_clusters(cluster_num: u32, file_entry: StandardDirectoryEntry) {
+    let cluster_address = (512 * cluster_num) + FS.lock().first_data_sector_address;
+    let file_contents = unsafe { (cluster_address as *const u8) }; // Pointer to this in 
+    match get_next_cluster(cluster_num) {
+        None => return, // End of file
+        Some(cluster_num) => {
+            parse_file_clusters(next_cluster_address, file_size: u32, cluster_num: u32)
+        }
+    }
+}
+
+fn get_next_cluster(cluster_num: u32) -> Option<u32> {
+    let fat_offset = cluster_num * 2;
+    let sector_number = fat_offset / 512;
+    let byte_offset = fat_offset % 512;
+
+    let next_cluster = read_fat(sector_number, byte_offset as usize);
+
+    print!("Next cluster: {:x}\n", next_cluster);
+
+    return match next_cluster {
+        0xFFF7 => panic!("Bad cluster!"), // Indicates bad cluster
+        0xFFF8..=0xFFFF => None, // Indicates the whole file has been read
+        _ => Some(next_cluster as u32) // Gives next cluster number
+    }
+}
+
+// Clusters represent linear addresses, sectors use segment addresses
+// LBA represents an indexed location on the disk
+fn get_lba(cluster_num: u32) -> u32 {
+    return (cluster_num - 2) * (FS.lock().bpb.unwrap().sectors_per_cluster) as u32;
+}
+
+// Uses 16 bits to address clusters
+fn read_fat(sector_num: u32, byte_offset: usize) -> u16 {
+    let fat =  unsafe { &*((FS.lock().fat_address + sector_num * 512) as *const [u8; 512]) };
+    return ((fat[byte_offset] as u16) << 8) | (fat[byte_offset+1] as u16);
 }
