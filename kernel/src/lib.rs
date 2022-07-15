@@ -17,6 +17,7 @@ mod spinlock;
 mod grub;
 mod syscalls;
 mod elf;
+mod filesystem;
 
 extern crate multiboot2;
 extern crate bitflags;
@@ -30,6 +31,8 @@ use crate::pit::PIT;
 use crate::pic::PicFunctions;
 use core::arch::asm;
 
+use multiboot2::load;
+
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     // TODO: Fix the horrific auto formatting in vscode
@@ -42,13 +45,11 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
 
-    paging::identity_map(12, &mut page_frame_allocator, None);
+    // paging::identity_map(12, &mut page_frame_allocator, None);
 
-    grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
+    filesystem::init(multiboot_information_address);
 
-    print!("Welcome!\n");
-
-    interrupts::enable();
+    // grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
     loop {}
 }
@@ -59,6 +60,3 @@ fn panic(info: &PanicInfo) -> ! {
     print!("Error: {}", info);
     loop {}
 }
-
-// Bochs magic breakpoint is xchg bx, bx
-

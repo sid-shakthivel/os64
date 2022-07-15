@@ -68,13 +68,13 @@ enum ElfIdent {
     EiPad = 9, // Padding
 }
 
-// #[repr(u16)]
-// #[derive(PartialEq, Debug, Clone, Copy)]
-// enum ElfType {
-//     EtNone = 0 as u16, // Unknown
-//     EtRel = 1 as u16, // Relocatable
-//     EtExec = 2 as u16, // Executable
-// }
+#[repr(u16)]
+#[derive(PartialEq, Debug, Clone, Copy)]
+enum ElfType {
+    EtNone = 0, // Unknown
+    EtRel = 1, // Relocatable
+    EtExec = 2, // Executable
+}
 
 #[repr(C, packed)]
 struct ElfSectionHeader{
@@ -102,12 +102,13 @@ struct ElfProgramHeader {
     p_align: Elf64Xword, // Alignment in memory and file
 }
 
-// #[repr(u32)]
-// #[derive(PartialEq, Copy, Clone)]
-// enum ProgramHeaderType {
-//     PtNull = 0, // unused
-//     PtLoad = 1, // loadable segment
-// }
+#[repr(u32)]
+#[derive(PartialEq, Copy, Clone)]
+enum ProgramHeaderType
+{
+    PtNull = 0, // unused
+    PtLoad = 1, // loadable segment
+}
 
 pub fn parse(file_start: u64, page_frame_allocator: &mut PageFrameAllocator) {
     let elf_header = unsafe { &*(file_start as *const ElfHeader) };
@@ -118,6 +119,7 @@ pub fn parse(file_start: u64, page_frame_allocator: &mut PageFrameAllocator) {
 
 // Verify file starts with ELF Magic number and is built for the correct system
 fn validate_file(elf_header: &ElfHeader) -> bool {
+    let test = elf_header.e_type;
     if elf_header.e_ident[ElfIdent::EiMag0 as usize] != 0x7F { panic!("ELF Header EI_MAG0 incorrect\n"); }
     else if elf_header.e_ident[ElfIdent::EiMag1 as usize] != ('E' as u8) { panic!("ELF header EI_MAG1 incorrect\n"); }
     else if elf_header.e_ident[ElfIdent::EiMag2 as usize] != ('L' as u8) { panic!("ELF header EI_MAG2 incorrect\n"); }
@@ -126,7 +128,7 @@ fn validate_file(elf_header: &ElfHeader) -> bool {
     else if elf_header.e_ident[ElfIdent::EiData as usize] != ELF_DATA { panic!("Unsupported ELF File byte order\n"); } 
     else if elf_header.e_ident[ElfIdent::EiVersion as usize] != ELF_VERSION { panic!("Unsupported ELF version\n"); } 
     else if elf_header.e_machine != ELF_MACHINE { panic!("Unsupported ELF file target\n"); }
-    else if elf_header.e_type != 2 { panic!("Unsupported ELF file type"); }
+    else if elf_header.e_type == 1 { panic!("Unsupported ELF file type"); }
     return true;
 }
 
@@ -137,7 +139,9 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader, page_frame_all
         let address = file_start + elf_header.e_phoff + (mem::size_of::<ElfProgramHeader>() as u64) * (i as u64);
         let program_header = unsafe { &*(address as *const ElfProgramHeader) };
 
-        match program_header.p_type {
+        let test = program_header.p_type;
+
+        match test {
             1 => {
                 let source = file_start + program_header.p_offset as u64;
                 if program_header.p_memsz != program_header.p_filesz { panic!("Segment is padded with 0's\n"); }

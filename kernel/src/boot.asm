@@ -36,55 +36,27 @@ setup_paging:
     or eax, 0b111 ; Present, Writeable
     mov [p3_table], eax
 
-    mov eax, p1_table_1
-    or eax, 0b111 ; Present, Writeable
-    mov [p2_table + 0 * 8], eax
+    mov eax, p1_tables
+    mov ecx, 0
 
-    mov eax, p1_table_2
+.map_p2_table
     or eax, 0b111
-    mov [p2_table + 1 * 8], eax
-
-    mov eax, p1_table_3
-    or eax, 0b111
-    mov [p2_table + 2 * 8], eax
+    mov [p2_table + ecx * 8], eax
+    inc ecx
+    add eax, 4096
+    cmp ecx, 12
+    jne .map_p2_table
 
     mov ecx, 0
 
-.map_p1_table_1
+.map_p1_tables
     mov eax, 0x1000
     mul ecx
-or eax, 0b111 ; Present, Writable
-    mov [p1_table_1 + ecx * 8], eax ; 8 bit entries
-
+    or eax, 0b111 ; Present, Writeable, User
+    mov [p1_tables + ecx * 8], eax
     inc ecx
-    cmp ecx, 512
-    jne .map_p1_table_1
-
-    mov ebx, 0
-
-.map_p1_table_2
-    mov eax, 0x1000
-    mul ecx
-    or eax, 0b111 ; Present, Writable
-    mov [p1_table_2 + ebx * 8], eax ; 8 bit entries
-
-    inc ebx
-    inc ecx
-    cmp ebx, 512
-    jne .map_p1_table_2
-
-    mov ebx, 0
-
-.map_p1_table_3
-    mov eax, 0x1000
-    mul ecx
-    or eax, 0b111 ; Present, Writable
-    mov [p1_table_3 + ebx * 8], eax ; 8 bit entries
-
-    inc ebx
-    inc ecx
-    cmp ebx, 512
-    jne .map_p1_table_3
+    cmp ecx, 6144 ; Make 12 tables
+    jne .map_p1_tables
 
     mov ecx, 0
 
@@ -130,14 +102,8 @@ p3_table:
     resb 4096
 p2_table:
     resb 4096
-p1_table_1:
-    resb 4096
-p1_table_2:
-    resb 4096
-p1_table_3:
-    resb 4096
-p1_table_4:
-    resb 4096
+p1_tables:
+    resb 49152 ; Identity map the first 24MB
 stack_bottom:
     resb 16384
 stack_top:

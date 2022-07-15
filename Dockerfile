@@ -22,6 +22,12 @@ RUN apt-get install nasm -y
 # Install Make
 RUN apt-get install make -y
 
+# Install fdisk
+RUN apt-get install fdisk -y
+
+# Install mkfs.vfat
+RUN apt-get install dosfstools -y
+
 WORKDIR /
 
 # Compile and create ISO

@@ -19,6 +19,7 @@ use crate::multitask::PROCESS_SCHEDULAR;
 use crate::gdt::TSS;
 use crate::multitask;
 use x86_64::addr::VirtAddr;
+use spin::Mutex;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -105,7 +106,7 @@ impl idt_entry {
                 GateType::Trap => 0x8F,
                 GateType::Interrupt => 0x8E
             };
-
+    
             match privilege_level {
                 PrivilegeLevel::Ring3 => {
                     IDT[vector].attributes |= 1 << 5; 
@@ -113,7 +114,7 @@ impl idt_entry {
                 },
                 _ => {}
             }
-
+    
             IDT[vector].isr_low = (func_address & 0xFFFF) as u16;
             IDT[vector].isr_mid = ((func_address >> 16) & 0xFFFF) as u16;
             IDT[vector].isr_high = (func_address >> 32) as u32;
@@ -161,10 +162,10 @@ pub extern fn interrupt_handler(registers: Registers) {
     }
 }
 
-// TODO: Clean and refactor this
+// TODO: Clean and refactor
 #[no_mangle]
 pub extern fn pit_handler(iret_stack: IretStack) -> *const u64 {
-    // // Acknowledge interrupt
+    // Acknowledge interrupt and timer
     PICS.lock().acknowledge(0x20); 
     PIT.lock().handle_timer();
 
@@ -244,8 +245,7 @@ pub fn init() {
 }
 
 extern "C" {
-    // All assembly functions
-    // TODO: Find way to reduce this
+    // ISRS's
     fn handle_no_err_exception0();
     fn handle_no_err_exception1();
     fn handle_no_err_exception2();
@@ -283,3 +283,4 @@ extern "C" {
     fn handle_syscall(); // Syscall
     fn idt_flush();
 }
+
