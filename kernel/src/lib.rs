@@ -17,7 +17,7 @@ mod spinlock;
 mod grub;
 mod syscalls;
 mod elf;
-mod filesystem;
+mod fs;
 
 extern crate multiboot2;
 extern crate bitflags;
@@ -47,7 +47,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     // paging::identity_map(12, &mut page_frame_allocator, None);
 
-    filesystem::init(multiboot_information_address);
+    fs::init(multiboot_information_address);
 
     // grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
