@@ -18,8 +18,6 @@
 
 // TODO: Use enums instead of numbers 
 
-use crate::vga_text::TERMINAL;
-use crate::print;
 use core::mem;
 use crate::page_frame_allocator::PAGE_SIZE;
 use crate::page_frame_allocator::PageFrameAllocator;
@@ -119,7 +117,6 @@ pub fn parse(file_start: u64, page_frame_allocator: &mut PageFrameAllocator) {
 
 // Verify file starts with ELF Magic number and is built for the correct system
 fn validate_file(elf_header: &ElfHeader) -> bool {
-    let test = elf_header.e_type;
     if elf_header.e_ident[ElfIdent::EiMag0 as usize] != 0x7F { panic!("ELF Header EI_MAG0 incorrect\n"); }
     else if elf_header.e_ident[ElfIdent::EiMag1 as usize] != ('E' as u8) { panic!("ELF header EI_MAG1 incorrect\n"); }
     else if elf_header.e_ident[ElfIdent::EiMag2 as usize] != ('L' as u8) { panic!("ELF header EI_MAG2 incorrect\n"); }
@@ -135,7 +132,7 @@ fn validate_file(elf_header: &ElfHeader) -> bool {
 // Elf program headers specify where segments are located
 fn parse_program_headers(file_start: u64, elf_header: &ElfHeader, page_frame_allocator: &mut PageFrameAllocator) {
     // Loop through the headers and load each loadable segment into memory
-    for i in 0..(elf_header.e_phnum) {
+    for i in 0..elf_header.e_phnum {
         let address = file_start + elf_header.e_phoff + (mem::size_of::<ElfProgramHeader>() as u64) * (i as u64);
         let program_header = unsafe { &*(address as *const ElfProgramHeader) };
 

@@ -19,6 +19,8 @@ use crate::vga_text::TERMINAL;
 use multiboot2::load;
 use spin::Mutex;
 use core::mem;
+use crate::page_frame_allocator::PageFrameAllocator;
+use crate::page_frame_allocator::FrameAllocator;
 
 // VFS
 
@@ -26,11 +28,12 @@ use core::mem;
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 struct File {
-    name: [u8; 32],
+    name: [u8; 8],
     flags: u32,
-    file_size: u32,
+    size: u32,
     cluster: u32,
-    file_type: FileType
+    index: u32,
+    file_type: FileType,
     // permissions: u32,
     // uid: u32,
     // gid: u32,
@@ -46,82 +49,90 @@ enum FileType {
 impl File {
     pub const fn new(cluster_num: u32, size: u32, file_type: FileType) -> File {
         return File {
-            name: [0; 32],
+            name: [0; 8],
             flags: 0,
-            file_size: size,
+            index: 0,
+            size: size,
             cluster: cluster_num,
             file_type: file_type,
         }
     }
 
-    // TODO: Figure out how to copy to a buffer?
-    pub fn read(&mut self) {
-        if (self.file_type == FileType::File) {
-            Self::read_file(self.cluster);
-        }
+    pub fn read(&mut self, buffer: *mut u8) {
+        if self.file_type != FileType::File { panic!("Tried to read on a directory"); }
+        if self.size > 2048 { panic!("Bigger then a cluster"); }
 
-        if (self.file_type == FileType::Directory) {
-            print!("Here?\n");
-            // Self::read_directory(self.cluster);
-            Self::read_directory(self.cluster);
-        }
-    }
+        let cluster_address = (512 * get_lba(self.cluster)) + FS.lock().first_data_sector_address;
 
-    // TODO: Remove
-    pub fn read_root(&mut self, address: u32) {
-        let mut cluster_address = address;
-
-        for i in 0..512 {
-            let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
-            print_filename(&directory_entry.filename, &directory_entry.ext);
-
-            match directory_entry.filename[0] {
-                0x00 => return, // No more files/directories
-                0xE5 => panic!("Unused entry"),
-                _ => {}
-            }
-        
-            cluster_address += 0x20;
-        }
-    }
-
-    fn read_directory(cluster_num: u32) {
-        let mut cluster_address = (512 * get_lba(cluster_num)) + FS.lock().first_data_sector_address;
-
-        // There are 64 entries in a single cluster
-        for i in 0..64 {
-            let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
-            print_filename(&directory_entry.filename, &directory_entry.ext);
-
-            match directory_entry.filename[0] {
-                0x00 => return, // No more files/directories
-                0xE5 => panic!("Unused entry"),
-                _ => {}
-            }
-        
-            cluster_address += 0x20;
-        }
-
-        match get_next_cluster(cluster_num) {
-            None => return, // End of cluster
-            Some(cluster_num) => {
-                Self::read_directory(cluster_num);
-            }
-        }
-    }
-
-    fn read_file(cluster_num: u32) {
-        let cluster_address = (512 * get_lba(cluster_num)) + FS.lock().first_data_sector_address;
-        let file_contents = unsafe { (cluster_address as *const u8) }; 
         unsafe {
-            print!("Character : {}\n", *file_contents.offset(0));
+            let file_contents = cluster_address as *mut u8;
+            memcpy_cluster(buffer, file_contents, self.index);
         }
-        match get_next_cluster(cluster_num) {
+
+        let saved_cluster_num = self.cluster;
+
+        match get_next_cluster(self.cluster) {
             None => return, // End of file
             Some(cluster_num) => {
-                Self::read_file(cluster_num);
+                self.index += 1;
+                self.cluster = cluster_num;
+                return self.read(buffer);
             }
         }
+    }
+
+    pub fn find(&mut self, filename: &str) -> Option<File> {
+        let cluster_address = (512 * get_lba(self.cluster)) + FS.lock().first_data_sector_address;
+        return self._find(filename, cluster_address);
+    }
+
+    pub fn find_root(&mut self, filename: &str) -> Option<File> {
+        let first_data_sector_address: u32 = FS.lock().first_data_sector_address;
+        let root_directory_size: u32 = FS.lock().root_directory_size;
+        let root_directory_address = first_data_sector_address - root_directory_size;
+
+        return self._find(filename, root_directory_address);
+    }
+
+    // pub fn readdir(&mut self, reset: bool) -> File {
+    //     if self.file_type != FileType::Directory { panic!("Tried to open on a file"); }
+    // }
+
+    fn _find(&mut self, filename: &str, mut cluster_address: u32) -> Option<File> {
+        if filename.len() > 8 { panic!("File name is too big!\n"); }
+        if self.file_type != FileType::Directory { panic!("Tried to open on a file"); }
+
+        for i in 0..64 {
+            let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
+
+            match directory_entry.filename[0] {
+                0x00 => return None, // No more files/directories
+                0xE5 => panic!("Unused entry"),
+                _ => {}
+            }
+
+            let dos_filename = core::str::from_utf8(&directory_entry.filename).unwrap().trim();
+            let dos_extension = core::str::from_utf8(&directory_entry.ext).unwrap().trim();
+            let mut split_filename = filename.split(".");
+
+            // Check if entry matches 
+            if split_filename.next().unwrap() == dos_filename {
+                if directory_entry.attributes & 0x10 > 0 {
+                    let mut node = File::new(directory_entry.cluster_low as u32, directory_entry.file_size, FileType::Directory);
+                    node.name = directory_entry.filename;
+                    return Some(node);
+                } else {
+                    let mut node = File::new(directory_entry.cluster_low as u32, directory_entry.file_size, FileType::File);
+                    node.name = directory_entry.filename;
+                    return Some(node);
+                }
+            }
+        
+            cluster_address += 0x20;
+        }
+
+        // Add support for directories which are greater then a cluster
+        return None;
     }
 }
 
@@ -210,13 +221,13 @@ struct LongDirectoryEntry {
 fn validate_fat(ebr: &ExtendedBootRecord) -> bool {
     // TODO: Calculate number of clusters and check whether smaller then 65525 and expand
 
-    if (ebr.signature != 0x28 && ebr.signature != 0x29) { panic!("Invalid signature, {:x}", ebr.signature); }
+    if ebr.signature != 0x28 && ebr.signature != 0x29 { panic!("Invalid signature, {:x}", ebr.signature); }
     // if (ebr.bootable_partition_signature != 0xAA55) { panic!("Invalid partition signature"); }
 
     return true;
 }
 
-fn get_next_cluster(mut cluster_num: u32) -> Option<u32> {
+fn get_next_cluster(cluster_num: u32) -> Option<u32> {
     let fat_offset = cluster_num * 2;
     let sector_number = fat_offset / 512;
     let byte_offset = fat_offset % 512;
@@ -252,7 +263,7 @@ static FS: Mutex<Fat16> = Mutex::new(Fat16::new());
 // Print filenames in required format
 fn print_filename(filename: &[u8], ext: &[u8]) {
     for i in 0..filename.len() {
-        if (filename[i] != 0x20) {
+        if filename[i] != 0x20 {
             print!("{}", filename[i] as char);
         }
     }
@@ -264,7 +275,7 @@ fn print_filename(filename: &[u8], ext: &[u8]) {
     print!("\n");
 }
 
-pub fn init(multiboot_information_address: usize) {
+pub fn init(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {
     let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
 
     // TODO: Change to get the first module only since this will always be an fs
@@ -280,20 +291,32 @@ pub fn init(multiboot_information_address: usize) {
         let fat_size: u32 = bpb.table_size_16 as u32;
 
         let root_directory_sector: u32 = (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
-        let root_directory_address = module.start_address() + (root_directory_sector * 512);
+        let root_directory_address: u32 = module.start_address() + (root_directory_sector * 512);
 
         let root_directory_size: u32 = ((((bpb.root_entry_count) * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector) as u32;
-        let first_data_sector = (root_directory_size * 512) + root_directory_address;
+        let first_data_sector: u32 = (root_directory_size * 512) + root_directory_address;
 
         FS.lock().bpb = Some(*bpb);
         FS.lock().start_address = module.start_address();
         FS.lock().fat_address = first_fat;
         FS.lock().first_data_sector_address = first_data_sector;
-        FS.lock().root_directory_size = (root_directory_size * 512);
+        FS.lock().root_directory_size = root_directory_size * 512;
 
-        // Create the root node
         let mut initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
-        print!("{:?}\n", initrd);
-        initrd.read_root(root_directory_address);
+        let mut node = initrd.find_root("A.TXT").unwrap();
+        print!("{:?}\n", node);
+        let dest = page_frame_allocator.alloc_frame().unwrap() as *mut u8;
+        node.read(dest);
+
+        node = initrd.find_root("SUBDIR").unwrap();
+        print!("{:?}\n", node);
     }
 }
+
+// Copies number of bytes into destination
+pub unsafe fn memcpy_cluster(dest: *mut u8, src: *mut u8, mut index: u32) {
+    for i in 0..2048 {
+        let offset = (i * index * 2048) as isize;
+        *(dest.offset(offset)) = *(src.offset(offset));
+    }
+} 

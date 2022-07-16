@@ -19,7 +19,6 @@ use crate::multitask::PROCESS_SCHEDULAR;
 use crate::gdt::TSS;
 use crate::multitask;
 use x86_64::addr::VirtAddr;
-use spin::Mutex;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;

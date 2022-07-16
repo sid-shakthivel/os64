@@ -1,7 +1,7 @@
 // src/lib.rs
 
 #![no_std] // Don't link with Rust standard library
-#![feature(const_mut_refs)]
+// #![feature(const_mut_refs)]
 
 mod vga_text;
 mod page_frame_allocator;
@@ -28,10 +28,6 @@ use core::panic::PanicInfo;
 use crate::vga_text::TERMINAL;
 use crate::pic::PICS;
 use crate::pit::PIT;
-use crate::pic::PicFunctions;
-use core::arch::asm;
-
-use multiboot2::load;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
@@ -47,7 +43,7 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     // paging::identity_map(12, &mut page_frame_allocator, None);
 
-    fs::init(multiboot_information_address);
+    fs::init(multiboot_information_address, &mut page_frame_allocator);
 
     // grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
 
