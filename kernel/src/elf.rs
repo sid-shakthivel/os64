@@ -18,6 +18,9 @@
 
 // TODO: Use enums instead of numbers 
 
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use core::mem;
 use crate::page_frame_allocator::PAGE_SIZE;
 use crate::page_frame_allocator::PageFrameAllocator;

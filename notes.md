@@ -1,7 +1,10 @@
 ### List of useful resources
 
 Bochs magic breakpoint is xchg bx, bx
-Dart: git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash 
 
-https://fejlesztek.hu/create-a-fat-file-system-image-on-linux/
-https://stackoverflow.com/questions/22385189/add-files-to-vfat-image-without-mounting/29798605#29798605
+TODO:
+- Port newlib C library
+- Extend usermode/syscall capabilities
+- GUI 
+- Port dart (git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash)
+- Malloc/Free

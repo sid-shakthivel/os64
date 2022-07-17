@@ -1,13 +1,11 @@
 # os64
 
 Features:
-- [x] VGA text mode
-- [x] Interrupts including PIT and keyboard
-- [x] Paging - Full 64 bit paging
-- [x] Pre-emptive multitasking 
-- [x] Userland in assembly with elf 
-- [x] Syscalls
-- [ ] File system
-- [ ] C Standard library 
-- [ ] GUI
+- VGA Text Mode
+- Interrupts (including PIT and Keyboard)
+- 64 Bit Paging
+- Pre-Emptive Multitasking
+- Userland in assembly (Can handle ELF binaries)
+- Syscalls
+- FAT16 Filesystem (Ramdisk)
 
