@@ -124,26 +124,28 @@ impl File {
         }
     }
 
-    pub fn read(&mut self, buffer: *mut u8) {
-        if self.file_type != FileType::File { panic!("Tried to read on a directory"); }
+    pub fn read(&mut self, buffer: *mut u8) -> Result<u64, &str> {
+        if self.file_type != FileType::File { return Err("Tried to read on a directory"); }
 
         self._modify(buffer, false);
         self.index = 0;
+        return Ok(0);
     }
 
-    pub fn write(&mut self, buffer: *mut u8) {
-        if self.file_type != FileType::File { panic!("Tried to read on a directory"); }
+    pub fn write(&mut self, buffer: *mut u8)-> Result<u64, &str> {
+        if self.file_type != FileType::File { return Err("Tried to write on a directory"); }
 
         self._modify(buffer, true);
         self.index = 0;
+        return Ok(0);
     }
 
-    pub fn find(&mut self, filename: &str) -> Option<File> {
-        let cluster_address = (512 * get_lba(self.cluster)) + FS.lock().first_data_sector_address;
+    pub fn find(&mut self, filename: &str) -> Result<File, &str> {
+        let cluster_address = convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
         return self._find(filename, cluster_address);
     }
 
-    pub fn find_root(&mut self, filename: &str) -> Option<File> {
+    pub fn find_root(&mut self, filename: &str) -> Result<File, &str> {
         let first_data_sector_address: u32 = FS.lock().first_data_sector_address;
         let root_directory_size: u32 = FS.lock().root_directory_size;
         let root_directory_address = first_data_sector_address - root_directory_size;
@@ -151,16 +153,16 @@ impl File {
         return self._find(filename, root_directory_address);
     }
 
-    pub fn readdir(&mut self) -> *const [File; 64] {
-        if self.file_type != FileType::Directory { panic!("Tried to open on a file"); }
-        let cluster_address = (512 * get_lba(self.cluster)) + FS.lock().first_data_sector_address;
-        return unsafe { &*(cluster_address as *const [File; 64]) };
+    pub fn readdir(&mut self) -> Result<*const [File; 64], &str> {
+        if self.file_type != FileType::Directory { return Err("Tried to open on a file"); }
+        let cluster_address = convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
+        return Ok(unsafe { &*(cluster_address as *const [File; 64]) });
     }
 
-    pub fn mkdir(&mut self, filename: &str) -> Option<File> {
-        if self.file_type != FileType::Directory { panic!("Tried to mkdir on a file"); }
+    pub fn mkdir(&mut self, filename: &str) -> Result<File, &str> {
+        if self.file_type != FileType::Directory { return Err("Tried to mkdir on a file"); }
 
-        let mut cluster_address = (512 * get_lba(self.cluster)) + FS.lock().first_data_sector_address;
+        let mut cluster_address = convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
         
         // Search for an empty space 
         for _i in 0..64 {
@@ -181,18 +183,18 @@ impl File {
     
                     let mut node = File::new(directory_entry_mut.cluster_low as u32, directory_entry_mut.file_size, FileType::Directory);
                     node.name = directory_entry.filename;
-                    return Some(node);
+                    return Ok(node);
                 }
             };
 
             cluster_address += 0x20;
         }
 
-        return None;
+        return Err("Directory is full");
     }
 
     fn _modify(&mut self, buffer: *mut u8, write: bool) {
-        let cluster_address = (512 * get_lba(self.cluster)) + FS.lock().first_data_sector_address;
+        let cluster_address = convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
 
         unsafe {
             let file_contents = cluster_address as *mut u8;
@@ -212,15 +214,15 @@ impl File {
         }
     }
 
-    fn _find(&mut self, filename: &str, mut cluster_address: u32) -> Option<File> {
-        if filename.len() > 8 { panic!("File name is too big!\n"); }
-        if self.file_type != FileType::Directory { panic!("Tried to open on a file"); }
+    fn _find(&mut self, filename: &str, mut cluster_address: u32) -> Result<File, &str> {
+        if filename.len() > 8 { return Err("File is too big"); }
+        if self.file_type != FileType::Directory { return Err("Tried to find on a directory"); }
 
         for _i in 0..64 {
             let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
 
             match directory_entry.filename[0] {
-                0x00 => return None, // No more files/directories
+                0x00 => return Err("File cannot be found in this directory"), // No more files/directories
                 0xE5 => panic!("Unused entry"),
                 _ => {}
             }
@@ -234,11 +236,11 @@ impl File {
                 if directory_entry.attributes & 0x10 > 0 {
                     let mut node = File::new(directory_entry.cluster_low as u32, directory_entry.file_size, FileType::Directory);
                     node.name = directory_entry.filename;
-                    return Some(node);
+                    return Ok(node);
                 } else {
                     let mut node = File::new(directory_entry.cluster_low as u32, directory_entry.file_size, FileType::File);
                     node.name = directory_entry.filename;
-                    return Some(node);
+                    return Ok(node);
                 }
             }
         
@@ -246,7 +248,7 @@ impl File {
         }
 
         // TODO: Add support for directories which are greater then a cluster
-        return None;
+        return Err("File cannot be found in this directory");
     }
 }
 
@@ -306,13 +308,13 @@ fn get_lba(cluster_num: u32) -> u32 {
 
 // Uses 16 bits to address clusters
 fn read_fat(sector_num: u32, byte_offset: usize) -> u16 {
-    let fat =  unsafe { &*((FS.lock().fat_address + sector_num * 512) as *const [u8; 512]) };
+    let fat =  unsafe { &*((FS.lock().fat_address + convert_sector_to_bytes(sector_num)) as *const [u8; 512]) };
     return ((fat[byte_offset+1] as u16) << 8) | (fat[byte_offset] as u16); // Little endian 
 }
 
 // Most addresses are calculated sectors and therefore must be converted into bytes to be read/written
-fn convert_sector_to_bytes() {
-
+fn convert_sector_to_bytes(sector: u32) -> u32 {
+    return sector * 512;
 }
 
 static FS: Mutex<Fat16> = Mutex::new(Fat16::new());
@@ -335,7 +337,6 @@ fn print_filename(filename: &[u8], ext: &[u8]) {
 pub fn init(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {
     let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
 
-    // TODO: Change to get the first module only since this will always be an fs
     for module in boot_info.module_tags() {
         let bpb = unsafe { &*((module.start_address()) as *const BiosParameterBlock) };
 
@@ -344,30 +345,24 @@ pub fn init(multiboot_information_address: usize, page_frame_allocator: &mut Pag
 
         validate_fat(ebr);
 
-        let first_fat = module.start_address() + (512 * bpb.reserved_sector_count as u32);
+        let first_fat = module.start_address() + convert_sector_to_bytes(bpb.reserved_sector_count as u32);
         let fat_size: u32 = bpb.table_size_16 as u32;
 
         let root_directory_sector: u32 = (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
-        let root_directory_address: u32 = module.start_address() + (root_directory_sector * 512);
+        let root_directory_address: u32 = module.start_address() + convert_sector_to_bytes(root_directory_sector);
 
         let root_directory_size: u32 = ((((bpb.root_entry_count) * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector) as u32;
-        let first_data_sector: u32 = (root_directory_size * 512) + root_directory_address;
+        let first_data_sector: u32 = convert_sector_to_bytes(root_directory_size) + root_directory_address;
 
         FS.lock().bpb = Some(*bpb);
         FS.lock().start_address = module.start_address();
         FS.lock().fat_address = first_fat;
         FS.lock().first_data_sector_address = first_data_sector;
-        FS.lock().root_directory_size = root_directory_size * 512;
-
-        let mut initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
-        let mut node = initrd.find_root("SUBDIR").unwrap();
-
-        print!("{:?}\n", node);
+        FS.lock().root_directory_size = convert_sector_to_bytes(root_directory_size);
 
         let dest = page_frame_allocator.alloc_frame().unwrap() as *mut u8;
-        
-        node.mkdir("TEST");
-        node.readdir();
+
+        let mut initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
     }
 }
 
