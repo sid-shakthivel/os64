@@ -9,3 +9,7 @@ TODO:
 - Port dart (git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash)
 - Malloc/Free
 - UART
+
+Daily tasks:
+- Make Writer trait which both vga_text and framebuffer use
+- Make Window system

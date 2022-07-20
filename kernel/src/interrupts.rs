@@ -8,7 +8,6 @@ An interrupt descriptor table defines what each interrupt will do
 */
 
 use crate::print;
-use crate::vga_text::TERMINAL;
 use core::mem::size_of;
 use core::arch::asm;
 use crate::pic::PICS;
@@ -139,13 +138,13 @@ pub extern fn exception_handler(registers: Registers) {
     let aligned_error_code = unsafe { core::ptr::read_unaligned(unaligned_error_code) };
     
     // Print a suitable error messages 
-    match registers.num {
-        0..=22 =>  print!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
-        27..=31 => print!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
-        _ => print!("Reserved\n"),
-    }
+    // match registers.num {
+    //     0..=22 =>  print!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
+    //     27..=31 => print!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
+    //     _ => print!("Reserved\n"),
+    // }
 
-    print!("Error Code: {:b}\n", aligned_error_code);
+    // print!("Error Code: {:b}\n", aligned_error_code);
 
     disable();
     unsafe { asm!("hlt"); }

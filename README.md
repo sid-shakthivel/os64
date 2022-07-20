@@ -8,4 +8,5 @@ Features:
 - Userland in assembly (Can handle ELF binaries)
 - Syscalls
 - FAT16 Filesystem (Ramdisk)
+- Framebuffer (Graphics)
 

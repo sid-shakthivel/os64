@@ -25,7 +25,6 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(unused_variables)]
 
 use crate::print;
-use crate::vga_text::TERMINAL;
 use crate::page_frame_allocator;
 use multiboot2::MemoryMapTag;
 use page_frame_allocator::PageFrameAllocator;
@@ -101,7 +100,7 @@ impl Table {
         
         // If there are 512 empty entries, the table may be freed
         if i == 512 {
-            print!("Dropping table\n");
+            // print!("Dropping table\n");
             allocator.free_frame(self as *const _ as *mut u64);
         }
     }

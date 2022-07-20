@@ -17,7 +17,6 @@
 // TODO: Long File Names
 
 use crate::print;
-use crate::vga_text::TERMINAL;
 use multiboot2::load;
 use spin::Mutex;
 use core::mem;
@@ -325,15 +324,15 @@ static FS: Mutex<Fat16> = Mutex::new(Fat16::new());
 fn print_filename(filename: &[u8], ext: &[u8]) {
     for i in 0..filename.len() {
         if filename[i] != 0x20 {
-            print!("{}", filename[i] as char);
+            // print!("{}", filename[i] as char);
         }
     }
 
     for i in 0..ext.len() {
-        print!("{}", ext[i] as char);
+        // print!("{}", ext[i] as char);
     }
 
-    print!("\n");
+    // print!("\n");
 }
 
 pub fn init(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {
