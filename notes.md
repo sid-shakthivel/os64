@@ -8,3 +8,4 @@ TODO:
 - GUI 
 - Port dart (git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash)
 - Malloc/Free
+- UART

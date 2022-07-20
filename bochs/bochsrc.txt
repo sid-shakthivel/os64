@@ -2,6 +2,7 @@
     display_library: sdl2
     romimage:        file=/usr/local/Cellar/bochs/2.7/share/bochs/BIOS-bochs-latest
     vgaromimage:     file=/usr/local/Cellar/bochs/2.7/share/bochs/VGABIOS-lgpl-latest
+    vga: extension=vbe
     ata0-master:     type=cdrom, path=os64.iso, status=inserted
     boot:            cdrom
     log:             bochs/bochslog.txt

@@ -14,6 +14,8 @@
     Node graph which represents files/directories which have methods (read, write, etc)
 */
 
+// TODO: Long File Names
+
 use crate::print;
 use crate::vga_text::TERMINAL;
 use multiboot2::load;

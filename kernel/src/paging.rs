@@ -27,7 +27,9 @@ Page table entries have a certain 64 bit format which looks like this:
 use crate::print;
 use crate::vga_text::TERMINAL;
 use crate::page_frame_allocator;
+use multiboot2::MemoryMapTag;
 use page_frame_allocator::PageFrameAllocator;
+use x86_64::structures::paging::page;
 use crate::page_frame_allocator::FrameAllocator;
 use core::prelude::v1::Some;
 
@@ -190,6 +192,14 @@ pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
 pub fn identity_map(megabytes: u64, page_frame_allocator: &mut PageFrameAllocator, optional_p4: Option<*mut Table>) {
     for address in 0..(megabytes * 256) {
         map_page(address * 4096, address * 4096, page_frame_allocator, true, optional_p4);
+    }
+}
+
+pub fn identity_map_from(start: u64, megabytes: u64, page_frame_allocator: &mut PageFrameAllocator) {
+    for address in 0..(megabytes * 256) {
+        let p_address = start + (address * 4096);
+        let v_address = 0x180000 + (address * 4096);
+        map_page(p_address, v_address, page_frame_allocator, false, None);
     }
 }
 

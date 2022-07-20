@@ -11,6 +11,7 @@ LINKER_FILE := src/linker.ld
 
 ASSEMBLY_SOURCES := $(wildcard */*.asm) $(wildcard *.asm)
 ASSEMBLY_OBJECTS := $(patsubst %.asm, $(OBJ)/%.o, $(ASSEMBLY_SOURCES))
+FONT := font.o
 
 os64.iso: kernel.bin
 	cd /code; rm -f isodir/boot/kernel.bin; \
@@ -18,7 +19,7 @@ os64.iso: kernel.bin
 	grub-mkrescue /usr/lib/grub/i386-pc -o os64.iso isodir
 
 kernel.bin: $(ASSEMBLY_OBJECTS) 
-	ld -n --gc-sections -o kernel.bin -T ${LINKER_FILE} ${ASSEMBLY_OBJECTS} $(RUST_LIBRARY)
+	ld -n --gc-sections -o kernel.bin -T ${LINKER_FILE} ${ASSEMBLY_OBJECTS} $(RUST_LIBRARY) ${FONT}
 
 $(ASSEMBLY_OBJECTS): $(ASSEMBLY_SOURCES)
 	$(ASSEMBLER) $(ASSEMBLER_FLAGS) $(patsubst $(OBJ)/%.o, %.asm, $@) -o $@
