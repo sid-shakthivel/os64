@@ -1,10 +1,16 @@
 // src/uart.rs
 
-// TODO: Write brief description
+/*
+    Physical serial ports provide a connector to attach devices (trasmits 1 byte at a time through a single channel)
+    Serial ports are bi-directional (half duplex) and are controlled by uart (chip which encodes and decodes data)
+    Must supply speed used for sending data (baud rate), error checking, data bits
+*/
+
+use spin::Mutex;
 
 use crate::ports::outb;
 use crate::ports::inb;
-use crate::ports::io_wait;
+use core::fmt;
 
 const PORT: u16 = 0x3f8; // COM1
 
@@ -24,26 +30,52 @@ pub fn init() {
     outb(PORT + 4, 0x0f); // Set to normal operation mode
 }
 
-fn read_serial() -> u8 {
-    while (serial_recieved() == 0) {};
-    return inb(PORT);
+pub struct Console {
+    port: u16
 }
 
-pub fn write_string(string: &str) {
-    for c in string.chars() {
-       write_serial(c);
+pub static CONSOLE: Mutex<Console> = Mutex::new(Console { port: PORT });
+
+#[macro_export] 
+macro_rules! print_serial {
+    ($($arg:tt)*) => ({
+        use core::fmt::Write;
+        CONSOLE.lock().write_fmt(format_args!($($arg)*)).unwrap();
+    });
+}
+
+impl fmt::Write for Console {
+    // To support the rust formatting system and use the write! macro, the write_str method must be supported
+   fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
+   }
+}
+
+impl Console {
+    pub fn write_string(&mut self, string: &str) {
+        for c in string.chars() {
+           self.write_serial(c);
+        }
     }
-}
-
-fn write_serial(character: char) {
-    while (is_transmit_empty() == 0) {};
-    outb(PORT, (character as u8));
-}
-
-fn is_transmit_empty() -> u8 {
-    return inb(PORT + 5) & 0x20;
-}
-
-fn serial_recieved() -> u8 {
-    return inb(PORT + 5) & 1;
+    
+    fn write_serial(&mut self, character: char) {
+        while self.is_transmit_empty() == 0 {};
+        outb(PORT, (character as u8));
+    }
+    
+    
+    fn read_serial(&self) -> u8 {
+        while (self.serial_recieved() == 0) {};
+        return inb(PORT);
+    }
+    
+    
+    fn is_transmit_empty(&self) -> u8 {
+        return inb(PORT + 5) & 0x20;
+    }
+    
+    fn serial_recieved(&self) -> u8 {
+        return inb(PORT + 5) & 1;
+    }
 }

@@ -11,7 +11,7 @@
     |    1 | Keyboard    |    9 | General I/O     |
     |    2 | PIC 2       |   10 | General I/O     |
     |    3 | COM 2       |   11 | General I/O     |
-    |    4 | COM 1       |   12 | General I/O     |
+    |    4 | COM 1       |   12 | PS2 Mouse       |
     |    5 | LPT 2       |   13 | Coprocessor     |
     |    6 | Floppy Disk |   14 | IDE Bus         |
     |    7 | LPT 1       |   15 | IDE Bus         |
@@ -88,9 +88,9 @@ impl ChainedPics {
  
         // fc keyboard + timer
         // fd keyboard only
-        // fe timer only
-        outb(self.master.data, 0xfe); 
-        outb(self.slave.data, 0xff); // Disable Slave completely
+        // fe timer only 
+        outb(self.master.data, 0xf9);  // Enable just keyboard and slave
+        outb(self.slave.data, 0xef); // Enable Slave completely
         io_wait();
     }
 }
@@ -138,7 +138,6 @@ impl PicFunctions for Pic {
 
     // Every interrupt from PIC must be acknowledged to confirm interrupt has been handled
     fn acknowledge(&self, _interrupt: u8) {
-        // print!("Acknowledging interrupt\n");
         outb(self.command, PIC_ACK);
     }
 }

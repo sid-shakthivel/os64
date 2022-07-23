@@ -1,6 +1,8 @@
-run: all
+run-qemu: all
+	qemu-system-x86_64 -serial stdio -cdrom os64.iso
+
+run-bochs: all
 	bochs -f bochs/bochsrc.txt -q
-	# qemu-system-x86_64 -cdrom os64.iso
 
 all:
 	# Userspace modules

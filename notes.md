@@ -11,5 +11,6 @@ TODO:
 - UART
 
 Daily tasks:
-- Make Writer trait which both vga_text and framebuffer use
+- Make Writer trait which vga_text, framebuffer, uart all use
 - Make Window system
+- PS/2 Mouse

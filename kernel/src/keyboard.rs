@@ -6,8 +6,10 @@
 */
 
 use crate::ports::inb;
-use crate::print;
+use crate::{print, print_serial};
 use spin::Mutex;
+use crate::TERMINAL;
+use crate::CONSOLE;
 
 pub struct Keyboard {
     is_upper: bool,
@@ -32,24 +34,22 @@ impl Keyboard {
     
     pub fn handle_keyboard(&mut self) {
         let scancode = inb(0x60);
+
+        match scancode {
+            0x26 => print!("l"),
+            0x2A => self.is_upper = true, // Left shift pressed
+            0x36 => self.is_upper = true, // Right shift pressed
+            0xAA => self.is_upper= false, // Left shift released
+            0xB6 => self.is_upper = false, // Right shift released
+            0x3A => { self.is_upper = !self.is_upper }, // Caps lock pressed
+            _ => {
+                let letter = self.translate(scancode, false);
     
-        // match scancode {
-        //     0x26 => print!("l"),
-        //     0x2A => self.is_upper = true, // Left shift pressed
-        //     0x36 => self.is_upper = true, // Right shift pressed
-        //     0xAA => self.is_upper= false, // Left shift released
-        //     0xB6 => self.is_upper = false, // Right shift released
-        //     0x3A => { self.is_upper = !self.is_upper }, // Caps lock pressed
-        //     0x1C => { TERMINAL.lock().new_line() }, // Enter pressed do newline
-        //     0x0E => { TERMINAL.lock().backspace() } // Backspace pressed remove char
-        //     _ => {
-        //         let letter = self.translate(scancode, false);
-    
-        //         if letter != '0' {
-        //             print!("{}", letter);
-        //         }
-        //     }
-        // }
+                if letter != '0' {
+                    print!("{}", letter);
+                }
+            }
+        }
     }
 }
 

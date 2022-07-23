@@ -20,6 +20,7 @@ mod elf;
 mod fs;
 mod framebuffer;
 mod uart;
+mod ps2;
 
 extern crate multiboot2;
 extern crate bitflags;
@@ -28,6 +29,7 @@ extern crate x86_64;
 
 use core::panic::PanicInfo;
 use crate::framebuffer::TERMINAL;
+use crate::uart::CONSOLE;
 use crate::pic::PICS;
 use crate::pit::PIT;
 
@@ -36,28 +38,21 @@ use multiboot2::{load};
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
-
-    // TERMINAL.lock().clear();    
-
-    // interrupts::init();
-    // gdt::init();
-    // PIT.lock().init();
-    // PICS.lock().init();
-
-    let mut page_frame_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
+    let mut pf_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
+    framebuffer::init(boot_info.framebuffer_tag().unwrap(), &mut pf_allocator);
     uart::init();
 
-    // paging::identity_map(12, &mut page_frame_allocator, None);
+    gdt::init();
+    PIT.lock().init();
+    PICS.lock().init();
+    interrupts::init();
+    ps2::init();
+
+    interrupts::enable();
 
     // fs::init(multiboot_information_address, &mut page_frame_allocator);
-
     // grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
     // bga_set_video_mode();
-
-    framebuffer::init(boot_info.framebuffer_tag().unwrap(), &mut page_frame_allocator);
-
-    print!("HELLO WORLD! {:x} 32\n", 32);
-    uart::write_string("Hello World!");
 
     loop {}
 }

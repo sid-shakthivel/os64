@@ -8,5 +8,4 @@ Features:
 - Userland in assembly (Can handle ELF binaries)
 - Syscalls
 - FAT16 Filesystem (Ramdisk)
-- Framebuffer (Graphics)
-
+- Framebuffer (Graphics) which utilises the excellant uni_vga font (https://www.inp.nsk.su/~bolkhov/files/fonts/univga/index.html)

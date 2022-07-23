@@ -8,6 +8,7 @@ An interrupt descriptor table defines what each interrupt will do
 */
 
 use crate::print;
+use crate::print_serial;
 use core::mem::size_of;
 use core::arch::asm;
 use crate::pic::PICS;
@@ -18,6 +19,8 @@ use crate::multitask::PROCESS_SCHEDULAR;
 use crate::gdt::TSS;
 use crate::multitask;
 use x86_64::addr::VirtAddr;
+use crate::uart::CONSOLE;
+use crate::TERMINAL;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -138,13 +141,15 @@ pub extern fn exception_handler(registers: Registers) {
     let aligned_error_code = unsafe { core::ptr::read_unaligned(unaligned_error_code) };
     
     // Print a suitable error messages 
-    // match registers.num {
-    //     0..=22 =>  print!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
-    //     27..=31 => print!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
-    //     _ => print!("Reserved\n"),
-    // }
+    match registers.num {
+        0..=22 =>  print!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
+        27..=31 => print!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
+        _ => print!("Reserved\n"),
+    }
 
-    // print!("Error Code: {:b}\n", aligned_error_code);
+    print!("Error Code: {:b}\n", aligned_error_code);
+
+    print_serial!("Oh dear");
 
     disable();
     unsafe { asm!("hlt"); }
@@ -154,9 +159,12 @@ pub extern fn exception_handler(registers: Registers) {
 pub extern fn interrupt_handler(registers: Registers) {
     PICS.lock().acknowledge(registers.num as u8); // To allow further interrupts, an acknowledgement must be sent
 
+    print!("Handling interrupt\n");
+
     match registers.num {
         0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
-        _ => panic!("Unknown Interrupt!"),
+        44 => print!("Mouse one\n"),
+        _ => print!("Unknown Interrupt!\n"),
     }
 }
 
@@ -234,6 +242,8 @@ pub fn init() {
     // Interrupts
     idt_entry::edit_entry(0x20, handle_pit_interrupt, GateType::Interrupt, PrivilegeLevel::Ring3);
     idt_entry::edit_entry(0x21, handle_interrupt33, GateType::Interrupt, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(44, handle_interrupt44, GateType::Interrupt, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(47, handle_interrupt44, GateType::Interrupt, PrivilegeLevel::Ring3);
 
     // Syscall
     idt_entry::edit_entry(0x80, handle_syscall, GateType::Interrupt, PrivilegeLevel::Ring3);
@@ -278,6 +288,7 @@ extern "C" {
     fn handle_no_err_exception31();
     fn handle_pit_interrupt(); // Timer
     fn handle_interrupt33(); // Keyboard
+    fn handle_interrupt44(); // Mouse?
     fn handle_syscall(); // Syscall
     fn idt_flush();
 }

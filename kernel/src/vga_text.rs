@@ -13,6 +13,7 @@ Each entry in the buffer must be formatted like this:
 */
 
 // TODO: Fix having to import use crate::vga_text::TERMINAL; on each file
+// TODO: Make a writer trait
 
 use lazy_static::lazy_static;
 use core::fmt;
