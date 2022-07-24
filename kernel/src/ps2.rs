@@ -114,9 +114,12 @@ pub fn init() -> Result<(), &'static str> {
 
     // Enable mouse
     ps2_write_device(1, 0xF4)?;
-    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK
+    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK 
 
-    print_serial!("Here\n");
+    ps2_write_device(1, 0xF2);
+    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK 
+
+    print!("Mouse device ID = {}\n", inb(0x60));
 
     return Ok(());
 }
@@ -134,7 +137,7 @@ fn ps2_write(port: u16, byte: u8) -> Result<u8, &'static str> {
     return Ok(0);
 }
 
-fn ps2_read(port: u16) -> Result<u8, &'static str> {
+pub fn ps2_read(port: u16) -> Result<u8, &'static str> {
     let mut timeout = TIMEOUT;
     while((inb(PS2_STATUS) & 1) == 0) {
         timeout -= 1;
@@ -172,10 +175,13 @@ fn ps2_identify_device_type(device_num: u16) -> Result<PS2Device, &'static str> 
     let byte1 = inb(PS2_DATA);
     let byte2 = inb(PS2_DATA);
 
+    print!("Bytes = {:x} {:x}\n", byte1, byte2);
+
 //    return match byte1 {
 //         0x00 => Ok(PS2Device::Mouse),
 //         0xAB => Ok(PS2Device::Keyboard),
 //         _ => panic!("Unknown device {:x} {:x}\n", byte1, byte2),
 //     }
+
     return Ok(PS2Device::Keyboard);
 }

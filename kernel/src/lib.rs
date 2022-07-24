@@ -21,6 +21,7 @@ mod fs;
 mod framebuffer;
 mod uart;
 mod ps2;
+mod mouse;
 
 extern crate multiboot2;
 extern crate bitflags;
@@ -37,6 +38,7 @@ use multiboot2::{load};
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
+    interrupts::disable();
     let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
     let mut pf_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
     framebuffer::init(boot_info.framebuffer_tag().unwrap(), &mut pf_allocator);
@@ -44,11 +46,13 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     gdt::init();
     PIT.lock().init();
-    PICS.lock().init();
-    interrupts::init();
     ps2::init();
+    interrupts::init();
+    PICS.lock().init();
 
     interrupts::enable();
+
+    print!("End of execution\n");
 
     // fs::init(multiboot_information_address, &mut page_frame_allocator);
     // grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);

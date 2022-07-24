@@ -3,6 +3,7 @@
 /*
     PS/2 Keyboard which uses serial communication
     Accept commands and sends scancodes which comply to a scancode set
+    TODO: Check status register is ready to be read
 */
 
 use crate::ports::inb;
@@ -47,6 +48,7 @@ impl Keyboard {
     
                 if letter != '0' {
                     print!("{}", letter);
+                    print_serial!("{}", letter);
                 }
             }
         }

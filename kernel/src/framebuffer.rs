@@ -125,7 +125,7 @@ impl Framebuffer {
         if (self.terminal_col >= SCREEN_WIDTH) { self.new_line(); }
     }
 
-    fn draw_pixel(&mut self, x: usize, y: usize, byte: u32) {
+    pub fn draw_pixel(&mut self, x: usize, y: usize, byte: u32) {
         unsafe {
             let offset = (0x180000 + (y * self.pitch) + ((x * self.bpp) / 8)) as *mut u32;
             *offset = byte;

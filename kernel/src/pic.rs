@@ -21,7 +21,9 @@
 use crate::ports::outb;
 use crate::ports::inb;
 use crate::ports::io_wait;
+use crate::print;
 use spin::Mutex;
+use crate::TERMINAL;
 
 const PIC1_PORT_COMMAND: u16 = 0x20;
 const PIC2_PORT_COMMAND: u16 = 0xA0;
@@ -86,11 +88,11 @@ impl ChainedPics {
         outb(self.slave.data, 1);        
         io_wait();
  
-        // fc keyboard + timer
-        // fd keyboard only
-        // fe timer only 
+        // f9 - kbd, slave
+        // fb - slave
+        // ef - mouse
         outb(self.master.data, 0xf9);  // Enable just keyboard and slave
-        outb(self.slave.data, 0xef); // Enable Slave completely
+        outb(self.slave.data, 0xef); // Mouse
         io_wait();
     }
 }
@@ -112,12 +114,13 @@ impl PicFunctions for ChainedPics {
         }
     }
 
+    // Both master and slave PIC must be acknowledged on a slave interrupt
     fn acknowledge(&self, interrupt: u8) {
-    if interrupt < PIC2_START_INTERRUPT {
-            self.master.acknowledge(interrupt);
-        } else {
-            self.master.acknowledge(interrupt);
+        if interrupt >= 0x28 {
+            self.slave.acknowledge(interrupt);
         }
+
+        self.master.acknowledge(interrupt);
     }
 }
 
