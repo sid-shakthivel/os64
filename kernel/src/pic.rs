@@ -116,11 +116,10 @@ impl PicFunctions for ChainedPics {
 
     // Both master and slave PIC must be acknowledged on a slave interrupt
     fn acknowledge(&self, interrupt: u8) {
-        if interrupt >= 0x28 {
+        self.master.acknowledge(interrupt);
+        if interrupt > 0x27 {
             self.slave.acknowledge(interrupt);
         }
-
-        self.master.acknowledge(interrupt);
     }
 }
 

@@ -9,3 +9,4 @@ Features:
 - Syscalls
 - FAT16 Filesystem (Ramdisk)
 - Framebuffer (Graphics) which utilises the excellant uni_vga font (https://www.inp.nsk.su/~bolkhov/files/fonts/univga/index.html)
+- Full PS2 Mouse and Keyboard driver

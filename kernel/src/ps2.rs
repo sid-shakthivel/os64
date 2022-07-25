@@ -10,6 +10,8 @@
     - Writing a value to 0x64 sends a command byte whilst reading gets the status byte
 */
 
+use crate::keyboard::KEYBOARD;
+use crate::mouse::MOUSE;
 use crate::ports::outb;
 use crate::ports::inb;
 use crate::ports::io_wait;
@@ -23,9 +25,13 @@ const PS2_STATUS: u16 = 0x64;
 const PS2_CMD: u16 = 0x64; // Command port
 const TIMEOUT: i16 = 10000;
 
-enum PS2Device {
-    Mouse,
-    Keyboard,
+#[derive(PartialEq)]
+pub enum PS2Device {
+    PS2Mouse,
+    PS2MouseScrollWheel,
+    PS2MouseFiveButtons,
+    MF2Keyboard,
+    MF2KeyboardTranslation,
 }
 
 pub fn init() -> Result<(), &'static str> {
@@ -103,20 +109,20 @@ pub fn init() -> Result<(), &'static str> {
         }
     }
 
-    // Identify devices
+    // Identify devices and initialise them appropriately
     for i in 0..2 {
-        ps2_identify_device_type(i)?;
+        match ps2_identify_device_type(i).unwrap() {
+            PS2Device::MF2KeyboardTranslation => {
+                KEYBOARD.lock().init();
+            },
+            PS2Device::PS2Mouse => {
+                MOUSE.lock().init();
+            },
+            _ => panic!("Unknown device"), 
+        }
     }
 
-    // Enable keyboard
-    ps2_write_device(0, 0xF4)?;
-    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK
-
-    // Enable mouse
-    ps2_write_device(1, 0xF4)?;
-    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK 
-
-    ps2_write_device(1, 0xF2);
+    ps2_write_device(1, 0xF2)?;
     while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK 
 
     print!("Mouse device ID = {}\n", inb(0x60));
@@ -150,7 +156,11 @@ pub fn ps2_read(port: u16) -> Result<u8, &'static str> {
     return Ok(inb(port));
 }
 
-fn ps2_write_device(device_num: u16, byte: u8) -> Result<u8, &'static str> {
+pub fn ps2_is_from_mouse() -> bool {
+    return inb(PS2_STATUS) & (1 << 5) == 0x20;
+}
+
+pub fn ps2_write_device(device_num: u16, byte: u8) -> Result<u8, &'static str> {
     return match device_num {
         0 => {
             ps2_write(PS2_DATA, byte)?;
@@ -165,23 +175,33 @@ fn ps2_write_device(device_num: u16, byte: u8) -> Result<u8, &'static str> {
     }
 }
 
-fn ps2_identify_device_type(device_num: u16) -> Result<PS2Device, &'static str> {
+// Must wait to recieve acknowledgement from device (0xFA)
+pub fn ps2_wait_ack() -> Result<bool, &'static str> {
+    while ps2_read(PS2_DATA)? != 0xFA {}
+    return Ok(true);
+}
+
+pub fn ps2_identify_device_type(device_num: u16) -> Result<PS2Device, &'static str> {
     ps2_write_device(device_num, 0xF5)?; // Send disable scanning command
-    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK
+    ps2_wait_ack()?;
 
     ps2_write_device(device_num, 0xF2)?; // Send identify command
-    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK
+    ps2_wait_ack()?;
 
-    let byte1 = inb(PS2_DATA);
-    let byte2 = inb(PS2_DATA);
-
-    print!("Bytes = {:x} {:x}\n", byte1, byte2);
-
-//    return match byte1 {
-//         0x00 => Ok(PS2Device::Mouse),
-//         0xAB => Ok(PS2Device::Keyboard),
-//         _ => panic!("Unknown device {:x} {:x}\n", byte1, byte2),
-//     }
-
-    return Ok(PS2Device::Keyboard);
+    let mut response = ps2_read(PS2_DATA)?;
+    return match response {
+        0x00 => Ok(PS2Device::PS2Mouse),
+        0x03 => Ok(PS2Device::PS2MouseScrollWheel),
+        0x04 => Ok(PS2Device::PS2MouseFiveButtons),
+        0xAB => {
+            response = ps2_read(PS2_DATA)?;
+            return match response {
+                0x41 => Ok(PS2Device::MF2KeyboardTranslation),
+                0xC1 => Ok(PS2Device::MF2KeyboardTranslation),
+                0x83 => Ok(PS2Device::MF2Keyboard),
+                _ => Err("Unknown device")
+            }
+        }
+        _ => Err("Unknown device")
+    }
 }

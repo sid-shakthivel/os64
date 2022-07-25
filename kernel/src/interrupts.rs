@@ -242,8 +242,7 @@ pub fn init() {
     // Interrupts
     idt_entry::edit_entry(0x20, handle_pit_interrupt, GateType::Interrupt, PrivilegeLevel::Ring3);
     idt_entry::edit_entry(0x21, handle_interrupt33, GateType::Interrupt, PrivilegeLevel::Ring3);
-    idt_entry::edit_entry(44, handle_interrupt44, GateType::Interrupt, PrivilegeLevel::Ring3);
-    idt_entry::edit_entry(47, handle_interrupt47, GateType::Interrupt, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x2c, handle_interrupt44, GateType::Interrupt, PrivilegeLevel::Ring3);
 
     // Syscall
     idt_entry::edit_entry(0x80, handle_syscall, GateType::Interrupt, PrivilegeLevel::Ring3);

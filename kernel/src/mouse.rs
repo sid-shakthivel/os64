@@ -19,40 +19,46 @@ use spin::Mutex;
 use crate::ports::outb;
 use crate::ports::inb;
 use crate::print_serial;
-use crate::ps2::ps2_read;
 use crate::print;
 use crate::TERMINAL;
 use crate::CONSOLE;
+use crate::ps2;
 
 pub struct Mouse {
     mouse_x: usize,
     mouse_y: usize,
-    mouse_packets: [u8; 3],
-    index: usize,
+    mouse_packets: [u8; 4],
+    current_byte: usize,
+    variety: ps2::PS2Device
 }
 
 // TODO: Make this dynamic with framebuffer size
 pub static MOUSE: Mutex<Mouse> = Mutex::new(Mouse {
     mouse_x: 512,
     mouse_y: 384,
-    mouse_packets: [0; 3],
-    index: 0,
+    mouse_packets: [0; 4],
+    current_byte: 0,
+    variety: ps2::PS2Device::PS2Mouse
 });
 
 impl Mouse {
-    pub fn init(&self) {
-        // TODO: Move init stuff from ps2 controller enable more buttons/wheel, etc
+    pub fn init(&mut self) {
+        self.enable_z_axis();
+        self.enable_5_buttons();
+        self.enable_scanning();
     }
 
     pub fn handle_mouse_interrupt(&mut self) {
-        let byte = ps2_read(0x60).unwrap();
-        self.mouse_packets[self.index] = byte;
-        self.index += 1;
+        if ps2::ps2_is_from_mouse() {
+            let byte = ps2::ps2_read(0x60).unwrap();
 
-        if (self.index > 2) {
-            // When we've recieved 3 bytes, update mouse movement
-            self.index = 0;
-            self.handle_mouse_packets();
+            self.mouse_packets[self.current_byte] = byte;
+
+            self.current_byte = (self.current_byte + 1) % 4;
+
+            if self.current_byte == 0 {
+                self.handle_mouse_packets();
+            }
         }
     }
 
@@ -79,8 +85,6 @@ impl Mouse {
 
         // X movement and Y movement values must be read as a 9 bit or greater SIGNED value if bit is enabled
 
-        // print!("{:b}\n", self.mouse_packets[0]);
-
         if self.mouse_packets[0] & (1 << 4) == 0x10 {
             self.mouse_x = self.mouse_x.wrapping_add(self.sign_extend(self.mouse_packets[1]) as usize);
         } else {
@@ -95,6 +99,22 @@ impl Mouse {
             self.mouse_y = self.mouse_y.wrapping_add(test as usize);
         }
 
+        if self.mouse_x > 1019 {
+            self.mouse_x = 1019;
+        }
+
+        if self.mouse_y > 763 {
+            self.mouse_y = 763;
+        }
+
+        if self.mouse_x <= 5{
+            self.mouse_x = 10;
+        }
+
+        if self.mouse_y <= 5 {
+            self.mouse_y = 10;
+        }
+
         // Draw small square to indicate mouse position
         for i in 0..5 {
             for j in 0..5 {
@@ -103,7 +123,44 @@ impl Mouse {
         }
     }
 
+    fn enable_scanning(&self) {
+        ps2::ps2_write_device(1, 0xF4).unwrap(); // Set sample rate command
+        ps2::ps2_wait_ack().unwrap();
+    }
+
+    fn disable_scanning(&self) {
+        ps2::ps2_write_device(1, 0xF5).unwrap(); // Set sample rate command
+        ps2::ps2_wait_ack().unwrap();
+    }
+
+    fn enable_z_axis(&mut self) {
+        self.set_mouse_rate(200);
+        self.set_mouse_rate(100);
+        self.set_mouse_rate(80);
+        if self.get_type() != ps2::PS2Device::PS2MouseScrollWheel { panic!("Scroll wheel failed"); }
+        else { self.variety = self.get_type() }
+    }
+
+    fn enable_5_buttons(&mut self) {
+        self.set_mouse_rate(200);
+        self.set_mouse_rate(200);
+        self.set_mouse_rate(80);
+        if self.get_type() != ps2::PS2Device::PS2MouseFiveButtons { panic!("5 button mode failed"); }
+        else { self.variety = self.get_type() }
+    }
+
+    fn get_type(&self) -> ps2::PS2Device {
+        return ps2::ps2_identify_device_type(1).unwrap();
+    }
+
     fn sign_extend(&self, packet: u8) -> i16 {
         ((packet as u16) | 0xFF00) as i16
+    }
+
+    fn set_mouse_rate(&self, sample_rate: u8) {
+        ps2::ps2_write_device(1, 0xF3).unwrap(); // Set sample rate command
+        ps2::ps2_wait_ack().unwrap();
+        ps2::ps2_write_device(1, sample_rate).unwrap();
+        ps2::ps2_wait_ack().unwrap();
     }
 }
