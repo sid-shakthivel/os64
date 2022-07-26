@@ -16,7 +16,6 @@
 
 // TODO: Long File Names
 
-use crate::print;
 use multiboot2::load;
 use spin::Mutex;
 use core::mem;

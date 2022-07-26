@@ -2,16 +2,15 @@
 
 /*
     PS/2 Keyboard which uses serial communication
-    Accept commands and sends scancodes which comply to a scancode set
-    TODO: Check status register is ready to be read
+    Accepts commands and sends scancodes which comply to a scancode set
+    Scancode is simply a byte and scan code set is map between ascii characters and bytes sent
 */
 
 use core::panic;
 
 use crate::ports::inb;
-use crate::{print, print_serial};
+use crate::{print_serial};
 use spin::Mutex;
-use crate::TERMINAL;
 use crate::CONSOLE;
 use crate::ps2;
 
@@ -55,7 +54,7 @@ impl Keyboard {
             let scancode = ps2::ps2_read(0x60).unwrap();
 
             match scancode {
-                0x26 => print!("l"),
+                0x26 => print_serial!("l"),
                 0x2A => self.is_upper = true, // Left shift pressed
                 0x36 => self.is_upper = true, // Right shift pressed
                 0xAA => self.is_upper= false, // Left shift released
@@ -65,7 +64,7 @@ impl Keyboard {
                     let letter = self.translate(scancode, false);
         
                     if letter != '0' {
-                        print!("{}", letter);
+                        print_serial!("{}", letter);
                     }
                 }
             }

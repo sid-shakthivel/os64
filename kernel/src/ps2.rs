@@ -17,8 +17,6 @@ use crate::ports::inb;
 use crate::ports::io_wait;
 use crate::print_serial;
 use crate::uart::CONSOLE;
-use crate::framebuffer::TERMINAL;
-use crate::print;
 
 const PS2_DATA: u16 = 0x60; // Data port
 const PS2_STATUS: u16 = 0x64;
@@ -46,20 +44,15 @@ pub fn init() -> Result<(), &'static str> {
     ps2_write(PS2_CMD, 0x20)?;
     let mut controller_config_byte = ps2_read(PS2_DATA)?;
 
-    print_serial!("{:b}\n", controller_config_byte);
     controller_config_byte = controller_config_byte & !(1 << 0) & !(1 << 1) & !(1 << 6);
     ps2_write(PS2_CMD, 0x60)?;
     ps2_write(PS2_DATA, controller_config_byte)?;
 
     // Perform controller self test
     ps2_write(PS2_CMD, 0xAA)?; // Test controller
-
-    let mut test = ps2_read(PS2_DATA)?;
-    if test != 0x55 {
+    if ps2_read(PS2_DATA)? != 0x55 {
         panic!("Controller self test failed\n");
     }
-
-    // print_serial!("It's {:x}\n", test);
 
     ps2_write(PS2_CMD, 0xA8)?; // Enable second PS2 port
     ps2_write(PS2_CMD, 0x20)?; 
@@ -88,9 +81,10 @@ pub fn init() -> Result<(), &'static str> {
     // Enable interrupts
     ps2_write(PS2_CMD, 0x20)?;
     controller_config_byte = ps2_read(PS2_DATA)?;
-    controller_config_byte = controller_config_byte | (1 << 0) | (1 << 1);
+    controller_config_byte = controller_config_byte | (1 << 0) | (1 << 1); // Enable interrupts for mouse and keyboard
+    controller_config_byte = controller_config_byte | (1 << 6); // Translate key scancodes
     ps2_write(PS2_CMD, 0x60)?;
-    ps2_write(PS2_DATA, 0b01000011)?;
+    ps2_write(PS2_DATA, controller_config_byte)?;
 
     // 0b1110011
 
@@ -125,8 +119,6 @@ pub fn init() -> Result<(), &'static str> {
     ps2_write_device(1, 0xF2)?;
     while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK 
 
-    print!("Mouse device ID = {}\n", inb(0x60));
-
     return Ok(());
 }
 
@@ -135,7 +127,7 @@ fn ps2_write(port: u16, byte: u8) -> Result<u8, &'static str> {
     while((inb(PS2_STATUS) & 2) > 0) {
         timeout -= 1;
         if timeout < 0 {
-            print!("PS2 WRITE FAILED\n");
+            print_serial!("PS2 WRITE FAILED\n");
             return Err("PS2 Write Failed");
         }
     }
@@ -148,7 +140,7 @@ pub fn ps2_read(port: u16) -> Result<u8, &'static str> {
     while((inb(PS2_STATUS) & 1) == 0) {
         timeout -= 1;
         if timeout < 0 {
-            print!("PS2 READ FAILED\n");
+            print_serial!("PS2 READ FAILED\n");
             return Err("PS2 Read Failed");
         }
     }

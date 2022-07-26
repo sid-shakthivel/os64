@@ -7,7 +7,6 @@ Interrupts are far more efficient then the CPU polling a device
 An interrupt descriptor table defines what each interrupt will do
 */
 
-use crate::print;
 use crate::print_serial;
 use core::mem::size_of;
 use core::arch::asm;
@@ -21,7 +20,6 @@ use crate::gdt::TSS;
 use crate::multitask;
 use x86_64::addr::VirtAddr;
 use crate::uart::CONSOLE;
-use crate::TERMINAL;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -143,12 +141,12 @@ pub extern fn exception_handler(registers: Registers) {
     
     // Print a suitable error messages 
     match registers.num {
-        0..=22 =>  print!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
-        27..=31 => print!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
-        _ => print!("Reserved\n"),
+        0..=22 =>  print_serial!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
+        27..=31 => print_serial!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
+        _ => print_serial!("Reserved\n"),
     }
 
-    print!("Error Code: {:b}\n", aligned_error_code);
+    print_serial!("Error Code: {:b}\n", aligned_error_code);
 
     disable();
     unsafe { asm!("hlt"); }
@@ -163,14 +161,13 @@ pub extern fn interrupt_handler(registers: Registers) {
     match registers.num {
         0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
         44 => { MOUSE.lock().handle_mouse_interrupt(); },
-        _ => print!("Unknown Interrupt!\n"),
+        _ => print_serial!("Unknown Interrupt!\n"),
     }
 }
 
 // TODO: Clean and refactor
 #[no_mangle]
 pub extern fn pit_handler(iret_stack: IretStack) -> *const u64 {
-    print!("Oh nooooooooo\n");
     // Acknowledge interrupt and timer
     PICS.lock().acknowledge(0x20); 
     PIT.lock().handle_timer();

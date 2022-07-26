@@ -19,9 +19,7 @@ use spin::Mutex;
 use crate::ports::outb;
 use crate::ports::inb;
 use crate::print_serial;
-use crate::print;
-use crate::TERMINAL;
-use crate::CONSOLE;
+use crate::framebuffer::FRAMEBUFFER;
 use crate::ps2;
 
 pub struct Mouse {
@@ -118,7 +116,7 @@ impl Mouse {
         // Draw small square to indicate mouse position
         for i in 0..5 {
             for j in 0..5 {
-                TERMINAL.lock().draw_pixel(self.mouse_x + j, self.mouse_y + i, 0xFF);
+                // FRAMEBUFFER.lock().draw_pixel(self.mouse_x + j, self.mouse_y + i, 0xFF);
             }
         }
     }

@@ -29,7 +29,7 @@ extern crate bit_field;
 extern crate x86_64;
 
 use core::panic::PanicInfo;
-use crate::framebuffer::TERMINAL;
+use crate::framebuffer::{Window};
 use crate::uart::CONSOLE;
 use crate::pic::PICS;
 use crate::pit::PIT;
@@ -50,9 +50,17 @@ pub extern fn rust_main(multiboot_information_address: usize) {
     interrupts::init();
     PICS.lock().init();
 
-    interrupts::enable();
+    // interrupts::enable();
 
-    print!("End of execution\n");
+    let window_1 = Window::new(10, 10, 300, 200);
+    let window_2 = Window::new(100, 150, 400, 400);
+    let window_3 = Window::new(200, 100, 200, 600);
+
+    window_1.paint();
+    window_2.paint();
+    window_3.paint();
+
+    print_serial!("End of execution\n");
 
     // fs::init(multiboot_information_address, &mut page_frame_allocator);
     // grub::initialise_userland(multiboot_information_address, &mut page_frame_allocator);
@@ -80,6 +88,6 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 #[panic_handler] // This function is called on panic.
 #[no_mangle]
 fn panic(info: &PanicInfo) -> ! {
-    print!("Error: {}", info);
+    print_serial!("Error: {}", info);
     loop {}
 }

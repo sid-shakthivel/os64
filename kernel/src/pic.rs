@@ -21,9 +21,7 @@
 use crate::ports::outb;
 use crate::ports::inb;
 use crate::ports::io_wait;
-use crate::print;
 use spin::Mutex;
-use crate::TERMINAL;
 
 const PIC1_PORT_COMMAND: u16 = 0x20;
 const PIC2_PORT_COMMAND: u16 = 0xA0;
