@@ -11,7 +11,7 @@
     |    1 | Keyboard    |    9 | General I/O     |
     |    2 | PIC 2       |   10 | General I/O     |
     |    3 | COM 2       |   11 | General I/O     |
-    |    4 | COM 1       |   12 | General I/O     |
+    |    4 | COM 1       |   12 | PS2 Mouse       |
     |    5 | LPT 2       |   13 | Coprocessor     |
     |    6 | Floppy Disk |   14 | IDE Bus         |
     |    7 | LPT 1       |   15 | IDE Bus         |
@@ -86,11 +86,11 @@ impl ChainedPics {
         outb(self.slave.data, 1);        
         io_wait();
  
-        // fc keyboard + timer
-        // fd keyboard only
-        // fe timer only
-        outb(self.master.data, 0xfe); 
-        outb(self.slave.data, 0xff); // Disable Slave completely
+        // f9 - kbd, slave
+        // fb - slave
+        // ef - mouse
+        outb(self.master.data, 0xf9);  // Enable just keyboard and slave
+        outb(self.slave.data, 0xef); // Mouse
         io_wait();
     }
 }
@@ -112,11 +112,11 @@ impl PicFunctions for ChainedPics {
         }
     }
 
+    // Both master and slave PIC must be acknowledged on a slave interrupt
     fn acknowledge(&self, interrupt: u8) {
-    if interrupt < PIC2_START_INTERRUPT {
-            self.master.acknowledge(interrupt);
-        } else {
-            self.master.acknowledge(interrupt);
+        self.master.acknowledge(interrupt);
+        if interrupt > 0x27 {
+            self.slave.acknowledge(interrupt);
         }
     }
 }
@@ -138,7 +138,6 @@ impl PicFunctions for Pic {
 
     // Every interrupt from PIC must be acknowledged to confirm interrupt has been handled
     fn acknowledge(&self, _interrupt: u8) {
-        // print!("Acknowledging interrupt\n");
         outb(self.command, PIC_ACK);
     }
 }

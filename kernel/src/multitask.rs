@@ -11,10 +11,6 @@ use core::mem::size_of;
 use crate::spinlock::Lock;
 use crate::page_frame_allocator::FrameAllocator;
 use crate::paging::Table;
-use crate::paging::P4;
-use crate::paging::Page;
-use crate::print;
-use crate::vga_text::TERMINAL;
 use crate::paging;
 
 /*

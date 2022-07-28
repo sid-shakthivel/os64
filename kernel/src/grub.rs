@@ -8,11 +8,8 @@
 */
 
 use crate::page_frame_allocator::PageFrameAllocator;
-use crate::vga_text::TERMINAL;
 use crate::multitask;
-use crate::print;
 use multiboot2::load;
-use core::mem;
 use crate::elf;
 
 pub fn initialise_userland(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {

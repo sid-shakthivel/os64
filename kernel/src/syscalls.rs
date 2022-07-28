@@ -17,8 +17,8 @@
 */
 
 use crate::interrupts::Registers;
-use crate::print;
-use crate::TERMINAL;
+use crate::print_serial;
+use crate::CONSOLE;
 
 // TODO: Add support for more syscalls
 
@@ -34,7 +34,7 @@ pub extern fn syscall_handler(registers: Registers) {
 
             for i in 0..message_length {
                 let char = unsafe { *((data + i) as *const u8) };
-                print!("{}", char as char);
+                print_serial!("{}", char as char);
             }
         }
         _ => panic!("Unknown Syscall\n")

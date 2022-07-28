@@ -7,19 +7,19 @@ Interrupts are far more efficient then the CPU polling a device
 An interrupt descriptor table defines what each interrupt will do
 */
 
-use crate::print;
-use crate::vga_text::TERMINAL;
+use crate::print_serial;
 use core::mem::size_of;
 use core::arch::asm;
 use crate::pic::PICS;
 use crate::pic::PicFunctions;
 use crate::keyboard::KEYBOARD;
+use crate::mouse::MOUSE;
 use crate::pit::PIT;
 use crate::multitask::PROCESS_SCHEDULAR;
 use crate::gdt::TSS;
 use crate::multitask;
 use x86_64::addr::VirtAddr;
-use spin::Mutex;
+use crate::uart::CONSOLE;
 
 // 256 entries within the IDT with the first 32 being exceptions
 const IDT_MAX_DESCRIPTIONS: u64 = 256;
@@ -141,12 +141,12 @@ pub extern fn exception_handler(registers: Registers) {
     
     // Print a suitable error messages 
     match registers.num {
-        0..=22 =>  print!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
-        27..=31 => print!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
-        _ => print!("Reserved\n"),
+        0..=22 =>  print_serial!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
+        27..=31 => print_serial!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
+        _ => print_serial!("Reserved\n"),
     }
 
-    print!("Error Code: {:b}\n", aligned_error_code);
+    print_serial!("Error Code: {:b}\n", aligned_error_code);
 
     disable();
     unsafe { asm!("hlt"); }
@@ -156,9 +156,12 @@ pub extern fn exception_handler(registers: Registers) {
 pub extern fn interrupt_handler(registers: Registers) {
     PICS.lock().acknowledge(registers.num as u8); // To allow further interrupts, an acknowledgement must be sent
 
+    let num = registers.num;
+
     match registers.num {
         0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
-        _ => panic!("Unknown Interrupt!"),
+        44 => { MOUSE.lock().handle_mouse_interrupt(); },
+        _ => print_serial!("Unknown Interrupt!\n"),
     }
 }
 
@@ -236,6 +239,7 @@ pub fn init() {
     // Interrupts
     idt_entry::edit_entry(0x20, handle_pit_interrupt, GateType::Interrupt, PrivilegeLevel::Ring3);
     idt_entry::edit_entry(0x21, handle_interrupt33, GateType::Interrupt, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x2c, handle_interrupt44, GateType::Interrupt, PrivilegeLevel::Ring3);
 
     // Syscall
     idt_entry::edit_entry(0x80, handle_syscall, GateType::Interrupt, PrivilegeLevel::Ring3);
@@ -279,7 +283,9 @@ extern "C" {
     fn handle_err_exception30();
     fn handle_no_err_exception31();
     fn handle_pit_interrupt(); // Timer
-    fn handle_interrupt33(); // Keyboard
+    fn handle_interrupt33(); // PPS2 Keyboard
+    fn handle_interrupt44(); // PS2 Mouse
+    fn handle_interrupt47(); // ???
     fn handle_syscall(); // Syscall
     fn idt_flush();
 }

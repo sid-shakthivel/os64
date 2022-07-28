@@ -13,6 +13,13 @@ outb_raw:
   out dx, al
   ret
 
+global outpw_raw
+outpw_raw:
+  mov dx, di ; Address (16 Bit) 
+  mov ax, si ; Value (16 Bit)
+  out dx, ax
+  ret
+
 ; Load IDT
 global idt_flush    
 idt_flush:
@@ -28,3 +35,8 @@ flush_tlb:
   mov cr3, rax
   pop rax
   ret
+
+global cause_tf:
+  cause_tf:
+  xchg bx, bx
+  mov rax, 0
