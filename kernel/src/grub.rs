@@ -8,20 +8,30 @@
 */
 
 use crate::page_frame_allocator::PageFrameAllocator;
-use crate::multitask;
-use multiboot2::load;
+use multiboot2::{BootInformation};
 use crate::elf;
+use crate::fs;
+use crate::multitask;
 
-pub fn initialise_userland(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {
-    let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
+const FILESYSTEM_ON: bool = false;
 
+pub fn initialise_userland(boot_info: &BootInformation, page_frame_allocator: &mut PageFrameAllocator) {
+    let mut i = 0; // TODO: Find a cleaner solution when have wifi
     for module in boot_info.module_tags() {
-        elf::parse(module.start_address() as u64, page_frame_allocator);
-        let user_process = multitask::Process::init(multitask::ProcessPriority::High, page_frame_allocator);
+        // First module will be filesystem if given && constant is true
+        if FILESYSTEM_ON && i == 0 { 
+            fs::init(module.start_address(), page_frame_allocator); 
+        }
+        else if FILESYSTEM_ON {
+            // Else, modules are userspace programs 
+            elf::parse(module.start_address() as u64, page_frame_allocator);
+            let user_process = multitask::Process::init(multitask::ProcessPriority::High, page_frame_allocator);
 
-        // Add process to list of processes
-        multitask::PROCESS_SCHEDULAR.lock().add_process(user_process);
-        multitask::PROCESS_SCHEDULAR.free();
+            // Add process to list of processes
+            multitask::PROCESS_SCHEDULAR.lock().add_process(user_process);
+            multitask::PROCESS_SCHEDULAR.free();   
+        }
+        i += 1;
     }
 }
 

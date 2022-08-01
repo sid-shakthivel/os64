@@ -8,7 +8,6 @@
 
 use core::panic;
 
-use crate::ports::inb;
 use crate::{print_serial};
 use spin::Mutex;
 use crate::CONSOLE;
@@ -35,7 +34,8 @@ pub static KEYBOARD: Mutex<Keyboard> = Mutex::new(Keyboard {
 
 impl Keyboard {
     pub fn init(&mut self) {
-        if (self.scancode_set != self.get_scancode_set()) { self.scancode_set = self.get_scancode_set(); }
+        self.disable_scanning();
+        if self.scancode_set != self.get_scancode_set() { self.scancode_set = self.get_scancode_set(); }
         self.enable_scanning();
     }
 

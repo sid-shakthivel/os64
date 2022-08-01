@@ -10,6 +10,7 @@ use spin::Mutex;
 
 use crate::ports::outb;
 use crate::ports::inb;
+use crate::writer::Writer;
 use core::fmt;
 
 const PORT: u16 = 0x3f8; // COM1
@@ -25,7 +26,7 @@ pub fn init() {
     outb(PORT + 4, 0x1e); // Set in loopback mode
     outb(PORT + 0, 0xae); // Test serial chip
 
-    if (inb(PORT + 0) != 0xae) { panic!("Faulty serial!"); }
+    if inb(PORT + 0) != 0xae { panic!("Faulty serial!"); }
 
     outb(PORT + 4, 0x0f); // Set to normal operation mode
 }
@@ -52,30 +53,35 @@ impl fmt::Write for Console {
    }
 }
 
-impl Console {
-    pub fn write_string(&mut self, string: &str) {
-        for c in string.chars() {
-           self.write_serial(c);
-        }
-    }
-    
+impl Console {    
     fn write_serial(&mut self, character: char) {
         while self.is_transmit_empty() == 0 {};
-        outb(PORT, (character as u8));
+        outb(self.port, character as u8);
     }
     
-    
     fn read_serial(&self) -> u8 {
-        while (self.serial_recieved() == 0) {};
-        return inb(PORT);
+        while self.serial_recieved() == 0 {};
+        return inb(self.port);
     }
     
     
     fn is_transmit_empty(&self) -> u8 {
-        return inb(PORT + 5) & 0x20;
+        return inb(self.port + 5) & 0x20;
     }
     
     fn serial_recieved(&self) -> u8 {
-        return inb(PORT + 5) & 1;
+        return inb(self.port + 5) & 1;
+    }
+}
+
+impl Writer for Console {
+    fn write_string(&mut self, string: &str) {
+        for c in string.chars() {
+            self.put_char(c);
+        }
+    }
+
+    fn put_char(&mut self, character: char) {
+        self.write_serial(character);
     }
 }

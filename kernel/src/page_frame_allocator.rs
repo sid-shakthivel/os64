@@ -64,7 +64,6 @@ impl Operations for Stack {
     }
 }
 
-
 pub trait FrameAllocator {
     fn alloc_frame(&mut self) -> Option<*mut u64>;
     fn free_frame(&mut self, frame_address: *mut u64) -> ();

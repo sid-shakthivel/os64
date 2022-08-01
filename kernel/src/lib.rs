@@ -21,44 +21,59 @@ mod fs;
 mod framebuffer;
 mod uart;
 mod ps2;
+mod writer;
 mod mouse;
 
 extern crate multiboot2;
+#[macro_use]
 extern crate bitflags;
-extern crate bit_field;
 extern crate x86_64;
 
 use core::panic::PanicInfo;
-use crate::framebuffer::{Window};
+use crate::framebuffer::{DESKTOP};
 use crate::uart::CONSOLE;
 use crate::pic::PICS;
 use crate::pit::PIT;
 
 use multiboot2::{load};
 
+// TODO: Rectify fact that available memory starts after framebuffer
+
 #[no_mangle]
 pub extern fn rust_main(multiboot_information_address: usize) {
     interrupts::disable();
+    
     let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
     let mut pf_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
-    framebuffer::init(boot_info.framebuffer_tag().unwrap(), &mut pf_allocator);
+    
+    // if boot_info.framebuffer_tag().is_some() {
+    //     framebuffer::init(boot_info.framebuffer_tag().unwrap(), &mut pf_allocator);
+    // }
+
     uart::init();
 
     gdt::init();
     PIT.lock().init();
-    ps2::init();
+    ps2::init().unwrap();
     interrupts::init();
     PICS.lock().init();
 
-    // interrupts::enable();
+    interrupts::enable();
 
-    let window_1 = Window::new(10, 10, 300, 200);
-    let window_2 = Window::new(100, 150, 400, 400);
-    let window_3 = Window::new(200, 100, 200, 600);
+    // unsafe {
+    //     core::arch::asm!("int 0x00");
+    // }
 
-    window_1.paint();
-    window_2.paint();
-    window_3.paint();
+    // DESKTOP.lock().create_window(10, 10, 300, 200, &mut pf_allocator); // small green
+    // DESKTOP.free();
+    // DESKTOP.lock().create_window(100, 150, 400, 400, &mut pf_allocator); // square red
+    // DESKTOP.free();
+    // DESKTOP.lock().create_window(200, 100, 200, 600, &mut pf_allocator); // long yellow
+    // DESKTOP.free();
+    // DESKTOP.lock().paint(); 
+    // DESKTOP.free();
+
+    // grub::initialise_userland(&boot_info, &mut pf_allocator);
 
     print_serial!("End of execution\n");
 

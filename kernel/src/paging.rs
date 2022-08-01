@@ -25,9 +25,7 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(unused_variables)]
 
 use crate::page_frame_allocator;
-use multiboot2::MemoryMapTag;
 use page_frame_allocator::PageFrameAllocator;
-use x86_64::structures::paging::page;
 use crate::page_frame_allocator::FrameAllocator;
 use core::prelude::v1::Some;
 

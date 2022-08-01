@@ -15,32 +15,40 @@
     Byte 3: Y Movement
 */
 
-use spin::Mutex;
-use crate::ports::outb;
-use crate::ports::inb;
-use crate::print_serial;
-use crate::framebuffer::FRAMEBUFFER;
-use crate::ps2;
+use crate::framebuffer::{self, FRAMEBUFFER};
+use crate::{ps2, print_serial};
+use crate::DESKTOP;
+use crate::spinlock::Lock;
+use crate::CONSOLE;
 
-pub struct Mouse {
-    mouse_x: usize,
-    mouse_y: usize,
-    mouse_packets: [u8; 4],
-    current_byte: usize,
-    variety: ps2::PS2Device
+#[derive(PartialEq)]
+pub enum MouseState {
+    Up,
+    Down,
+    Immobile,
 }
 
-// TODO: Make this dynamic with framebuffer size
-pub static MOUSE: Mutex<Mouse> = Mutex::new(Mouse {
-    mouse_x: 512,
-    mouse_y: 384,
+pub struct Mouse {
+    pub mouse_x: u64,
+    pub mouse_y: u64,
+    mouse_packets: [u8; 4],
+    current_byte: usize,
+    variety: ps2::PS2Device,
+    pub mouse_state: MouseState
+}
+
+pub static MOUSE: Lock<Mouse> = Lock::new(Mouse {
+    mouse_x: framebuffer::SCREEN_WIDTH / 2,
+    mouse_y: framebuffer::SCREEN_HEIGHT / 2,
     mouse_packets: [0; 4],
     current_byte: 0,
-    variety: ps2::PS2Device::PS2Mouse
+    variety: ps2::PS2Device::PS2Mouse,
+    mouse_state: MouseState::Immobile,
 });
 
 impl Mouse {
     pub fn init(&mut self) {
+        self.disable_scanning();
         self.enable_z_axis();
         self.enable_5_buttons();
         self.enable_scanning();
@@ -66,35 +74,39 @@ impl Mouse {
             return; // TODO: Add an error
         }
 
-        // Bit 3 verifies packet alignment
+        // Bit 3 verifies packet alignment (if wrong, should return error)
         if self.mouse_packets[0] & (1 << 3) != 0x08 {
             return; 
         }
 
         // Left button pressed
         if self.mouse_packets[0] & (1 << 0) == 1 {
-            return;
+            self.mouse_state = MouseState::Down;
+            DESKTOP.lock().handle_mouse_movement(self.mouse_x, self.mouse_y);
+            DESKTOP.free();
+        } else {
+            self.mouse_state = MouseState::Up;
         }
 
         // Right button pressed
-        if self.mouse_packets[0] & (1 << 1) == 2 {
-            return;
-        }
+        // if self.mouse_packets[0] & (1 << 1) == 2 {
+        //     return;
+        // }
 
         // X movement and Y movement values must be read as a 9 bit or greater SIGNED value if bit is enabled
 
         if self.mouse_packets[0] & (1 << 4) == 0x10 {
-            self.mouse_x = self.mouse_x.wrapping_add(self.sign_extend(self.mouse_packets[1]) as usize);
+            self.mouse_x = self.mouse_x.wrapping_add(self.sign_extend(self.mouse_packets[1]) as u64);
         } else {
-            self.mouse_x = self.mouse_x.wrapping_add(self.mouse_packets[1] as usize);
+            self.mouse_x = self.mouse_x.wrapping_add(self.mouse_packets[1] as u64);
         }
 
         if self.mouse_packets[0] & (1 << 5) == 0x20 {
-            let test = self.sign_extend(self.mouse_packets[2]) * -1;
-            self.mouse_y = self.mouse_y.wrapping_add(test as usize);
+            let adjusted_y = self.sign_extend(self.mouse_packets[2]) * -1;
+            self.mouse_y = self.mouse_y.wrapping_add(adjusted_y as u64);
         } else {
-            let test = (self.mouse_packets[2] as i16) * -1;
-            self.mouse_y = self.mouse_y.wrapping_add(test as usize);
+            let adjusted_y = (self.mouse_packets[2] as i16) * -1;
+            self.mouse_y = self.mouse_y.wrapping_add(adjusted_y as u64);
         }
 
         if self.mouse_x > 1019 {
@@ -116,7 +128,7 @@ impl Mouse {
         // Draw small square to indicate mouse position
         for i in 0..5 {
             for j in 0..5 {
-                // FRAMEBUFFER.lock().draw_pixel(self.mouse_x + j, self.mouse_y + i, 0xFF);
+                FRAMEBUFFER.lock().draw_pixel(self.mouse_x + j, self.mouse_y + i, 0xFF);
             }
         }
     }

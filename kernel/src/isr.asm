@@ -134,4 +134,3 @@ handle_no_err_exception 31
 
 handle_interrupt 33
 handle_interrupt 44
-handle_interrupt 47

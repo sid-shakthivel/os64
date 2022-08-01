@@ -16,12 +16,13 @@
     +-----------+----------------------------------+
 */
 
-// TODO: Use enums instead of numbers 
+// TODO: Fix very irritating enum thing when I have wifi
 
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
 use core::mem;
+use crate::multitask::USER_PROCESS_START_ADDRESS;
 use crate::page_frame_allocator::PAGE_SIZE;
 use crate::page_frame_allocator::PageFrameAllocator;
 use crate::page_frame_allocator::FrameAllocator;
@@ -37,6 +38,7 @@ const ELF_DATA: u8 = 1; // Little Endian
 const ELF_CLASS: u8 = 2; // 64 Bit
 const ELF_VERSION: u8 = 1;
 const ELF_MACHINE: Elf64Half = 0x3E; // AMD x86-64
+const ELF_FLAG_MAG0: u8 = 0x7F;
 
 #[repr(C, packed)]
 struct ElfHeader {
@@ -103,8 +105,8 @@ struct ElfProgramHeader {
     p_align: Elf64Xword, // Alignment in memory and file
 }
 
-#[repr(u32)]
 #[derive(PartialEq, Copy, Clone)]
+#[repr(u32)]
 enum ProgramHeaderType
 {
     PtNull = 0, // unused
@@ -120,7 +122,7 @@ pub fn parse(file_start: u64, page_frame_allocator: &mut PageFrameAllocator) {
 
 // Verify file starts with ELF Magic number and is built for the correct system
 fn validate_file(elf_header: &ElfHeader) -> bool {
-    if elf_header.e_ident[ElfIdent::EiMag0 as usize] != 0x7F { panic!("ELF Header EI_MAG0 incorrect\n"); }
+    if elf_header.e_ident[ElfIdent::EiMag0 as usize] != ELF_FLAG_MAG0 { panic!("ELF Header EI_MAG0 incorrect\n"); }
     else if elf_header.e_ident[ElfIdent::EiMag1 as usize] != ('E' as u8) { panic!("ELF header EI_MAG1 incorrect\n"); }
     else if elf_header.e_ident[ElfIdent::EiMag2 as usize] != ('L' as u8) { panic!("ELF header EI_MAG2 incorrect\n"); }
     else if elf_header.e_ident[ElfIdent::EiMag3 as usize] != ('F' as u8) { panic!("ELF header EI_MAG3 incorrect\n"); } 
@@ -139,15 +141,13 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader, page_frame_all
         let address = file_start + elf_header.e_phoff + (mem::size_of::<ElfProgramHeader>() as u64) * (i as u64);
         let program_header = unsafe { &*(address as *const ElfProgramHeader) };
 
-        let test = program_header.p_type;
-
-        match test {
-            1 => {
+        match program_header.p_type {
+            0 => {
                 let source = file_start + program_header.p_offset as u64;
                 if program_header.p_memsz != program_header.p_filesz { panic!("Segment is padded with 0's\n"); }
                 load_segment_into_memory(source, program_header.p_memsz, i as u64, page_frame_allocator);
             }
-            0 => {},
+            1 => {},
             _ => panic!("Unknown\n"),
         }
     }
@@ -159,7 +159,7 @@ fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader, page_frame_all
         // let address = file_start + elf_header.e_shoff + (mem::size_of::<ElfSectionHeader>() as u64) * (i as u64);
         // let section_header = unsafe { &*(address as *const ElfSectionHeader) };
 
-        // Add support for .bss by checking flags etc
+        // TODO: Add support for .bss by checking flags etc
     }
 }
 
@@ -177,6 +177,6 @@ fn load_segment_into_memory(source_raw: u64, size: u64, index: u64, page_frame_a
     }
 
     // Map the physical pages to 0x800000
-    let v_address = 0x800000 + (index * 0x1000) as u64;
+    let v_address = USER_PROCESS_START_ADDRESS + (index * 0x1000) as u64;
     paging::map_page(dest as u64, v_address, page_frame_allocator, true, None);
 }

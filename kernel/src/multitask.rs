@@ -18,7 +18,7 @@ use crate::paging;
     There are kernel processes (run in kernel mode) and user processes (run in user mode)
     Processes will be selected based on what priority they are
 */
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Process {
     pid: u64,
     pub rsp: *const u64,
@@ -34,7 +34,7 @@ pub enum ProcessPriority {
 }
 
 pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
-static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
+pub static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
 
 // Processes schedular holds all tasks and decides which will be serviced
 pub struct ProcessSchedular {
@@ -99,7 +99,6 @@ impl Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4
-        // let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
         let new_p4: *mut Table = paging::deep_clone(page_frame_allocator);
         
         // Create and setup a stack as though an interrupt has been fired

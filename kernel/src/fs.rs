@@ -16,7 +16,9 @@
 
 // TODO: Long File Names
 
-use multiboot2::load;
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use spin::Mutex;
 use core::mem;
 use crate::page_frame_allocator::PageFrameAllocator;
@@ -105,7 +107,7 @@ struct File {
     // gid: u32,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Copy, PartialEq, Clone, Debug)]
 enum FileType {
     File,
     Directory,
@@ -334,36 +336,32 @@ fn print_filename(filename: &[u8], ext: &[u8]) {
     // print!("\n");
 }
 
-pub fn init(multiboot_information_address: usize, page_frame_allocator: &mut PageFrameAllocator) {
-    let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
+pub fn init(start_address: u32, page_frame_allocator: &mut PageFrameAllocator) {
+    let bpb = unsafe { &*(start_address as *const BiosParameterBlock) };
 
-    for module in boot_info.module_tags() {
-        let bpb = unsafe { &*((module.start_address()) as *const BiosParameterBlock) };
+    let ebr_address = start_address + (mem::size_of::<BiosParameterBlock>() as u32);
+    let ebr = unsafe { &*(ebr_address as *const ExtendedBootRecord) };
 
-        let ebr_address = module.start_address() + (mem::size_of::<BiosParameterBlock>() as u32);
-        let ebr = unsafe { &*(ebr_address as *const ExtendedBootRecord) };
+    validate_fat(ebr);
 
-        validate_fat(ebr);
+    let first_fat = start_address + convert_sector_to_bytes(bpb.reserved_sector_count as u32);
+    let fat_size: u32 = bpb.table_size_16 as u32;
 
-        let first_fat = module.start_address() + convert_sector_to_bytes(bpb.reserved_sector_count as u32);
-        let fat_size: u32 = bpb.table_size_16 as u32;
+    let root_directory_sector: u32 = (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
+    let root_directory_address: u32 = start_address + convert_sector_to_bytes(root_directory_sector);
 
-        let root_directory_sector: u32 = (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
-        let root_directory_address: u32 = module.start_address() + convert_sector_to_bytes(root_directory_sector);
+    let root_directory_size: u32 = ((((bpb.root_entry_count) * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector) as u32;
+    let first_data_sector: u32 = convert_sector_to_bytes(root_directory_size) + root_directory_address;
 
-        let root_directory_size: u32 = ((((bpb.root_entry_count) * 32) + (bpb.bytes_per_sector - 1)) / bpb.bytes_per_sector) as u32;
-        let first_data_sector: u32 = convert_sector_to_bytes(root_directory_size) + root_directory_address;
+    FS.lock().bpb = Some(*bpb);
+    FS.lock().start_address = start_address;
+    FS.lock().fat_address = first_fat;
+    FS.lock().first_data_sector_address = first_data_sector;
+    FS.lock().root_directory_size = convert_sector_to_bytes(root_directory_size);
 
-        FS.lock().bpb = Some(*bpb);
-        FS.lock().start_address = module.start_address();
-        FS.lock().fat_address = first_fat;
-        FS.lock().first_data_sector_address = first_data_sector;
-        FS.lock().root_directory_size = convert_sector_to_bytes(root_directory_size);
+    let dest = page_frame_allocator.alloc_frame().unwrap() as *mut u8;
 
-        let dest = page_frame_allocator.alloc_frame().unwrap() as *mut u8;
-
-        let mut initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
-    }
+    let initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
 }
 
 // Copies number of bytes into destination

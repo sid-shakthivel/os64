@@ -156,11 +156,9 @@ pub extern fn exception_handler(registers: Registers) {
 pub extern fn interrupt_handler(registers: Registers) {
     PICS.lock().acknowledge(registers.num as u8); // To allow further interrupts, an acknowledgement must be sent
 
-    let num = registers.num;
-
     match registers.num {
         0x21 => KEYBOARD.lock().handle_keyboard(), // Keyboard
-        44 => { MOUSE.lock().handle_mouse_interrupt(); },
+        44 => { MOUSE.lock().handle_mouse_interrupt(); MOUSE.free(); },
         _ => print_serial!("Unknown Interrupt!\n"),
     }
 }
@@ -244,6 +242,8 @@ pub fn init() {
     // Syscall
     idt_entry::edit_entry(0x80, handle_syscall, GateType::Interrupt, PrivilegeLevel::Ring3);
 
+    print_serial!("here\n");
+    
     // Load idt
     unsafe { idt_flush(); }
 }
@@ -285,7 +285,6 @@ extern "C" {
     fn handle_pit_interrupt(); // Timer
     fn handle_interrupt33(); // PPS2 Keyboard
     fn handle_interrupt44(); // PS2 Mouse
-    fn handle_interrupt47(); // ???
     fn handle_syscall(); // Syscall
     fn idt_flush();
 }
