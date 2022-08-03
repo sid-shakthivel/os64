@@ -241,8 +241,6 @@ pub fn init() {
 
     // Syscall
     idt_entry::edit_entry(0x80, handle_syscall, GateType::Interrupt, PrivilegeLevel::Ring3);
-
-    print_serial!("here\n");
     
     // Load idt
     unsafe { idt_flush(); }

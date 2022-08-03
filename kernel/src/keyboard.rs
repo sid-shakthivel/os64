@@ -34,7 +34,6 @@ pub static KEYBOARD: Mutex<Keyboard> = Mutex::new(Keyboard {
 
 impl Keyboard {
     pub fn init(&mut self) {
-        self.disable_scanning();
         if self.scancode_set != self.get_scancode_set() { self.scancode_set = self.get_scancode_set(); }
         self.enable_scanning();
     }

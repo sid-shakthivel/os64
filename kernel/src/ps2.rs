@@ -14,7 +14,6 @@ use crate::keyboard::KEYBOARD;
 use crate::mouse::MOUSE;
 use crate::ports::outb;
 use crate::ports::inb;
-use crate::ports::io_wait;
 use crate::print_serial;
 use crate::uart::CONSOLE;
 
@@ -23,7 +22,20 @@ const PS2_STATUS: u16 = 0x64;
 const PS2_CMD: u16 = 0x64; // Command port
 const TIMEOUT: i16 = 10000;
 
-#[derive(PartialEq)]
+bitflags! {
+    struct ControllerRegister: u8 {
+        const KEYBOARD_INTERRUPT_ENABLE = 0b00000001;
+        const MOUSE_INTERRUPT_ENABLE = 0b00000010;
+        const SYSTEM_FLAG = 0b00000100;
+        const IGNORE_KEYBOARD_LOCK = 0b00001000;
+        const KEYBOARD_ENABLE = 0b00010000;
+        const MOUSE_ENABLE = 0b00100000;
+        const KEYBOARD_TRANSLATION = 0b01000000;
+        const UNUSED = 0b10000000;
+    }
+}
+
+#[derive(PartialEq, Debug)]
 pub enum PS2Device {
     PS2Mouse,
     PS2MouseScrollWheel,
@@ -43,10 +55,14 @@ pub fn init() -> Result<(), &'static str> {
     // Set controller configuration byte to disable IRQ's, disable translation
     ps2_write(PS2_CMD, 0x20)?;
     let mut controller_config_byte = ps2_read(PS2_DATA)?;
+    let mut controller_config = ControllerRegister::from_bits_truncate(controller_config_byte);
+    ControllerRegister::remove(&mut controller_config, ControllerRegister::KEYBOARD_INTERRUPT_ENABLE);
+    ControllerRegister::remove(&mut controller_config, ControllerRegister::MOUSE_INTERRUPT_ENABLE);
+    ControllerRegister::remove(&mut controller_config, ControllerRegister::KEYBOARD_TRANSLATION);
 
-    controller_config_byte = controller_config_byte & !(1 << 0) & !(1 << 1) & !(1 << 6);
+    // controller_config_byte = controller_config_byte & !(1 << 0) & !(1 << 1) & !(1 << 6);
     ps2_write(PS2_CMD, 0x60)?;
-    ps2_write(PS2_DATA, controller_config_byte)?;
+    ps2_write(PS2_DATA, controller_config.bits)?;
 
     // Perform controller self test
     ps2_write(PS2_CMD, 0xAA)?; // Test controller
@@ -57,7 +73,8 @@ pub fn init() -> Result<(), &'static str> {
     ps2_write(PS2_CMD, 0xA8)?; // Enable second PS2 port
     ps2_write(PS2_CMD, 0x20)?; 
     controller_config_byte = ps2_read(PS2_DATA)?;
-    if (controller_config_byte & (1 << 5) > 0) {
+    controller_config = ControllerRegister::from_bits_truncate(controller_config_byte);
+    if controller_config.contains(ControllerRegister::MOUSE_ENABLE) {
         panic!("Not dual channel???\n");
     } else {
         ps2_write(PS2_CMD, 0xA7)?;
@@ -81,17 +98,19 @@ pub fn init() -> Result<(), &'static str> {
     // Enable interrupts
     ps2_write(PS2_CMD, 0x20)?;
     controller_config_byte = ps2_read(PS2_DATA)?;
-    controller_config_byte = controller_config_byte | (1 << 0) | (1 << 1); // Enable interrupts for mouse and keyboard
-    controller_config_byte = controller_config_byte | (1 << 6); // Translate key scancodes
-    ps2_write(PS2_CMD, 0x60)?;
-    ps2_write(PS2_DATA, controller_config_byte)?;
+    controller_config = ControllerRegister::from_bits_truncate(controller_config_byte);
 
-    // 0b1110011
+    ControllerRegister::set(&mut controller_config, ControllerRegister::KEYBOARD_INTERRUPT_ENABLE, true);
+    ControllerRegister::set(&mut controller_config, ControllerRegister::MOUSE_INTERRUPT_ENABLE, true);
+    ControllerRegister::set(&mut controller_config, ControllerRegister::KEYBOARD_TRANSLATION, true);
+
+    ps2_write(PS2_CMD, 0x60)?;
+    ps2_write(PS2_DATA, controller_config.bits)?;
 
     // Reset devices
     for i in 0..2 {
         ps2_write_device(i, 0xFF)?;
-        let mut response = ps2_read(PS2_DATA)?;
+        let response = ps2_read(PS2_DATA)?;
 
         if response != 0xFA || ps2_read(PS2_DATA)? != 0xAA {
             panic!("Reading device {} failed with {:x}", i, response);
@@ -111,13 +130,11 @@ pub fn init() -> Result<(), &'static str> {
             },
             PS2Device::PS2Mouse => {
                 MOUSE.lock().init();
+                MOUSE.free();
             },
             _ => panic!("Unknown device"), 
         }
     }
-
-    ps2_write_device(1, 0xF2)?;
-    while ps2_read(PS2_DATA)? != 0xFA {} // Wait for ACK 
 
     return Ok(());
 }

@@ -1,4 +1,4 @@
-; src/multiboot_header.asm
+w; src/multiboot_header.asm
 
 section .multiboot_header
 header_start:
@@ -17,6 +17,6 @@ header_start:
 
     ; required end tag to terminate
     dw 0    ; Type
-    dw 0    ; Flags
+    dw 0    ; Flagsw
     dd 0    ; Size
 header_end:

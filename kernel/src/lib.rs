@@ -1,54 +1,54 @@
 // src/lib.rs
 
 #![no_std] // Don't link with Rust standard library
-// #![feature(const_mut_refs)]
+           // #![feature(const_mut_refs)]
 
 // mod vga_text;
+mod elf;
+mod framebuffer;
+mod fs;
+mod gdt;
+mod grub;
+mod interrupts;
+mod keyboard;
+mod mouse;
+mod multitask;
 mod page_frame_allocator;
 mod paging;
-mod interrupts;
-mod ports;
 mod pic;
-mod keyboard;
 mod pit;
-mod gdt;
-mod multitask;
-mod spinlock;
-mod grub;
-mod syscalls;
-mod elf;
-mod fs;
-mod framebuffer;
-mod uart;
+mod ports;
 mod ps2;
+mod spinlock;
+mod syscalls;
+mod uart;
 mod writer;
-mod mouse;
 
 extern crate multiboot2;
 #[macro_use]
 extern crate bitflags;
 extern crate x86_64;
 
-use core::panic::PanicInfo;
-use crate::framebuffer::{DESKTOP};
-use crate::uart::CONSOLE;
+use crate::framebuffer::DESKTOP;
+use crate::mouse::MOUSE;
 use crate::pic::PICS;
 use crate::pit::PIT;
+use crate::uart::CONSOLE;
+use core::panic::PanicInfo;
 
-use multiboot2::{load};
+use multiboot2::load;
 
 // TODO: Rectify fact that available memory starts after framebuffer
 
 #[no_mangle]
-pub extern fn rust_main(multiboot_information_address: usize) {
+pub extern "C" fn rust_main(multiboot_information_address: usize) {
     interrupts::disable();
-    
+
     let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
-    let mut pf_allocator = page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);    
-    
-    // if boot_info.framebuffer_tag().is_some() {
-    //     framebuffer::init(boot_info.framebuffer_tag().unwrap(), &mut pf_allocator);
-    // }
+    let mut pf_allocator =
+        page_frame_allocator::PageFrameAllocator::new(multiboot_information_address);
+
+    framebuffer::init(boot_info.framebuffer_tag().unwrap(), &mut pf_allocator);
 
     uart::init();
 
@@ -60,18 +60,21 @@ pub extern fn rust_main(multiboot_information_address: usize) {
 
     interrupts::enable();
 
-    // unsafe {
-    //     core::arch::asm!("int 0x00");
-    // }
-
-    // DESKTOP.lock().create_window(10, 10, 300, 200, &mut pf_allocator); // small green
-    // DESKTOP.free();
+    DESKTOP
+        .lock()
+        .create_window(10, 10, 300, 200, &mut pf_allocator); // small green
+    DESKTOP.free();
     // DESKTOP.lock().create_window(100, 150, 400, 400, &mut pf_allocator); // square red
     // DESKTOP.free();
     // DESKTOP.lock().create_window(200, 100, 200, 600, &mut pf_allocator); // long yellow
     // DESKTOP.free();
-    // DESKTOP.lock().paint(); 
-    // DESKTOP.free();
+    let mouse_x = MOUSE.lock().mouse_x;
+    MOUSE.free();
+    let mouse_y = MOUSE.lock().mouse_y;
+    MOUSE.free();
+
+    DESKTOP.lock().paint(mouse_x, mouse_y);
+    DESKTOP.free();
 
     // grub::initialise_userland(&boot_info, &mut pf_allocator);
 

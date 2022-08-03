@@ -24,10 +24,12 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::page_frame_allocator;
+use crate::{page_frame_allocator, print_serial};
 use page_frame_allocator::PageFrameAllocator;
 use crate::page_frame_allocator::FrameAllocator;
 use core::prelude::v1::Some;
+
+use crate::CONSOLE;
 
 #[allow(dead_code)]
 enum Flags {
@@ -192,6 +194,7 @@ pub fn identity_map(megabytes: u64, page_frame_allocator: &mut PageFrameAllocato
 }
 
 pub fn identity_map_from(start: u64, megabytes: u64, page_frame_allocator: &mut PageFrameAllocator) {
+    // let mut test = 0;
     for address in 0..(megabytes * 256) {
         let p_address = start + (address * 4096);
         let v_address = 0x180000 + (address * 4096);
