@@ -21,6 +21,20 @@ Start with the deepest window to the shallowest (recursive algorithm)
 Copy each window buffer to screen buffer and use compare memory - if different write (perhaps using SSE)
 Give mouse/keyboard event to each window and let them decide whether to process (check position overlaps)
 
-Rewrite linked list structure
-Clipping (framebuffer)
+Rewrite linked list structure to become more generic
+Rectangle Clipping - 
+Window 2 -> Window 1
+compare 2 edges for now
+check whether overlap with edges, pick the one highest one and remove the other one 
+make method to print lines (vertical, horizontal) to check stuff
+output final clip to framebuffer
+2 windows - clipping, subject
+Mutablility is not effective (links with global pf_allocator)
 
+Understand test conditions
+Add to linked list appropriately and modify list of rects
+Remove element correctly if split
+
+    Top
+Left -> Right
+    Bottom

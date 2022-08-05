@@ -141,7 +141,7 @@ pub fn init() -> Result<(), &'static str> {
 
 fn ps2_write(port: u16, byte: u8) -> Result<u8, &'static str> {
     let mut timeout = TIMEOUT;
-    while((inb(PS2_STATUS) & 2) > 0) {
+    while (inb(PS2_STATUS) & 2) > 0 {
         timeout -= 1;
         if timeout < 0 {
             print_serial!("PS2 WRITE FAILED\n");
@@ -154,7 +154,7 @@ fn ps2_write(port: u16, byte: u8) -> Result<u8, &'static str> {
 
 pub fn ps2_read(port: u16) -> Result<u8, &'static str> {
     let mut timeout = TIMEOUT;
-    while((inb(PS2_STATUS) & 1) == 0) {
+    while (inb(PS2_STATUS) & 1) == 0 {
         timeout -= 1;
         if timeout < 0 {
             print_serial!("PS2 READ FAILED\n");

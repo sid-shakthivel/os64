@@ -1,4 +1,3 @@
-
 // src/page_frame_allocator.rs
 
 /*
@@ -46,7 +45,9 @@ impl Operations for Stack {
     }
 
     fn push(&mut self, node: *mut Frame) {
-        unsafe { (*node).next_frame = self.current; }
+        unsafe {
+            (*node).next_frame = self.current;
+        }
         self.current = Some(node);
         self.length += 1;
     }
@@ -57,10 +58,10 @@ impl Operations for Stack {
         unsafe {
             self.current = match self.current {
                 Some(frame) => (*frame).next_frame,
-                _ => None
+                _ => None,
             };
         }
-        old_current 
+        old_current
     }
 }
 
@@ -87,10 +88,10 @@ impl FrameAllocator for PageFrameAllocator {
                 }
             }
         } else {
-            return  match self.free_frames.pop() {
-                Some(frame) => unsafe { Some(&mut *(frame as *mut u64)) }, 
-                _ => None
-            }
+            return match self.free_frames.pop() {
+                Some(frame) => unsafe { Some(&mut *(frame as *mut u64)) },
+                _ => None,
+            };
         }
     }
 
@@ -107,13 +108,23 @@ impl FrameAllocator for PageFrameAllocator {
 impl PageFrameAllocator {
     pub fn new(multiboot_information_address: usize) -> PageFrameAllocator {
         let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
-        let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");  
+        let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
 
-        let mut memory_start: u64 = (boot_info.end_address() as u64) + (500000 as u64) & 0x000fffff_fffff000;
+        let mut memory_start: u64 =
+            (boot_info.end_address() as u64) + (500000 as u64) & 0x000fffff_fffff000;
         memory_start = 4714496 & 0x000fffff_fffff000; // TODO: Fix this temp fix
-        let memory_end: u64 = memory_map_tag.memory_areas().last().expect("Unknown Length").end_address() & 0x000fffff_fffff000;
+        let memory_end: u64 = memory_map_tag
+            .memory_areas()
+            .last()
+            .expect("Unknown Length")
+            .end_address()
+            & 0x000fffff_fffff000;
 
-        let mut page_frame_allocator = PageFrameAllocator { memory_end: memory_end, current_page: unsafe { &mut *(memory_start as *mut u64) }, free_frames: unsafe { &mut *(memory_start as *mut Stack) } };
+        let mut page_frame_allocator = PageFrameAllocator {
+            memory_end: memory_end,
+            current_page: unsafe { &mut *(memory_start as *mut u64) },
+            free_frames: unsafe { &mut *(memory_start as *mut Stack) },
+        };
         page_frame_allocator.setup_stack();
         return page_frame_allocator;
     }

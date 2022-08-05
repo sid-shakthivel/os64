@@ -11,17 +11,20 @@
     Glyphs are bitmaps of 8*16
 */
 
+// TODO: Free memory and make a malloc
+
 #![allow(dead_code)]
 
+use crate::interrupts::Registers;
 use crate::spinlock::Lock;
 use crate::writer::Writer;
 use lazy_static::lazy_static;
 use multiboot2::FramebufferTag;
 
-use crate::page_frame_allocator::{Frame, FrameAllocator, PageFrameAllocator};
+use crate::page_frame_allocator::{FrameAllocator, PageFrameAllocator};
+use crate::paging::{self, Page};
 use crate::print_serial;
 use crate::CONSOLE;
-use crate::{mouse, paging};
 
 pub const SCREEN_WIDTH: u64 = 1024;
 pub const SCREEN_HEIGHT: u64 = 768;
@@ -35,6 +38,7 @@ pub struct Desktop {
     drag_window: Option<*mut Window>,
     drag_x_offset: u64,
     drag_y_offset: u64,
+    head_rect: Option<*mut Rectangle>,
 }
 
 pub static DESKTOP: Lock<Desktop> = Lock::new(Desktop::new());
@@ -49,6 +53,7 @@ impl Desktop {
             drag_window: None,
             drag_x_offset: 0,
             drag_y_offset: 0,
+            head_rect: None,
         }
     }
 
@@ -58,8 +63,9 @@ impl Desktop {
         y: u64,
         width: u64,
         height: u64,
-        pf_allocator: &mut PageFrameAllocator,
+        mut pf_allocator: &mut PageFrameAllocator,
     ) {
+        // let test = &mut pf_allocator;
         let p_window: *mut Window = pf_allocator.alloc_frame().unwrap() as *mut _;
 
         let window = unsafe { &mut *p_window };
@@ -81,23 +87,69 @@ impl Desktop {
         // Push new window to start of linked list
         self.head = Some(p_window);
         self.count += 1;
+
+        // Create new rectangle which are rendered upon the screen
+        // let new_rectangle = Rectangle::new(window.y, window.y + window.height, window.x, window.x + window.width, &mut pf_allocator);
+
+        let p_rectangle: *mut Rectangle = pf_allocator.alloc_frame().unwrap() as *mut _;
+        let new_rectangle = unsafe { &mut *p_rectangle };
+        new_rectangle.top = window.y;
+        new_rectangle.bottom = window.y + window.height;
+        new_rectangle.left = window.x;
+        new_rectangle.right = window.x + window.width;
+        new_rectangle.next = None;
+
+        self.add_clipped_rect(new_rectangle, pf_allocator);
+    }
+
+    fn add_clipped_rect(
+        &mut self,
+        new_rectangle: &mut Rectangle,
+        mut pf_allocator: &mut PageFrameAllocator,
+    ) {
+        let mut current_rect = self.head_rect;
+        if current_rect.is_some() {
+            let unwrapped_rect = unsafe { &mut *(current_rect.unwrap()) };
+
+            // Check for overlap with other rectangles
+            // If there is no overlap, no need for snipping so skip
+            if !(unwrapped_rect.left <= new_rectangle.right &&
+                unwrapped_rect.right >= new_rectangle.left &&
+                unwrapped_rect.top <= new_rectangle.bottom &&
+                unwrapped_rect.bottom >= new_rectangle.top)
+            {
+                // continue;
+            } else {
+                 // Split and add to rect's linked list
+                let rectangles = Rectangle::split(unwrapped_rect, new_rectangle, &mut pf_allocator);
+
+                // Remove subject rect and replace with the split ones
+                // Temp fix
+                self.head_rect = rectangles;
+
+                current_rect = unwrapped_rect.next;
+            }
+        }
+
+        // Add to rectangle list
+        if self.head_rect.is_some() {
+            new_rectangle.next = self.head_rect;
+        }
+        self.head_rect = Some(new_rectangle as *mut Rectangle);
     }
 
     // Current functionality is to delete a window if pressed
     pub fn handle_mouse_movement(&mut self, mouse_x: u64, mouse_y: u64) {
-        self.update_drag_window_coordinates(mouse_x, mouse_y);
+        // self.update_drag_window_coordinates(mouse_x, mouse_y);
         let window = self.get_clicked_window(mouse_x, mouse_y);
 
         if window.is_some() {
-            let unwrapped_window = window.unwrap().clone();
+            // let unwrapped_window = window.unwrap().clone();
 
             // Remove from linked list
             // self.remove_window(&unwrapped_window);
 
-            // Add to top of linked list
-            // unsafe {
-            // self.create_window((*unwrapped_window).x, (*unwrapped_window).y, (*unwrapped_window).width, (*unwrapped_window).height, pf_allocator);
-            // }
+            // Add to top of linked list so it appears at the start
         }
 
         // Paint
@@ -106,9 +158,9 @@ impl Desktop {
 
     // Update coordinates of a dragged window in relation to mouse cursor
     fn update_drag_window_coordinates(&mut self, mouse_x: u64, mouse_y: u64) {
-        if !self.drag_window.is_none() {
+        if self.drag_window.is_some() {
             unsafe {
-                let window = (&mut *self.drag_window.unwrap());
+                let window = &mut *self.drag_window.unwrap();
                 Framebuffer::fill_rect(window.x, window.y, window.width, window.height, 0x00);
                 window.x = mouse_x.wrapping_sub(self.drag_x_offset);
                 window.y = mouse_y.wrapping_sub(self.drag_y_offset);
@@ -170,7 +222,6 @@ impl Desktop {
                     }
                 }
 
-                // TODO: Should free memory but need an idiocramatic method to do so or else lose 1 page of memory each time....
                 return;
             }
 
@@ -189,6 +240,16 @@ impl Desktop {
         if self.head.is_some() {
             unsafe { Window::paint(Some(&mut *(self.head.unwrap()))) };
         }
+
+        let mut current_rect = self.head_rect;
+        while current_rect.is_some() {
+            let unwrapped_rect = unsafe { &mut (*current_rect.unwrap()) };
+            print_serial!("{:?}\n", unwrapped_rect);
+            unwrapped_rect.paint(0xFF);
+            current_rect = unsafe { (*current_rect.unwrap()).next };
+        }
+
+        print_serial!("Painting\n");
 
         // Paint mouse
         Framebuffer::fill_rect(mouse_x, mouse_y, 5, 5, 0xFF);
@@ -218,7 +279,7 @@ impl Window {
     pub fn paint(window: Option<&mut Window>) {
         let window_unwrapped = window.unwrap();
 
-        Framebuffer::fill_rect(
+        Framebuffer::draw_rect(
             window_unwrapped.x,
             window_unwrapped.y,
             window_unwrapped.width,
@@ -230,6 +291,80 @@ impl Window {
             let next_window = window_unwrapped.next.unwrap();
             unsafe { return Self::paint(Some(&mut *next_window)) };
         }
+    }
+}
+
+#[derive(Debug)]
+struct Rectangle {
+    top: u64,
+    bottom: u64,
+    right: u64,
+    left: u64,
+    next: Option<*mut Rectangle>,
+}
+
+impl Rectangle {
+    pub fn new(top: u64, bottom: u64, left: u64, right: u64, pf_allocator: &mut PageFrameAllocator) -> &mut Rectangle {
+        let p_rectangle: *mut Rectangle = pf_allocator.alloc_frame().unwrap() as *mut _;
+        let rectangle = unsafe { &mut *p_rectangle };
+        rectangle.top = top;
+        rectangle.bottom = bottom;
+        rectangle.left = left;
+        rectangle.right = right;
+        rectangle
+    }
+
+    /*
+        Method is called upon the subject rect, given a clipping rect
+        Returns a list of rectangles that can be drawn
+    */
+    fn split(&mut self, clipping_rect: &mut Rectangle, pf_allocator: &mut PageFrameAllocator) -> Option<*mut Rectangle> {
+        let mut new_rectangles: Option<*mut Rectangle> = None;
+        print_serial!("Splitting rect\n");
+        // Check left side of subject to right side of clipping
+        if clipping_rect.left < self.right {
+            // Make new rect with updated coordinates
+            let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left, pf_allocator);
+
+            // Update current rectangle to match (update left)
+            self.left = new_rect.right;
+
+            if new_rectangles.is_none() {
+                new_rectangles = Some(new_rect as *mut Rectangle);
+            } else {
+                unsafe {
+                    (*new_rectangles.unwrap()).next = Some(new_rect as *mut Rectangle);
+                }
+            }
+        }
+
+        // Compare subject bottom to clipping top
+        if clipping_rect.top > self.top {
+            let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right, pf_allocator);
+
+            // Update current rectange to match (update top)
+            self.top = new_rect.bottom;
+
+            if new_rectangles.is_none() {
+                new_rectangles = Some(new_rect as *mut Rectangle);
+            } else {
+                unsafe {
+                    (*new_rectangles.unwrap()).next = Some(new_rect as *mut Rectangle);
+                }
+            }
+        }
+
+        return new_rectangles;
+    }
+
+    fn paint(&self, colour: u32) {
+        Framebuffer::draw_rect(
+            self.left,
+            self.top,
+            self.right - self.left,
+            self.bottom - self.top,
+            colour,
+        );
     }
 }
 
@@ -294,6 +429,7 @@ impl Framebuffer {
         Self::fill_rect(x, y, width, height, colour);
     }
 
+    // Draws rectangle
     pub fn fill_rect(x: u64, y: u64, width: u64, height: u64, colour: u32) {
         if x.checked_add(width).is_some() && y.checked_add(height).is_some() {
             for i in x..(width + x) {
@@ -304,6 +440,15 @@ impl Framebuffer {
         }
     }
 
+    // Draws outline of rectangle only
+    pub fn draw_rect(x: u64, y: u64, width: u64, height: u64, colour: u32) {
+        Framebuffer::draw_horizontal_line(x, y, width, colour);
+        Framebuffer::draw_horizontal_line(x, y + height, width, colour);
+
+        Framebuffer::draw_vertical_line(x, y, height, colour);
+        Framebuffer::draw_vertical_line(x + width, y, height, colour);
+    }
+
     pub fn draw_pixel(x: u64, y: u64, byte: u32) {
         unsafe {
             // TODO: make this use framebuffer array for safety
@@ -311,11 +456,19 @@ impl Framebuffer {
             *offset = byte;
         }
     }
+
+    fn draw_horizontal_line(x: u64, y: u64, length: u64, colour: u32) {
+        Framebuffer::fill_rect(x, y, length, 5, colour);
+    }
+
+    fn draw_vertical_line(x: u64, y: u64, length: u64, colour: u32) {
+        Framebuffer::fill_rect(x, y, 5, length, colour);
+    }
 }
 
 impl Writer for Framebuffer {
     fn clear(&mut self) {
-        // TODO: Clear screen
+        Framebuffer::fill_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x00);
     }
 
     fn put_char(&mut self, character: char) {

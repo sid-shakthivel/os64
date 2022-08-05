@@ -62,10 +62,12 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     DESKTOP
         .lock()
-        .create_window(10, 10, 300, 200, &mut pf_allocator); // small green
+        .create_window(10, 10, 300, 300, &mut pf_allocator); // small green
     DESKTOP.free();
-    // DESKTOP.lock().create_window(100, 150, 400, 400, &mut pf_allocator); // square red
-    // DESKTOP.free();
+    DESKTOP
+        .lock()
+        .create_window(200, 150, 400, 400, &mut pf_allocator); // square red
+    DESKTOP.free();
     // DESKTOP.lock().create_window(200, 100, 200, 600, &mut pf_allocator); // long yellow
     // DESKTOP.free();
     let mouse_x = MOUSE.lock().mouse_x;

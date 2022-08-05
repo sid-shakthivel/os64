@@ -15,11 +15,11 @@
     Byte 3: Y Movement
 */
 
-use crate::framebuffer::{self, FRAMEBUFFER};
 use crate::spinlock::Lock;
 use crate::CONSOLE;
 use crate::DESKTOP;
 use crate::{print_serial, ps2};
+use crate::framebuffer;
 
 #[derive(PartialEq)]
 pub enum MouseState {
