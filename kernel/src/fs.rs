@@ -21,7 +21,8 @@
 
 use spin::Mutex;
 use core::mem;
-use crate::page_frame_allocator::PageFrameAllocator;
+
+use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::page_frame_allocator::FrameAllocator;
 
 struct Fat16 {
@@ -336,7 +337,7 @@ fn print_filename(filename: &[u8], ext: &[u8]) {
     // print!("\n");
 }
 
-pub fn init(start_address: u32, page_frame_allocator: &mut PageFrameAllocator) {
+pub fn init(start_address: u32) {
     let bpb = unsafe { &*(start_address as *const BiosParameterBlock) };
 
     let ebr_address = start_address + (mem::size_of::<BiosParameterBlock>() as u32);
@@ -359,7 +360,8 @@ pub fn init(start_address: u32, page_frame_allocator: &mut PageFrameAllocator) {
     FS.lock().first_data_sector_address = first_data_sector;
     FS.lock().root_directory_size = convert_sector_to_bytes(root_directory_size);
 
-    let dest = page_frame_allocator.alloc_frame().unwrap() as *mut u8;
+    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut u8;
+    PAGE_FRAME_ALLOCATOR.free();
 
     let initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
 }

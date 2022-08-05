@@ -1,8 +1,6 @@
 // src/list.rs
 
-use crate::print_serial;
-use crate::CONSOLE;
-
+// Each node stores a reference to the next/previous node within the list along with a payload
 #[derive(Debug)]
 pub struct Node<T: 'static> {
     pub payload: T,
@@ -16,16 +14,6 @@ pub struct Stack<T: 'static> {
     pub head: Option<*mut Node<T>>,
     pub tail: Option<*mut Node<T>>,
     pub length: usize,
-}
-
-impl<T> Default for Stack<T> {
-    fn default() -> Self {
-        Self {
-            head: None,
-            tail: None,
-            length: 0,
-        }
-    }
 }
 
 impl<'a, T> IntoIterator for &'a Stack<T> {
@@ -55,12 +43,20 @@ impl<'a, T> Iterator for StackIntoIterator<'a, T> {
         } else {
             self.current = None;
         }
-        
+
         return Some(saved_current);
     }
 }
 
 impl<T: Clone> Stack<T> {
+    pub const fn new() -> Self {
+        Self {
+            head: None,
+            tail: None,
+            length: 0,
+        }
+    }
+
     // Appends a new node to the start of the stack
     pub fn push(&mut self, address: u64, value: T) {
         let new_node = Node::new(address, value);
@@ -71,9 +67,14 @@ impl<T: Clone> Stack<T> {
                 (*new_node).next = self.head;
                 (*self.head.unwrap()).prev = Some(new_node);
             }
+        } else {
+            // Set tail
+            self.tail = Some(new_node);
         }
+
         // Push to front of list
         self.head = Some(new_node);
+
         self.length += 1;
     }
 
@@ -85,6 +86,10 @@ impl<T: Clone> Stack<T> {
                 // Update head to become next value and update the prev value
                 self.head = (*self.head.unwrap()).next;
                 (*self.head.unwrap()).prev = None;
+
+                if self.head.is_none() {
+                    self.tail = None;
+                }
             }
         }
 
@@ -92,8 +97,13 @@ impl<T: Clone> Stack<T> {
         head.expect("Attempted to pop from an empty item")
     }
 
+    // TODO: Will remove at certain index
     pub fn remove_at(&mut self, index: usize) {
         if index > self.length { panic!("Index out of bounds") }; 
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.length == 0
     }
 }
 

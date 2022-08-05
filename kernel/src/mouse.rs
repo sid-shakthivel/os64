@@ -16,9 +16,8 @@
 */
 
 use crate::spinlock::Lock;
-use crate::CONSOLE;
 use crate::DESKTOP;
-use crate::{print_serial, ps2};
+use crate::{ps2};
 use crate::framebuffer;
 
 #[derive(PartialEq)]

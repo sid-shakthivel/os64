@@ -24,12 +24,8 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::{page_frame_allocator, print_serial};
-use page_frame_allocator::PageFrameAllocator;
-use crate::page_frame_allocator::FrameAllocator;
+use crate::{page_frame_allocator::{PAGE_FRAME_ALLOCATOR, FrameAllocator}};
 use core::prelude::v1::Some;
-
-use crate::CONSOLE;
 
 #[allow(dead_code)]
 enum Flags {
@@ -89,7 +85,7 @@ pub struct Table {
 
 impl Table {
     // When unmapping a page, if there are no other entries, the table can be freed from memory
-    fn drop_table(&mut self, allocator: &mut PageFrameAllocator) {
+    fn drop_table(&mut self) {
         let i = 0;
         for i in 0..self.entries.len() {
             if self.entries[i].entry != 0 {
@@ -99,8 +95,8 @@ impl Table {
         
         // If there are 512 empty entries, the table may be freed
         if i == 512 {
-            // print!("Dropping table\n");
-            allocator.free_frame(self as *const _ as *mut u64);
+            PAGE_FRAME_ALLOCATOR.lock().free_frame(self as *const _ as *mut u64);
+            PAGE_FRAME_ALLOCATOR.free();
         }
     }
 
@@ -108,9 +104,10 @@ impl Table {
     When mapping an address, new tables may have to be created if there are none for a certain memory address
     If there is no table, it is created and then returned
     */
-    fn create_next_table(&mut self, index: usize, allocator: &mut PageFrameAllocator) -> &mut Table {
+    fn create_next_table(&mut self, index: usize) -> &mut Table {
         if self.get_table(index).is_none() {
-            let page_frame = allocator.alloc_frame();
+            let page_frame = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+            PAGE_FRAME_ALLOCATOR.free();
             self.entries[index] = Page::new(page_frame.unwrap() as u64);
         } 
         return self.get_table(index).expect("why not working");
@@ -146,18 +143,16 @@ impl Table {
 pub const P4: *mut Table = 0xffffffff_fffff000 as *mut _;
 
 // The index from the address is used to go to or create tables
-pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut PageFrameAllocator, is_user: bool, optional_p4: Option<*mut Table>) {   
+pub fn map_page(physical_address: u64, virtual_address: u64, is_user: bool) {   
     assert!(virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000, "invalid address: 0x{:x}", virtual_address);
 
-    let mut p4 = unsafe { &mut *P4 };
-
-    if optional_p4.is_none() == false { p4 = unsafe { &mut *(optional_p4.unwrap()) }; }
+    let p4 = unsafe { &mut *P4 };
 
     let (p1_index, p2_index, p3_index, p4_index) = Table::get_indexes(virtual_address);
 
-    let p3 = p4.create_next_table(p4_index,  allocator);
-    let p2 = p3.create_next_table(p3_index, allocator);
-    let p1 = p2.create_next_table(p2_index, allocator);
+    let p3 = p4.create_next_table(p4_index);
+    let p2 = p3.create_next_table(p3_index);
+    let p1 = p2.create_next_table(p2_index);
 
     p1.entries[p1_index] = Page::new(physical_address);
 
@@ -165,61 +160,66 @@ pub fn map_page(physical_address: u64, virtual_address: u64, allocator: &mut Pag
     unsafe { flush_tlb(); }
 }
 
-pub fn unmap_page(virtual_address: u64, allocator: &mut PageFrameAllocator) {
+pub fn unmap_page(virtual_address: u64) {
     // Loop through each table and if empty drop it
     let p4 = unsafe { &mut *P4 };
 
     let (p1_index, p2_index, p3_index, p4_index) = Table::get_indexes(virtual_address);
 
-    let p3 = p4.create_next_table(p4_index,  allocator);
-    p3.drop_table(allocator);
-    let p2 = p3.create_next_table(p3_index, allocator);
-    p2.drop_table(allocator);
-    let p1 = p2.create_next_table(p2_index, allocator);
-    p1.drop_table(allocator);
+    let p3 = p4.create_next_table(p4_index);
+    p3.drop_table();
+    let p2 = p3.create_next_table(p3_index);
+    p2.drop_table();
+    let p1 = p2.create_next_table(p2_index);
+    p1.drop_table();
 
     let frame = p1.entries[p1_index];
     if frame.is_unused() == false {
-        allocator.free_frame(frame.get_physical_address());
+        PAGE_FRAME_ALLOCATOR.lock().free_frame(frame.get_physical_address());
+        PAGE_FRAME_ALLOCATOR.free();
         p1.entries[p1_index].set_unused();
 
         unsafe { flush_tlb(); }
     }
 }
 
-pub fn identity_map(megabytes: u64, page_frame_allocator: &mut PageFrameAllocator, optional_p4: Option<*mut Table>) {
+pub fn identity_map(megabytes: u64, optional_p4: Option<*mut Table>) {
     for address in 0..(megabytes * 256) {
-        map_page(address * 4096, address * 4096, page_frame_allocator, true, optional_p4);
+        map_page(address * 4096, address * 4096, true);
     }
 }
 
-pub fn identity_map_from(start: u64, megabytes: u64, page_frame_allocator: &mut PageFrameAllocator) {
+pub fn identity_map_from(start: u64, megabytes: u64) {
     // let mut test = 0;
     for address in 0..(megabytes * 256) {
         let p_address = start + (address * 4096);
         let v_address = 0x180000 + (address * 4096);
-        map_page(p_address, v_address, page_frame_allocator, false, None);
+        map_page(p_address, v_address, false);
     }
 }
 
 // Creates a deep clone of the paging system 
-pub fn deep_clone(page_frame_allocator: &mut PageFrameAllocator) -> *mut Table {
+pub fn deep_clone() -> *mut Table {
     unsafe {
         let p4 = &mut *P4;
-        let new_p4: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+        let new_p4: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+        PAGE_FRAME_ALLOCATOR.free();
         for i in 0..(*p4).entries.len() - 1 {
             if (*p4).entries[i].entry != 0 {
-                let new_p3: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+                let new_p3: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+                PAGE_FRAME_ALLOCATOR.free();
                 let p3 = p4.get_table(i).unwrap();
 
                 for j in 0..(*p3).entries.len() {
                     if (*p3).entries[j].entry != 0 {
-                        let new_p2: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+                        let new_p2: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+                        PAGE_FRAME_ALLOCATOR.free();
                         let p2 = p3.get_table(j).unwrap();
 
                         for k in 0..(*p2).entries.len() {
                             if (*p2).entries[k].entry != 0 {
-                                let new_p1: *mut Table = page_frame_allocator.alloc_frame().unwrap() as *mut _;
+                                let new_p1: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+                                PAGE_FRAME_ALLOCATOR.free();
                                 let p1 = p2.get_table(k).unwrap();
 
                                 for l in 0..(*p1).entries.len() {

@@ -235,9 +235,9 @@ pub fn init() {
     idt_entry::edit_entry(0x1F, handle_no_err_exception31 , GateType::Trap, PrivilegeLevel::Ring3);
 
     // Interrupts
-    idt_entry::edit_entry(0x20, handle_pit_interrupt, GateType::Interrupt, PrivilegeLevel::Ring3);
-    idt_entry::edit_entry(0x21, handle_interrupt33, GateType::Interrupt, PrivilegeLevel::Ring3);
-    idt_entry::edit_entry(0x2c, handle_interrupt44, GateType::Interrupt, PrivilegeLevel::Ring3);
+    idt_entry::edit_entry(0x20, handle_pit_interrupt, GateType::Interrupt, PrivilegeLevel::Ring3); // Timer
+    idt_entry::edit_entry(0x21, handle_interrupt33, GateType::Interrupt, PrivilegeLevel::Ring3); // PS2 Keyboard
+    idt_entry::edit_entry(0x2c, handle_interrupt44, GateType::Interrupt, PrivilegeLevel::Ring3); // PS2 Mouse
 
     // Syscall
     idt_entry::edit_entry(0x80, handle_syscall, GateType::Interrupt, PrivilegeLevel::Ring3);

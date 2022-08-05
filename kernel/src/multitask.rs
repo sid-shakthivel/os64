@@ -5,7 +5,7 @@
 */
 
 use core::prelude::v1::Some;
-use crate::page_frame_allocator::PageFrameAllocator;
+use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::page_frame_allocator::PAGE_SIZE;
 use core::mem::size_of;
 use crate::spinlock::Lock;
@@ -95,14 +95,15 @@ impl ProcessSchedular {
 
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
-    pub fn init(process_priority: ProcessPriority, page_frame_allocator: &mut PageFrameAllocator) -> Process {
+    pub fn init(process_priority: ProcessPriority) -> Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4
-        let new_p4: *mut Table = paging::deep_clone(page_frame_allocator);
+        let new_p4: *mut Table = paging::deep_clone();
         
         // Create and setup a stack as though an interrupt has been fired
-        let mut rsp = page_frame_allocator.alloc_frame().unwrap(); 
+        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap(); 
+        PAGE_FRAME_ALLOCATOR.free();
 
         unsafe {
             let stack_top = rsp.offset(511) as u64;

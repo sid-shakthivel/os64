@@ -21,8 +21,7 @@ Start with the deepest window to the shallowest (recursive algorithm)
 Copy each window buffer to screen buffer and use compare memory - if different write (perhaps using SSE)
 Give mouse/keyboard event to each window and let them decide whether to process (check position overlaps)
 
-Make pf allocator globally available
-Continue clipping system (remove rectangles, )
+Continue clipping system (remove rectangles, add properly)
 Change colour scheme, title bar, etc
 Give each window clipping area 
 - Push out (subtract window areas) for subwindows

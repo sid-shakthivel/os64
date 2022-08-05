@@ -15,14 +15,13 @@
 
 #![allow(dead_code)]
 
-use crate::interrupts::Registers;
+use crate::paging;
 use crate::spinlock::Lock;
 use crate::writer::Writer;
 use lazy_static::lazy_static;
 use multiboot2::FramebufferTag;
 
-use crate::page_frame_allocator::{FrameAllocator, PageFrameAllocator};
-use crate::paging::{self, Page};
+use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::print_serial;
 use crate::CONSOLE;
 
@@ -57,16 +56,9 @@ impl Desktop {
         }
     }
 
-    pub fn create_window(
-        &mut self,
-        x: u64,
-        y: u64,
-        width: u64,
-        height: u64,
-        mut pf_allocator: &mut PageFrameAllocator,
-    ) {
-        // let test = &mut pf_allocator;
-        let p_window: *mut Window = pf_allocator.alloc_frame().unwrap() as *mut _;
+    pub fn create_window(&mut self, x: u64, y: u64, width: u64, height: u64) {
+        let p_window: *mut Window = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+        PAGE_FRAME_ALLOCATOR.free();
 
         let window = unsafe { &mut *p_window };
         window.init(x, y, width, height, self.get_rand_colour());
@@ -89,42 +81,33 @@ impl Desktop {
         self.count += 1;
 
         // Create new rectangle which are rendered upon the screen
-        // let new_rectangle = Rectangle::new(window.y, window.y + window.height, window.x, window.x + window.width, &mut pf_allocator);
-
-        let p_rectangle: *mut Rectangle = pf_allocator.alloc_frame().unwrap() as *mut _;
-        let new_rectangle = unsafe { &mut *p_rectangle };
-        new_rectangle.top = window.y;
-        new_rectangle.bottom = window.y + window.height;
-        new_rectangle.left = window.x;
-        new_rectangle.right = window.x + window.width;
-        new_rectangle.next = None;
-
-        self.add_clipped_rect(new_rectangle, pf_allocator);
+        let new_rectangle = Rectangle::new(
+            window.y,
+            window.y + window.height,
+            window.x,
+            window.x + window.width,
+        );
+        self.add_clipped_rect(new_rectangle);
     }
 
-    fn add_clipped_rect(
-        &mut self,
-        new_rectangle: &mut Rectangle,
-        mut pf_allocator: &mut PageFrameAllocator,
-    ) {
+    fn add_clipped_rect(&mut self, new_rectangle: &mut Rectangle) {
         let mut current_rect = self.head_rect;
         if current_rect.is_some() {
             let unwrapped_rect = unsafe { &mut *(current_rect.unwrap()) };
 
             // Check for overlap with other rectangles
             // If there is no overlap, no need for snipping so skip
-            if !(unwrapped_rect.left <= new_rectangle.right &&
-                unwrapped_rect.right >= new_rectangle.left &&
-                unwrapped_rect.top <= new_rectangle.bottom &&
-                unwrapped_rect.bottom >= new_rectangle.top)
+            if !(unwrapped_rect.left <= new_rectangle.right
+                && unwrapped_rect.right >= new_rectangle.left
+                && unwrapped_rect.top <= new_rectangle.bottom
+                && unwrapped_rect.bottom >= new_rectangle.top)
             {
                 // continue;
             } else {
-                 // Split and add to rect's linked list
-                let rectangles = Rectangle::split(unwrapped_rect, new_rectangle, &mut pf_allocator);
+                // Split and add to rect's linked list
+                let rectangles = Rectangle::split(unwrapped_rect, new_rectangle);
 
-                // Remove subject rect and replace with the split ones
-                // Temp fix
+                // Remove subject rect and replace with the split ones TODO: Temp fix
                 self.head_rect = rectangles;
 
                 current_rect = unwrapped_rect.next;
@@ -304,8 +287,10 @@ struct Rectangle {
 }
 
 impl Rectangle {
-    pub fn new(top: u64, bottom: u64, left: u64, right: u64, pf_allocator: &mut PageFrameAllocator) -> &mut Rectangle {
-        let p_rectangle: *mut Rectangle = pf_allocator.alloc_frame().unwrap() as *mut _;
+    pub fn new(top: u64, bottom: u64, left: u64, right: u64) -> &'static mut Rectangle {
+        let p_rectangle: *mut Rectangle =
+            PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+        PAGE_FRAME_ALLOCATOR.free();
         let rectangle = unsafe { &mut *p_rectangle };
         rectangle.top = top;
         rectangle.bottom = bottom;
@@ -318,13 +303,13 @@ impl Rectangle {
         Method is called upon the subject rect, given a clipping rect
         Returns a list of rectangles that can be drawn
     */
-    fn split(&mut self, clipping_rect: &mut Rectangle, pf_allocator: &mut PageFrameAllocator) -> Option<*mut Rectangle> {
+    fn split(&mut self, clipping_rect: &mut Rectangle) -> Option<*mut Rectangle> {
         let mut new_rectangles: Option<*mut Rectangle> = None;
         print_serial!("Splitting rect\n");
         // Check left side of subject to right side of clipping
         if clipping_rect.left > self.left && clipping_rect.left < self.right {
             // Make new rect with updated coordinates
-            let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left, pf_allocator);
+            let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left);
 
             // Update current rectangle to match (update left)
             self.left = new_rect.right;
@@ -340,7 +325,7 @@ impl Rectangle {
 
         // Compare subject bottom to clipping top
         if clipping_rect.top > self.top && clipping_rect.top < self.bottom {
-            let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right, pf_allocator);
+            let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right);
 
             // Update current rectange to match (update top)
             self.top = new_rect.bottom;
@@ -355,7 +340,7 @@ impl Rectangle {
         }
 
         if clipping_rect.right > self.left && clipping_rect.right < self.right {
-            let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left, pf_allocator);
+            let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left);
             self.left = clipping_rect.left;
 
             if new_rectangles.is_none() {
@@ -368,7 +353,7 @@ impl Rectangle {
         }
 
         if clipping_rect.bottom > self.top && clipping_rect.bottom < self.bottom {
-            let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right, pf_allocator);
+            let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right);
             self.left = clipping_rect.left;
 
             if new_rectangles.is_none() {
@@ -504,7 +489,7 @@ impl Writer for Framebuffer {
     }
 }
 
-pub fn init(framebuffer_tag: FramebufferTag, page_frame_allocator: &mut PageFrameAllocator) {
+pub fn init(framebuffer_tag: FramebufferTag) {
     let font_end = unsafe { &_binary_font_psf_end as *const _ as u32 };
     let font_size = unsafe { &_binary_font_psf_size as *const _ as u32 };
     let font_start = font_end - font_size;
@@ -513,7 +498,7 @@ pub fn init(framebuffer_tag: FramebufferTag, page_frame_allocator: &mut PageFram
     FRAMEBUFFER.lock().pitch = framebuffer_tag.pitch as u64;
     FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;
 
-    paging::identity_map_from(framebuffer_tag.address, 3, page_frame_allocator);
+    paging::identity_map_from(framebuffer_tag.address, 3);
 }
 
 extern "C" {

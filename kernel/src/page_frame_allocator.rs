@@ -7,62 +7,15 @@ It returns the physical start address of a page frame
 A stack of free pages along with a pointer to the first page will be used in order to keep track of pages
 */
 
+use crate::{list::Stack, spinlock::Lock};
 use core::prelude::v1::Some;
-use multiboot2::load;
-
-/*
-Each frame must store a reference to the next frame along with physical meta data (value is for testing)
-*/
-#[derive(Debug)]
-pub struct Frame {
-    pub next_frame: Option<*mut Frame>,
-}
-
-pub struct Stack {
-    pub current: Option<*mut Frame>,
-    pub length: u64,
-}
+use multiboot2::BootInformation;
 
 pub struct PageFrameAllocator {
+    pub free_frames: Stack<u64>,
+    pub current_page: u64,
     memory_end: u64,
-    pub free_frames: &'static mut Stack,
-    pub current_page: *mut u64,
-}
-
-/*
-Basic operations any data structure should be able to do
-Can be used when building vectors, stacks, queues, etc
-*/
-pub trait Operations {
-    fn is_empty(&self) -> bool;
-    fn push(&mut self, node: *mut Frame);
-    fn pop(&mut self) -> Option<*mut Frame>;
-}
-
-impl Operations for Stack {
-    fn is_empty(&self) -> bool {
-        self.length == 0
-    }
-
-    fn push(&mut self, node: *mut Frame) {
-        unsafe {
-            (*node).next_frame = self.current;
-        }
-        self.current = Some(node);
-        self.length += 1;
-    }
-
-    fn pop(&mut self) -> Option<*mut Frame> {
-        let old_current = self.current.clone();
-        self.length -= 1;
-        unsafe {
-            self.current = match self.current {
-                Some(frame) => (*frame).next_frame,
-                _ => None,
-            };
-        }
-        old_current
-    }
+    page_count: u64,
 }
 
 pub trait FrameAllocator {
@@ -72,47 +25,49 @@ pub trait FrameAllocator {
 
 impl FrameAllocator for PageFrameAllocator {
     /*
-    Check the stack for any known free frames and pop it
-    If there are no free frames, increment the pointer to the next frame and return that
+    Check the free frames stack for frames and pop it from the stack and return the address
+    Else increment the address to the next frame and return that
     */
     fn alloc_frame(&mut self) -> Option<*mut u64> {
         if self.free_frames.is_empty() {
-            // Current Page is a 64 bit address thus 1 page is 512 64 bits (4096 bytes in a page)
-            unsafe {
-                if (self.current_page.offset(512) as u64) < self.memory_end {
-                    self.current_page = self.current_page.offset(512);
-                    return Some(self.current_page);
-                } else {
-                    // Ran out of memory
-                    return None;
-                }
+            if (self.current_page + 4096) < self.memory_end {
+                self.current_page += 4096;
+                return Some(self.current_page as *mut u64);
+            } else {
+                // Reached memory limit
+                return None;
             }
         } else {
-            return match self.free_frames.pop() {
-                Some(frame) => unsafe { Some(&mut *(frame as *mut u64)) },
-                _ => None,
-            };
+            return Some(self.free_frames.pop() as *mut u64);
         }
     }
 
     /*
-    Build a new frame struct and store it in the memory address of the freed page
-    Push it to the end of the stack
+    Store reference to frame struct in memory and add to start of stack
+    Freed page isn't used by any process and thus can be safely written to
     */
     fn free_frame(&mut self, frame_address: *mut u64) {
-        let new_free_frame = unsafe { &mut *(frame_address as *mut Frame) };
-        self.free_frames.push(new_free_frame);
+        self.free_frames.push(frame_address as u64, self.page_count);
+        self.page_count += 1;
     }
 }
 
 impl PageFrameAllocator {
-    pub fn new(multiboot_information_address: usize) -> PageFrameAllocator {
-        let boot_info = unsafe { load(multiboot_information_address as usize).unwrap() };
-        let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
+    pub const fn new() -> Self {
+        PageFrameAllocator {
+            free_frames: Stack::<u64>::new(),
+            current_page: 0,
+            memory_end: 0,
+            page_count: 0,
+        }
+    }
 
+    pub fn init(&mut self, boot_info: &BootInformation) {
+        let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
         let mut memory_start: u64 =
             (boot_info.end_address() as u64) + (500000 as u64) & 0x000fffff_fffff000;
-        memory_start = 4714496 & 0x000fffff_fffff000; // TODO: Fix this temp fix
+        memory_start = 4714496 & 0x000fffff_fffff000; // TODO: Fix this temp fix (memory starts after framebuffer)
+
         let memory_end: u64 = memory_map_tag
             .memory_areas()
             .last()
@@ -120,19 +75,11 @@ impl PageFrameAllocator {
             .end_address()
             & 0x000fffff_fffff000;
 
-        let mut page_frame_allocator = PageFrameAllocator {
-            memory_end: memory_end,
-            current_page: unsafe { &mut *(memory_start as *mut u64) },
-            free_frames: unsafe { &mut *(memory_start as *mut Stack) },
-        };
-        page_frame_allocator.setup_stack();
-        return page_frame_allocator;
-    }
-
-    pub fn setup_stack(&mut self) {
-        self.free_frames.length = 0;
-        self.free_frames.current = None;
+        self.current_page = memory_start;
+        self.memory_end = memory_end;
     }
 }
+
+pub static PAGE_FRAME_ALLOCATOR: Lock<PageFrameAllocator> = Lock::new(PageFrameAllocator::new()); 
 
 pub const PAGE_SIZE: usize = 4096;

@@ -23,8 +23,8 @@
 
 use core::mem;
 use crate::multitask::USER_PROCESS_START_ADDRESS;
+use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::page_frame_allocator::PAGE_SIZE;
-use crate::page_frame_allocator::PageFrameAllocator;
 use crate::page_frame_allocator::FrameAllocator;
 use crate::paging;
 
@@ -113,10 +113,10 @@ enum ProgramHeaderType
     PtLoad = 1, // loadable segment
 }
 
-pub fn parse(file_start: u64, page_frame_allocator: &mut PageFrameAllocator) {
+pub fn parse(file_start: u64) {
     let elf_header = unsafe { &*(file_start as *const ElfHeader) };
     validate_file(elf_header);
-    parse_program_headers(file_start, elf_header, page_frame_allocator);
+    parse_program_headers(file_start, elf_header);
     // elf::parse_segment_headers(file_start, elf_header, page_frame_allocator);
 }
 
@@ -135,7 +135,7 @@ fn validate_file(elf_header: &ElfHeader) -> bool {
 }
 
 // Elf program headers specify where segments are located
-fn parse_program_headers(file_start: u64, elf_header: &ElfHeader, page_frame_allocator: &mut PageFrameAllocator) {
+fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
     // Loop through the headers and load each loadable segment into memory
     for i in 0..elf_header.e_phnum {
         let address = file_start + elf_header.e_phoff + (mem::size_of::<ElfProgramHeader>() as u64) * (i as u64);
@@ -145,7 +145,7 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader, page_frame_all
             0 => {
                 let source = file_start + program_header.p_offset as u64;
                 if program_header.p_memsz != program_header.p_filesz { panic!("Segment is padded with 0's\n"); }
-                load_segment_into_memory(source, program_header.p_memsz, i as u64, page_frame_allocator);
+                load_segment_into_memory(source, program_header.p_memsz, i as u64);
             }
             1 => {},
             _ => panic!("Unknown\n"),
@@ -153,7 +153,7 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader, page_frame_all
     }
 }
 
-fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader, page_frame_allocator: &mut PageFrameAllocator) {
+fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader) {
     // Loop through sections
     for i in 0..(elf_header.e_shnum) {
         // let address = file_start + elf_header.e_shoff + (mem::size_of::<ElfSectionHeader>() as u64) * (i as u64);
@@ -163,12 +163,13 @@ fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader, page_frame_all
     }
 }
 
-fn load_segment_into_memory(source_raw: u64, size: u64, index: u64, page_frame_allocator: &mut PageFrameAllocator) {
+fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {
     if size > (PAGE_SIZE as u64) { panic!("Segment is over 1 page"); } 
 
     // Allocate memory for the segment
     // TODO: Implement system to have continuous memory range 
-    let dest = page_frame_allocator.alloc_frame().unwrap();
+    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap();
+    PAGE_FRAME_ALLOCATOR.free();
     let source = source_raw as *mut u64;
 
     // Copy segment data into the memory space
@@ -178,5 +179,5 @@ fn load_segment_into_memory(source_raw: u64, size: u64, index: u64, page_frame_a
 
     // Map the physical pages to 0x800000
     let v_address = USER_PROCESS_START_ADDRESS + (index * 0x1000) as u64;
-    paging::map_page(dest as u64, v_address, page_frame_allocator, true, None);
+    paging::map_page(dest as u64, v_address, true);
 }
