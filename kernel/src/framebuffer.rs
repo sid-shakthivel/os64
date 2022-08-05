@@ -322,7 +322,7 @@ impl Rectangle {
         let mut new_rectangles: Option<*mut Rectangle> = None;
         print_serial!("Splitting rect\n");
         // Check left side of subject to right side of clipping
-        if clipping_rect.left < self.right {
+        if clipping_rect.left > self.left && clipping_rect.left < self.right {
             // Make new rect with updated coordinates
             let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left, pf_allocator);
 
@@ -339,11 +339,37 @@ impl Rectangle {
         }
 
         // Compare subject bottom to clipping top
-        if clipping_rect.top > self.top {
+        if clipping_rect.top > self.top && clipping_rect.top < self.bottom {
             let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right, pf_allocator);
 
             // Update current rectange to match (update top)
             self.top = new_rect.bottom;
+
+            if new_rectangles.is_none() {
+                new_rectangles = Some(new_rect as *mut Rectangle);
+            } else {
+                unsafe {
+                    (*new_rectangles.unwrap()).next = Some(new_rect as *mut Rectangle);
+                }
+            }
+        }
+
+        if clipping_rect.right > self.left && clipping_rect.right < self.right {
+            let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left, pf_allocator);
+            self.left = clipping_rect.left;
+
+            if new_rectangles.is_none() {
+                new_rectangles = Some(new_rect as *mut Rectangle);
+            } else {
+                unsafe {
+                    (*new_rectangles.unwrap()).next = Some(new_rect as *mut Rectangle);
+                }
+            }
+        }
+
+        if clipping_rect.bottom > self.top && clipping_rect.bottom < self.bottom {
+            let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right, pf_allocator);
+            self.left = clipping_rect.left;
 
             if new_rectangles.is_none() {
                 new_rectangles = Some(new_rect as *mut Rectangle);
