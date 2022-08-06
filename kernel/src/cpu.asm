@@ -20,6 +20,12 @@ outpw_raw:
   out dx, ax
   ret
 
+global inpw_raw
+inpw_raw:
+  mov dx, di ; Address (16 Bit) 
+  in ax, dx
+  ret
+
 ; Load IDT
 global idt_flush    
 idt_flush:

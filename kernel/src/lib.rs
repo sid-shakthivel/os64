@@ -1,7 +1,7 @@
 // src/lib.rs
 
 #![no_std] // Don't link with Rust standard library
-#![feature(associated_type_bounds)]
+#![feature(associated_type_bounds)] // Magic which makes the page frame allocator work 
 #![feature(generic_associated_types)]
 #![feature(const_option)]
 #![feature(const_mut_refs)]
@@ -50,6 +50,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     PAGE_FRAME_ALLOCATOR.lock().init(&boot_info);
     PAGE_FRAME_ALLOCATOR.free();
 
+    grub::bga_set_video_mode();
+
     framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
     uart::init();
@@ -66,12 +68,12 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
         .lock()
         .create_window(10, 10, 300, 300); // small green
     DESKTOP.free();
+
     DESKTOP
         .lock()
         .create_window(200, 150, 400, 400); // square red
     DESKTOP.free();
-    // DESKTOP.lock().create_window(200, 100, 200, 600, &mut pf_allocator); // long yellow
-    // DESKTOP.free();
+
     let mouse_x = MOUSE.lock().mouse_x;
     MOUSE.free();
     let mouse_y = MOUSE.lock().mouse_y;

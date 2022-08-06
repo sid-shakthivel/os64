@@ -9,7 +9,7 @@ pub struct Node<T: 'static> {
 }
 
 // LIFO (Last in, First out)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Stack<T: 'static> {
     pub head: Option<*mut Node<T>>,
     pub tail: Option<*mut Node<T>>,
@@ -22,7 +22,10 @@ impl<'a, T> IntoIterator for &'a Stack<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         StackIntoIterator {
-            current: unsafe { Some(& *self.head.unwrap()) }
+            current: match self.head {
+                Some(head) => unsafe { Some(&* head) },
+                _ => None,
+            }
         }
     }
 }
@@ -97,9 +100,40 @@ impl<T: Clone> Stack<T> {
         head.expect("Attempted to pop from an empty item")
     }
 
-    // TODO: Will remove at certain index
-    pub fn remove_at(&mut self, index: usize) {
+    pub fn remove_at(&mut self, index: usize) -> *mut Node<T> {
         if index > self.length { panic!("Index out of bounds") }; 
+        if index == self.length { return self.pop_tail(); }
+
+        match index {
+            0 => self.pop(),
+            _ => {
+                let node = self.into_iter().nth(index).unwrap().unwrap();
+                unsafe {
+                    (*node.prev.unwrap()).next = node.next;
+                    (*node.next.unwrap()).prev = node.prev;
+
+                    let const_ptr = node as *const Node<T>;
+                    const_ptr as *mut Node<T>
+                }
+            }
+        }
+    }
+
+    fn pop_tail(&mut self) -> *mut Node<T> {
+        unsafe {
+            let clone = self.tail;
+            if self.head == self.tail {
+                // If only 1 node, make both null
+                self.tail = None;
+                self.head = None;
+            } else {
+                // Make second to last node the new tail and give it a next of None
+                let new_tail = (*self.tail.unwrap()).prev;
+                (*new_tail.unwrap()).next = None;
+                self.tail = new_tail;
+            }
+            return clone.unwrap();
+        }
     }
 
     pub fn is_empty(&self) -> bool {

@@ -3,16 +3,37 @@
 // src/grub.rs
 
 /*
-    Grub loads a number of modules into certain memory locations which need to be mapped into user pages
-    These modules serve as user programs which will be embellished later
+    Grub 2 (GNU bootloader) is a bootloader which uses a header file to configure options
+    Grub loads a number of modules(user programs) into certain memory locations which need to be mapped into user pages
+    Grub emulates VGA card 
+    BGA (Bochs Graphic Updator) is accessible via 2 ports (index, data) in which it's possible to enable/disable VBE extentions
+    Includes changing screen resolution, dit depth | Latest version is 0xB0C5
+
+
 */
 
 use multiboot2::{BootInformation};
 use crate::elf;
+use crate::framebuffer;
 use crate::fs;
 use crate::multitask;
+use crate::ports::inpw;
+use crate::ports::outpw;
 
 const FILESYSTEM_ON: bool = false;
+const VBE_DISPI_IOPORT_INDEX: u16 = 0x01CE;
+const VBE_DISPI_IOPORT_DATA: u16 = 0x01CF;
+const VBE_DISPI_INDEX_ID: u16 = 0;
+const VBE_DISPI_INDEX_XRES: u16 = 1;
+const VBE_DISPI_INDEX_YRES: u16 = 2;
+const VBE_DISPI_INDEX_BPP: u16 = 3;
+const VBE_DISPI_INDEX_ENABLE: u16 = 4;
+const VBE_DISPI_INDEX_BANK: u16 = 5;
+const VBE_DISPI_INDEX_VIRT_WIDTH: u16 = 6;
+const VBE_DISPI_INDEX_VIRT_HEIGHT: u16 = 7;
+const VBE_DISPI_INDEX_X_OFFSET: u16 = 8;
+const VBE_DISPI_INDEX_Y_OFFSET: u16 = 9;
+const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
 pub fn initialise_userland(boot_info: &BootInformation) {
     let mut i = 0; // TODO: Find a cleaner solution when have wifi
@@ -35,19 +56,25 @@ pub fn initialise_userland(boot_info: &BootInformation) {
 }
 
 pub fn bga_set_video_mode() {
-    write_bga_register(4, 0);
-    write_bga_register(1, 1024);
-    write_bga_register(2, 768);
-    write_bga_register(3, 0x20);
-    write_bga_register(4, 1);
-    write_bga_register(5, 0x40 | 0x1); // Linear frame buffer
+    if !is_bga_available() { panic!("BGA is not available"); }
+    write_bga_register(VBE_DISPI_INDEX_ENABLE, 0x00); // To modify contents of other registers, VBE extensions must be disabled
+    write_bga_register(VBE_DISPI_INDEX_XRES, framebuffer::SCREEN_WIDTH as u16);
+    write_bga_register(VBE_DISPI_INDEX_YRES, framebuffer::SCREEN_HEIGHT as u16);
+    write_bga_register(VBE_DISPI_INDEX_BPP, 0x20);
+    write_bga_register(VBE_DISPI_INDEX_ENABLE, 0x01);
+    write_bga_register(VBE_DISPI_INDEX_BANK, VBE_DISPI_LFB_ENABLED | 0x1); // Linear frame buffer
 }
 
 fn write_bga_register(index: u16, value: u16) {
-    unsafe {
-        // outpw_raw(0x01CE, index);
-        // outpw_raw(0x01CF, value);
-    }
+    outpw(VBE_DISPI_IOPORT_INDEX, index);
+    outpw(VBE_DISPI_IOPORT_DATA, value); 
 }
 
-// TODO: write up https://wiki.osdev.org/Bochs_VBE_Extensions
+fn read_bga_register(index: u16) -> u16 {
+    outpw(VBE_DISPI_IOPORT_INDEX, index);
+    return inpw(VBE_DISPI_IOPORT_DATA);
+}
+
+fn is_bga_available() -> bool {
+    return read_bga_register(VBE_DISPI_INDEX_ID) == 0xB0C5
+}
