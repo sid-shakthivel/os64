@@ -1,5 +1,7 @@
 // src/list.rs
 
+use crate::{page_frame_allocator::{PAGE_FRAME_ALLOCATOR, FrameAllocator}, print_serial};
+
 // Each node stores a reference to the next/previous node within the list along with a payload
 #[derive(Debug)]
 pub struct Node<T: 'static> {
@@ -86,9 +88,11 @@ impl<T: Clone> Stack<T> {
         let head = self.head.clone();
         if self.head.is_some() {
             unsafe {
-                // Update head to become next value and update the prev value
+                // Update head to become next value and update the prev value if it's not None
                 self.head = (*self.head.unwrap()).next;
-                (*self.head.unwrap()).prev = None;
+                if self.head.is_some() {
+                    (*self.head.unwrap()).prev = None;
+                }
 
                 if self.head.is_none() {
                     self.tail = None;
@@ -100,6 +104,7 @@ impl<T: Clone> Stack<T> {
         head.expect("Attempted to pop from an empty item")
     }
 
+    // Removes a node of a linked list given position
     pub fn remove_at(&mut self, index: usize) -> *mut Node<T> {
         if index > self.length { panic!("Index out of bounds") }; 
         if index == self.length { return self.pop_tail(); }
@@ -107,6 +112,7 @@ impl<T: Clone> Stack<T> {
         match index {
             0 => self.pop(),
             _ => {
+                self.length -= 1;
                 let node = self.into_iter().nth(index).unwrap().unwrap();
                 unsafe {
                     (*node.prev.unwrap()).next = node.next;
@@ -117,6 +123,19 @@ impl<T: Clone> Stack<T> {
                 }
             }
         }
+    }
+
+    // Returns all nodes of a linked list above a certain index
+    // Uses page frame allocator to create new list
+    pub fn get_above_nodes(&self, index: usize) -> Stack<T> {
+        let mut new_stack = Stack::<T>::new();
+        for (i, node) in self.into_iter().enumerate() {
+            if i == index { break; }
+            new_stack.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64, node.unwrap().payload.clone());
+            PAGE_FRAME_ALLOCATOR.free();
+        }
+        new_stack.length = index;
+        return new_stack;
     }
 
     fn pop_tail(&mut self) -> *mut Node<T> {
@@ -132,6 +151,7 @@ impl<T: Clone> Stack<T> {
                 (*new_tail.unwrap()).next = None;
                 self.tail = new_tail;
             }
+            self.length -= 1;
             return clone.unwrap();
         }
     }

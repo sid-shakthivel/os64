@@ -90,7 +90,7 @@ impl Mouse {
         // }
 
         // Clear mouse coordiantes before updating
-        crate::framebuffer::Framebuffer::fill_rect(self.mouse_x, self.mouse_y, 5, 5, 0x00);
+        crate::framebuffer::Framebuffer::fill_rect(None, self.mouse_x, self.mouse_y, 5, 5, 0x00);
 
         // X movement and Y movement values must be read as a 9 bit or greater SIGNED value if bit is enabled
         if self.mouse_packets[0] & (1 << 4) == 0x10 {
@@ -98,7 +98,7 @@ impl Mouse {
                 .mouse_x
                 .wrapping_add(self.sign_extend(self.mouse_packets[1]) as u64);
         } else {
-            self.mouse_x = self.mouse_x.wrapping_add(self.mouse_packets[1] as u64);
+            self.mouse_x = self.mouse_x.wrapping_add(self.mouse_packets[1] as u64) ;
         }
 
         if self.mouse_packets[0] & (1 << 5) == 0x20 {
