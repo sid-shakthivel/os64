@@ -1,7 +1,7 @@
 // src/lib.rs
 
 #![no_std] // Don't link with Rust standard library
-#![feature(associated_type_bounds)] // Magic which makes the page frame allocator work 
+#![feature(associated_type_bounds)] // Magic which makes the page frame allocator work
 #![feature(generic_associated_types)]
 #![feature(const_option)]
 #![feature(const_mut_refs)]
@@ -35,7 +35,7 @@ extern crate x86_64;
 
 use crate::framebuffer::DESKTOP;
 use crate::mouse::MOUSE;
-use crate::page_frame_allocator::{PAGE_FRAME_ALLOCATOR};
+use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
@@ -64,14 +64,12 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     interrupts::enable();
 
-    DESKTOP
-        .lock()
-        .create_window(10, 10, 300, 300); // small green
+    DESKTOP.lock().create_window(10, 10, 300, 300); // small green
     DESKTOP.free();
 
     DESKTOP
         .lock()
-        .create_window(200, 150, 400, 400); // square red
+        .create_window(300, 150, 400, 400); // square red
     DESKTOP.free();
 
     let mouse_x = MOUSE.lock().mouse_x;
@@ -97,3 +95,5 @@ fn panic(info: &PanicInfo) -> ! {
     print_serial!("Error: {}", info);
     loop {}
 }
+
+

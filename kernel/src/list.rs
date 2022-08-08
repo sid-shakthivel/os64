@@ -1,6 +1,9 @@
 // src/list.rs
 
-use crate::{page_frame_allocator::{PAGE_FRAME_ALLOCATOR, FrameAllocator}, print_serial};
+use crate::{
+    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
+    print_serial,
+};
 
 // Each node stores a reference to the next/previous node within the list along with a payload
 #[derive(Debug)]
@@ -19,32 +22,34 @@ pub struct Stack<T: 'static> {
 }
 
 impl<'a, T> IntoIterator for &'a Stack<T> {
-    type Item =  Option<&'a Node<T>>;
+    type Item = Option<&'a Node<T>>;
     type IntoIter = StackIntoIterator<'a, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         StackIntoIterator {
             current: match self.head {
-                Some(head) => unsafe { Some(&* head) },
+                Some(head) => unsafe { Some(&*head) },
                 _ => None,
-            }
+            },
         }
     }
 }
 pub struct StackIntoIterator<'a, T: 'static> {
-    current: Option<&'a Node<T>>
+    current: Option<&'a Node<T>>,
 }
 
 impl<'a, T> Iterator for StackIntoIterator<'a, T> {
-    type Item =  Option<&'a Node<T>>;
+    type Item = Option<&'a Node<T>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let saved_current = self.current;
-        if saved_current.is_none() { return None; }
+        if saved_current.is_none() {
+            return None;
+        }
 
         let next = self.current.unwrap().next;
-        if next.is_some() { 
-            self.current = unsafe { Some(& *next.unwrap()) } 
+        if next.is_some() {
+            self.current = unsafe { Some(&*next.unwrap()) }
         } else {
             self.current = None;
         }
@@ -106,8 +111,12 @@ impl<T: Clone> Stack<T> {
 
     // Removes a node of a linked list given position
     pub fn remove_at(&mut self, index: usize) -> *mut Node<T> {
-        if index > self.length { panic!("Index out of bounds") }; 
-        if index == self.length { return self.pop_tail(); }
+        if index > self.length {
+            panic!("Index out of bounds")
+        };
+        if index == self.length {
+            return self.pop_tail();
+        }
 
         match index {
             0 => self.pop(),
@@ -130,8 +139,13 @@ impl<T: Clone> Stack<T> {
     pub fn get_above_nodes(&self, index: usize) -> Stack<T> {
         let mut new_stack = Stack::<T>::new();
         for (i, node) in self.into_iter().enumerate() {
-            if i == index { break; }
-            new_stack.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64, node.unwrap().payload.clone());
+            if i == index {
+                break;
+            }
+            new_stack.push(
+                PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+                node.unwrap().payload.clone(),
+            );
             PAGE_FRAME_ALLOCATOR.free();
         }
         new_stack.length = index;

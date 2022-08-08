@@ -15,10 +15,10 @@
     Byte 3: Y Movement
 */
 
+use crate::framebuffer;
+use crate::ps2;
 use crate::spinlock::Lock;
 use crate::DESKTOP;
-use crate::{ps2};
-use crate::framebuffer;
 
 #[derive(PartialEq)]
 pub enum MouseState {
@@ -67,6 +67,7 @@ impl Mouse {
     }
 
     fn handle_mouse_packets(&mut self) {
+        let mut is_left_clicked = false;
         // Check overflows, if set, discard packet
         if self.mouse_packets[0] & (1 << 7) >= 0x80 || self.mouse_packets[0] & (1 << 6) >= 0x40 {
             return; // TODO: Add an error
@@ -79,6 +80,7 @@ impl Mouse {
 
         // Left button pressed
         if self.mouse_packets[0] & (1 << 0) == 1 {
+            is_left_clicked = true;
             self.mouse_state = MouseState::Down;
         } else {
             self.mouse_state = MouseState::Up;
@@ -90,7 +92,7 @@ impl Mouse {
         // }
 
         // Clear mouse coordiantes before updating
-        crate::framebuffer::Framebuffer::fill_rect(None, self.mouse_x, self.mouse_y, 5, 5, 0x00);
+        crate::framebuffer::Framebuffer::fill_rect(None, self.mouse_x, self.mouse_y, 5, 5, framebuffer::BACKGROUND_COLOUR);
 
         // X movement and Y movement values must be read as a 9 bit or greater SIGNED value if bit is enabled
         if self.mouse_packets[0] & (1 << 4) == 0x10 {
@@ -98,7 +100,7 @@ impl Mouse {
                 .mouse_x
                 .wrapping_add(self.sign_extend(self.mouse_packets[1]) as u64);
         } else {
-            self.mouse_x = self.mouse_x.wrapping_add(self.mouse_packets[1] as u64) ;
+            self.mouse_x = self.mouse_x.wrapping_add(self.mouse_packets[1] as u64);
         }
 
         if self.mouse_packets[0] & (1 << 5) == 0x20 {
@@ -127,7 +129,7 @@ impl Mouse {
 
         DESKTOP
             .lock()
-            .handle_mouse_movement(self.mouse_x, self.mouse_y);
+            .handle_mouse_movement(self.mouse_x, self.mouse_y, is_left_clicked);
         DESKTOP.free();
     }
 

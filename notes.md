@@ -10,6 +10,7 @@ TODO:
 - Port dart (git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash)
 
 Refactoring Tasks:
+- Free memory properly
 - Address todos
 - Bitflags
 - Improve spinlock
@@ -22,39 +23,14 @@ Copy each window buffer to screen buffer and use compare memory - if different w
 Give mouse/keyboard event to each window and let them decide whether to process (check position overlaps)
 
 Now:
-Fix bugs
-Change colour scheme, title bar, uniformity, etc
-Ensure freeing/dragging works properly
-Get background rendered properly onto screen
+Ensure clipping works properly as intended
+Malloc/Free
+Background (https://forum.osdev.org/viewtopic.php?f=13&t=30154) or render background (rbg file) (https://wiki.osdev.org Drawing_In_a_Linear_Framebuffer)
 
 Future:
-Double buffering
 Dirty rectangles when dragging windows
+Double buffering (back/front buffer)
+Improve performance (https://wiki.osdev.org/GUI)
 Build a small kernel land application
 Implement closing windows
-
-(HEAD) Red => Green (TAIL)
-
-Red (Forground)
-Green (Background)
-Green should not render completly as red is above and is ahead of red anyway
-
-check if overlaps with clipping_rect
-Red over green (Correct)
-
-Figure out a better way to check against clipping rects?
-
-When we get to green
-Should recognize there is red ahead of it
-Should split the shape up
-Should subtract the green away
-Should loop through clipping rects and render them
-
-Green - subject
-Red - clip
-
-Clipping rects are what we want to render
-2nd window not rendered?
-max_x is the issue
-
-16:21
+Dragging only upon title bar

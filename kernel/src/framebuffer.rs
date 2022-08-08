@@ -31,10 +31,10 @@ use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 
 pub const SCREEN_WIDTH: u64 = 1024;
 pub const SCREEN_HEIGHT: u64 = 768;
-const WINDOW_BACKGROUND_COLOUR: u32 = 0xb4b3b4;
-const BACKGROUND_COLOUR: u32 = 0x0095fe;
-const WINDOW_BORDER_COLOUR: u32 = 0x00;
-const WINDOW_TITLE_COLOUR: u32 = 0xb0c7da;
+const WINDOW_BACKGROUND_COLOUR: u32 = 0xFFBBBBBB;
+pub const BACKGROUND_COLOUR: u32 = 0x3499fe;
+const WINDOW_BORDER_COLOUR: u32 = 0xFF000000;
+const WINDOW_TITLE_COLOUR: u32 = 0x7092be;
 
 #[derive(Debug, Clone)]
 pub struct Desktop {
@@ -48,6 +48,7 @@ pub struct Desktop {
 pub static DESKTOP: Lock<Desktop> = Lock::new(Desktop::new());
 
 impl Desktop {
+    // The order of windows is maintained through the stack in which the top most window is at the front and the bottom window is at the back
     pub const fn new() -> Desktop {
         Desktop {
             windows: Stack::<Window>::new(),
@@ -59,7 +60,7 @@ impl Desktop {
     }
 
     pub fn create_window(&mut self, x: u64, y: u64, width: u64, height: u64) {
-        let new_window = Window::new(x, y, width, height, self.get_rand_colour());
+        let new_window = Window::new(x, y, width, height, WINDOW_BACKGROUND_COLOUR);
 
         self.windows.push(
             PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
@@ -73,46 +74,60 @@ impl Desktop {
         for (i, window) in &mut self.windows.into_iter().enumerate() {
             let windows_above = self.windows.get_above_nodes(i);
             window.unwrap().payload.clone().paint(windows_above);
-            // TODO: Should free more memory
+            // WARNING: Should free more memory
         }
 
         // Paint mouse
-        Framebuffer::fill_rect(None, mouse_x, mouse_y, 5, 5, 0xFF);
+        Framebuffer::fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00);
     }
 
-    // Move z order of window to top and handle dragging of windows (stack represents z order)
-    pub fn handle_mouse_movement(&mut self, mouse_x: u64, mouse_y: u64) {
-        self.update_drag_window_coordinates(mouse_x, mouse_y);
-        let (index, window) = self.get_clicked_window(mouse_x, mouse_y);
+    // Move window to front and handle dragging of windows
+    pub fn handle_mouse_movement(&mut self, mouse_x: u64, mouse_y: u64, is_left_pressed: bool) {
+        if is_left_pressed {
+            self.update_drag_window_coordinates(mouse_x, mouse_y);
+            let (index, window) = self.get_clicked_window(mouse_x, mouse_y);
 
-        if window.is_some() {
-            let unwrapped_window = window.unwrap().clone();
+            if window.is_some() {
+                let unwrapped_window = window.unwrap().clone();
 
-            // Remove from linked list
-            self.windows.remove_at(index);
+                // WARNING: Only do this maneuver if it's not head for performance
 
-            // TODO: Check if this works effectively (reuse same memory location instead of freeing first)
-            // self.windows.push(&mut unwrapped_window as *mut u64, &mut unwrapped_window);
+                // Remove from linked list
+                // self.windows.remove_at(index);
+
+                // // WARNING: Should really preserve old window and move it (make a method within list)
+                // self.windows.push(
+                //     PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+                //     unwrapped_window,
+                // );
+                // PAGE_FRAME_ALLOCATOR.free();
+            }
+        } else {
+            self.drag_window = None;
         }
+
+        self.paint(mouse_x, mouse_y);
     }
 
-    // Loops through windows to find window in which mouse is within
-    // Returns both the index of the window along with the window itself
+    /*
+        Loops through windows to find window in which mouse coordinates are within
+        Returns both the index of the window along with the window itself
+    */
     fn get_clicked_window(&mut self, mouse_x: u64, mouse_y: u64) -> (usize, Option<Window>) {
         for (i, window) in self.windows.into_iter().enumerate() {
-            let mut temp = &window.unwrap().payload;
+            let temp = window.unwrap().payload.clone();
             if mouse_x >= temp.x
                 && mouse_x <= (temp.x + temp.width)
                 && mouse_y >= temp.y
                 && mouse_y <= (temp.y + temp.height)
             {
                 // Update drag window, etc
-                let const_ptr = temp as *const Window;
-                self.drag_window = Some(const_ptr as *mut Window);
+                let const_ptr = &window.unwrap().payload as *const Window;
+                let mut_ptr = const_ptr as *mut Window;
+                self.drag_window = Some(mut_ptr);
                 self.drag_x_offset = mouse_x - temp.x;
                 self.drag_y_offset = mouse_y - temp.y;
-                // return (i, Some(*temp)); TODO: Fix clicking 
-                return (0, None);
+                return (i, Some(temp));
             }
         }
 
@@ -123,15 +138,11 @@ impl Desktop {
     fn update_drag_window_coordinates(&mut self, mouse_x: u64, mouse_y: u64) {
         if self.drag_window.is_some() {
             let window = unsafe { &mut *self.drag_window.unwrap() };
-            // window.clear(); TODO: Fix dragging 
+            let windows_above = self.windows.get_above_nodes(0);
+            window.draw_window(windows_above, false);
             window.x = mouse_x.wrapping_sub(self.drag_x_offset);
             window.y = mouse_y.wrapping_sub(self.drag_y_offset);
         }
-    }
-
-    fn get_rand_colour(&mut self) -> u32 {
-        self.colour_num += 1;
-        return 0x00000000 + (self.colour_num * 100 * 0xFF00) as u32;
     }
 }
 
@@ -163,16 +174,21 @@ impl Window {
         Only renders pixels which are visible thus saving memory
     */
     pub fn paint(&mut self, windows_above: Stack<Window>) {
+        self.draw_window(windows_above, true);
+    }
+
+    pub fn clear(&mut self, windows_above: Stack<Window>) {
+        self.draw_window(windows_above, false);
+    }
+
+    fn draw_window(&mut self, windows_above: Stack<Window>, is_colour: bool) {
         let mut self_clone = self.clone();
+
         // Empty rectangles in case anything has been updated  (should make this a method)
-        // for (i, rectangle) in &mut self.clipped_rectangles.into_iter().enumerate() {
-            // self_clone.clipped_rectangles.remove_at(i);
-            // TODO: Free properly to avoid running out of RAM
-            // PAGE_FRAME_ALLOCATOR
-            //     .lock()
-            //     .free_frame(rectangle.unwrap() as *mut u64);
-            // PAGE_FRAME_ALLOCATOR.free();
-        // }
+        for (i, rectangle) in &mut self.clipped_rectangles.into_iter().enumerate() {
+            self_clone.clipped_rectangles.remove_at(i);
+            // TODO: Free properly
+        }
 
         for (i, window) in windows_above.into_iter().enumerate() {
             // Clip subject by windows above to reduce area which is rendered
@@ -180,8 +196,85 @@ impl Window {
             self.subtract_rectangle(clipping_rect); // Apply the clipping rect upon the subject rect
         }
 
-        // Fill window region and exclude the clipped regions
-        Framebuffer::fill_rect(Some(&self.clipped_rectangles), self.x, self.y, self.width, self.height, self.colour);
+        if is_colour {
+            // Render window background
+            Framebuffer::fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                self.colour,
+            );
+
+            // Render window border
+            Framebuffer::draw_rect_outline(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                WINDOW_BORDER_COLOUR,
+            );
+
+            // Render window bar
+            Framebuffer::fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x + 3,
+                self.y + 3,
+                self.width - 3,
+                20,
+                WINDOW_TITLE_COLOUR,
+            );
+
+            // Render window bar close
+            Framebuffer::draw_horizontal_line(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y + 21,
+                self.width,
+                WINDOW_BORDER_COLOUR,
+            );
+        } else {
+            // Render window background
+            Framebuffer::fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                BACKGROUND_COLOUR,
+            );
+
+            // Render window border
+            Framebuffer::draw_rect_outline(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                BACKGROUND_COLOUR,
+            );
+
+            // Render window bar
+            Framebuffer::fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x + 3,
+                self.y + 3,
+                self.width - 3,
+                20,
+                BACKGROUND_COLOUR,
+            );
+
+            // Render window bar close
+            Framebuffer::draw_horizontal_line(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y + 21,
+                self.width,
+                BACKGROUND_COLOUR,
+            );
+        }
     }
 
     // WARNING: May not work with multiple calls to paint/multiple windows
@@ -194,7 +287,6 @@ impl Window {
             && clipping_rect.top <= subject.bottom
             && clipping_rect.bottom >= subject.top)
         {
-            print_serial!("INTERSECTS\n");
             return;
         }
 
@@ -238,7 +330,12 @@ impl Rectangle {
     }
 
     pub fn from_window(window: &Window) -> Self {
-        Self::new(window.y, window.y + window.height, window.x, window.x + window.width)
+        Self::new(
+            window.y,
+            window.y + window.height,
+            window.x,
+            window.x + window.width,
+        )
     }
 
     /*
@@ -350,9 +447,9 @@ impl Framebuffer {
                     for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
                         let clip = clipped_rectangle.unwrap().payload;
 
-                        // Simply print each clip TODO: Clamp edges
+                        // Simply print each clip TODO: Clamp edges properly
                         for i in clip.left..clip.right {
-                            for j in clip.top..clip.bottom{
+                            for j in clip.top..clip.bottom {
                                 Framebuffer::draw_pixel(i, j, colour);
                             }
                         }
@@ -365,12 +462,14 @@ impl Framebuffer {
                 x = core::cmp::max(x, 0);
                 y = core::cmp::max(y, 0);
 
-                let x_limit = core::cmp::min(x + width, SCREEN_WIDTH);
-                let y_limit = core::cmp::min(y + height, SCREEN_HEIGHT);
+                if x.checked_add(width).is_some() && y.checked_add(height).is_some() {
+                    let x_limit = core::cmp::min(x + width, SCREEN_WIDTH);
+                    let y_limit = core::cmp::min(y + height, SCREEN_HEIGHT);
 
-                for i in x..x_limit {
-                    for j in y..y_limit {
-                        Framebuffer::draw_pixel(i, j, colour);
+                    for i in x..x_limit {
+                        for j in y..y_limit {
+                            Framebuffer::draw_pixel(i, j, colour);
+                        }
                     }
                 }
             }
@@ -378,12 +477,21 @@ impl Framebuffer {
     }
 
     // Draws outline of rectangle only
-    pub fn draw_rect_outline(x: u64, y: u64, width: u64, height: u64, colour: u32) {
-        Framebuffer::draw_horizontal_line(x, y, width, colour);
-        Framebuffer::draw_horizontal_line(x, y + height, width, colour);
+    pub fn draw_rect_outline(
+        clipped_rectangles: Option<&Stack<Rectangle>>,
+        x: u64,
+        y: u64,
+        width: u64,
+        height: u64,
+        colour: u32,
+    ) {
+        if x.checked_add(width).is_some() && y.checked_add(height).is_some() {
+            Framebuffer::draw_horizontal_line(clipped_rectangles, x, y, width, colour);
+            Framebuffer::draw_horizontal_line(clipped_rectangles, x, y + height, width, colour);
 
-        Framebuffer::draw_vertical_line(x, y, height, colour);
-        Framebuffer::draw_vertical_line(x + width, y, height, colour);
+            Framebuffer::draw_vertical_line(clipped_rectangles, x, y, height, colour);
+            Framebuffer::draw_vertical_line(clipped_rectangles, x + width, y, height, colour);
+        }
     }
 
     pub fn draw_pixel(x: u64, y: u64, byte: u32) {
@@ -394,12 +502,24 @@ impl Framebuffer {
         }
     }
 
-    fn draw_horizontal_line(x: u64, y: u64, length: u64, colour: u32) {
-        //     Framebuffer::fill_rect(x, y, length, 5, colour);
+    fn draw_horizontal_line(
+        clipped_rectangles: Option<&Stack<Rectangle>>,
+        x: u64,
+        y: u64,
+        length: u64,
+        colour: u32,
+    ) {
+        Framebuffer::fill_rect(clipped_rectangles, x, y, length, 3, colour);
     }
 
-    fn draw_vertical_line(x: u64, y: u64, length: u64, colour: u32) {
-        // Framebuffer::fill_rect(x, y, 5, length, colour);
+    fn draw_vertical_line(
+        clipped_rectangles: Option<&Stack<Rectangle>>,
+        x: u64,
+        y: u64,
+        length: u64,
+        colour: u32,
+    ) {
+        Framebuffer::fill_rect(clipped_rectangles, x, y, 3, length, colour);
     }
 
     fn draw_character(&mut self, _character: char) {
@@ -435,6 +555,7 @@ impl Writer for Framebuffer {
 }
 
 pub fn init(framebuffer_tag: FramebufferTag) {
+    // Setup font information
     let font_end = unsafe { &_binary_font_psf_end as *const _ as u32 };
     let font_size = unsafe { &_binary_font_psf_size as *const _ as u32 };
     let font_start = font_end - font_size;
@@ -443,11 +564,14 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     FRAMEBUFFER.lock().pitch = framebuffer_tag.pitch as u64;
     FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;
 
+    // Map the framebuffer into accessible memory
     paging::identity_map_from(framebuffer_tag.address, 3);
+
+    // Make background blank
+    Framebuffer::fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BACKGROUND_COLOUR);
 }
 
 extern "C" {
     pub(crate) static _binary_font_psf_end: usize;
     pub(crate) static _binary_font_psf_size: usize;
 }
-
