@@ -2,8 +2,8 @@
 
 /*
     Framebuffer is portion of RAM which contains a bitmap which maps to the display (pixels)
-    GRUB s&ets the correct video mode before loading the kernel as specified within the multiboot header
-    Pitch is number of bytes per row, BPP is bit depth
+    GRUB s&ets the correct video mode before loading the &kernel as specified within the multiboot header
+    Pitch is n&umber of bytes per row, BPP is bit depth
     Rectangles are arranged like this:
         Top
     Left    Right
@@ -196,85 +196,58 @@ impl Window {
             self.subtract_rectangle(clipping_rect); // Apply the clipping rect upon the subject rect
         }
 
-        if is_colour {
-            // Render window background
-            Framebuffer::fill_rect(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y,
-                self.width,
-                self.height,
-                self.colour,
-            );
-
-            // Render window border
-            Framebuffer::draw_rect_outline(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y,
-                self.width,
-                self.height,
-                WINDOW_BORDER_COLOUR,
-            );
-
-            // Render window bar
-            Framebuffer::fill_rect(
-                Some(&self.clipped_rectangles),
-                self.x + 3,
-                self.y + 3,
-                self.width - 3,
-                20,
-                WINDOW_TITLE_COLOUR,
-            );
-
-            // Render window bar close
-            Framebuffer::draw_horizontal_line(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y + 21,
-                self.width,
-                WINDOW_BORDER_COLOUR,
-            );
-        } else {
-            // Render window background
-            Framebuffer::fill_rect(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y,
-                self.width,
-                self.height,
-                BACKGROUND_COLOUR,
-            );
-
-            // Render window border
-            Framebuffer::draw_rect_outline(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y,
-                self.width,
-                self.height,
-                BACKGROUND_COLOUR,
-            );
-
-            // Render window bar
-            Framebuffer::fill_rect(
-                Some(&self.clipped_rectangles),
-                self.x + 3,
-                self.y + 3,
-                self.width - 3,
-                20,
-                BACKGROUND_COLOUR,
-            );
-
-            // Render window bar close
-            Framebuffer::draw_horizontal_line(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y + 21,
-                self.width,
-                BACKGROUND_COLOUR,
-            );
+        let mut window_background_colour = self.colour;
+        if !is_colour {
+            window_background_colour = BACKGROUND_COLOUR;
         }
+
+        let mut window_border_colour = WINDOW_BORDER_COLOUR;
+        if !is_colour {
+            window_border_colour = BACKGROUND_COLOUR;
+        }
+
+        let mut window_title_colour = WINDOW_TITLE_COLOUR;
+        if !is_colour {
+            window_title_colour = BACKGROUND_COLOUR;
+        }
+
+        Framebuffer::fill_rect(
+            Some(&self.clipped_rectangles),
+            self.x,
+            self.y,
+            self.width,
+            self.height,
+            window_background_colour,
+        );
+
+        // Render window border
+        Framebuffer::draw_rect_outline(
+            Some(&self.clipped_rectangles),
+            self.x,
+            self.y,
+            self.width,
+            self.height,
+            window_border_colour,
+        );
+
+        // Render window bar
+        Framebuffer::fill_rect(
+            Some(&self.clipped_rectangles),
+            self.x + 3,
+            self.y + 3,
+            self.width - 3,
+            20,
+            window_title_colour,
+        );
+
+        // Render window bar bottom line
+        Framebuffer::draw_horizontal_line(
+            Some(&self.clipped_rectangles),
+            self.x,
+            self.y + 21,
+            self.width,
+            window_border_colour,
+        );
     }
 
     // WARNING: May not work with multiple calls to paint/multiple windows
@@ -294,10 +267,6 @@ impl Window {
         // let old_rect = self.clipped_rectangles.remove_at(i);
         // PAGE_FRAME_ALLOCATOR.lock().free_frame(old_rect as *mut u64);
         // PAGE_FRAME_ALLOCATOR.free();
-        unsafe {
-            // Insert the split rectangles in place of the current ones
-            // (*split_rectangles.tail.unwrap()).next = self.clipped_rectangles.head;
-        }
         self.clipped_rectangles.head = split_rectangles.head;
     }
 
@@ -447,9 +416,14 @@ impl Framebuffer {
                     for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
                         let clip = clipped_rectangle.unwrap().payload;
 
-                        // Simply print each clip TODO: Clamp edges properly
-                        for i in clip.left..clip.right {
-                            for j in clip.top..clip.bottom {
+                        // Clamp of printable area to clipped region itself
+                        let x_base = core::cmp::max(x, clip.left);
+                        let y_base = core::cmp::max(y, clip.top);
+                        let x_limit = core::cmp::min(x + width, clip.right);
+                        let y_limit = core::cmp::min(y + height, clip.bottom);
+
+                        for i in x_base..x_limit {
+                            for j in y_base..y_limit {
                                 Framebuffer::draw_pixel(i, j, colour);
                             }
                         }

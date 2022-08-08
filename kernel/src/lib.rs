@@ -27,6 +27,7 @@ mod spinlock;
 mod syscalls;
 mod uart;
 mod writer;
+mod allocator;
 
 extern crate multiboot2;
 #[macro_use]
@@ -50,37 +51,38 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     PAGE_FRAME_ALLOCATOR.lock().init(&boot_info);
     PAGE_FRAME_ALLOCATOR.free();
 
-    grub::bga_set_video_mode();
+    // grub::bga_set_video_mode();
 
-    framebuffer::init(boot_info.framebuffer_tag().unwrap());
+    // framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
     uart::init();
 
-    gdt::init();
-    PIT.lock().init();
-    ps2::init().unwrap();
-    interrupts::init();
-    PICS.lock().init();
+    // gdt::init();
+    // PIT.lock().init();
+    // ps2::init().unwrap();
+    // interrupts::init();
+    // PICS.lock().init();
 
-    interrupts::enable();
+    // interrupts::enable();
 
-    DESKTOP.lock().create_window(10, 10, 300, 300); // small green
-    DESKTOP.free();
+    // DESKTOP.lock().create_window(10, 10, 300, 300); 
+    // DESKTOP.free();
 
-    DESKTOP
-        .lock()
-        .create_window(300, 150, 400, 400); // square red
-    DESKTOP.free();
+    // DESKTOP.lock().create_window(200, 150, 400, 400); 
+    // DESKTOP.free();
 
-    let mouse_x = MOUSE.lock().mouse_x;
-    MOUSE.free();
-    let mouse_y = MOUSE.lock().mouse_y;
-    MOUSE.free();
+    // let mouse_x = MOUSE.lock().mouse_x;
+    // MOUSE.free();
+    // let mouse_y = MOUSE.lock().mouse_y;
+    // MOUSE.free();
 
-    DESKTOP.lock().paint(mouse_x, mouse_y);
-    DESKTOP.free();
+    // DESKTOP.lock().paint(mouse_x, mouse_y);
+    // DESKTOP.free();
 
     // grub::initialise_userland(&boot_info);
+
+    allocator::extend_memory_region();
+    allocator::malloc(5);
 
     print_serial!("End of execution\n");
 
@@ -95,5 +97,3 @@ fn panic(info: &PanicInfo) -> ! {
     print_serial!("Error: {}", info);
     loop {}
 }
-
-
