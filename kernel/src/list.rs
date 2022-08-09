@@ -14,7 +14,7 @@ pub struct Node<T: 'static> {
 }
 
 // LIFO (Last in, First out)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Stack<T: 'static> {
     pub head: Option<*mut Node<T>>,
     pub tail: Option<*mut Node<T>>,
@@ -58,7 +58,7 @@ impl<'a, T> Iterator for StackIntoIterator<'a, T> {
     }
 }
 
-impl<T: Clone> Stack<T> {
+impl<T: Clone + core::cmp::PartialEq> Stack<T> {
     pub const fn new() -> Self {
         Self {
             head: None,
@@ -109,7 +109,7 @@ impl<T: Clone> Stack<T> {
         head.expect("Attempted to pop from an empty item")
     }
 
-    // Removes a node of a linked list given position
+    // Removes a node from linked list given position
     pub fn remove_at(&mut self, index: usize) -> *mut Node<T> {
         if index > self.length {
             panic!("Index out of bounds")
@@ -134,8 +134,22 @@ impl<T: Clone> Stack<T> {
         }
     }
 
-    // Returns all nodes of a linked list above a certain index
-    // Uses page frame allocator to create new list
+    // Removes a node from linked list given value
+    pub fn remove(&mut self, target_node: &Node<T>) -> *mut Node<T> {
+        let raw_value = target_node.payload.clone();
+        for (i, node) in &mut self.into_iter().enumerate() {
+            let unwrapped_node = node.unwrap().payload.clone();
+            if unwrapped_node == raw_value {
+                return self.remove_at(i);
+            }
+        }
+        panic!("Cannot find element");
+    }
+
+    /*
+        Takes in index to return from
+        NOTE: Utilises page frame allocator to create new list
+    */
     pub fn get_above_nodes(&self, index: usize) -> Stack<T> {
         let mut new_stack = Stack::<T>::new();
         for (i, node) in self.into_iter().enumerate() {

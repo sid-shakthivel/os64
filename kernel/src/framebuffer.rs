@@ -146,7 +146,7 @@ impl Desktop {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Window {
     x: u64,
     y: u64,
@@ -280,7 +280,7 @@ impl Window {
     // }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rectangle {
     top: u64,
     bottom: u64,

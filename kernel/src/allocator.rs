@@ -6,6 +6,8 @@
     Uses a free list allocator, which traverses a list of memory blocks until it finds a block which can fit the size
 */
 
+use x86_64::structures::idt::HandlerFuncWithErrCode;
+
 use crate::{
     list::{Node, Stack},
     page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR},
@@ -14,13 +16,16 @@ use crate::{
     CONSOLE,
 };
 
+// Divide by 8 as u64 is 8 bytes and a *mut u64 points to 8 bytes
+const NODE_MEMORY_BLOCK_SIZE: isize = (core::mem::size_of::<Node<MemoryBlock>>() / 8) as isize;
+
 /*
    +--------+------+-------+
    | Header | Data | Align |
    +--------+------+-------+
 */
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 struct MemoryBlock {
     is_free: bool, // Indicates whether the memory block is available to be used
     size: u64,
@@ -28,17 +33,12 @@ struct MemoryBlock {
 }
 
 impl MemoryBlock {
-    fn new(data: *mut u64, size: u64) -> MemoryBlock {
+    fn new(data: *mut u64, size: u64, is_free: bool) -> MemoryBlock {
         MemoryBlock {
-            is_free: true,
+            is_free,
             size,
             data,
         }
-    }
-
-    unsafe fn get_header_address(&self) -> *mut u64 {
-        let size = core::mem::size_of::<Node<MemoryBlock>>();
-        return self.data.offset(-1 * (size / 8) as isize);
     }
 }
 
@@ -48,53 +48,34 @@ static MEMORY_BLOCK_LIST: Lock<Stack<MemoryBlock>> = Lock::new(Stack::<MemoryBlo
     Recives the size of variables in bytes which are to be used
     Returns pointer to data region
 */
-pub fn malloc(mut size: u64) -> Option<*mut u64> {
+pub fn malloc(mut size: u64) -> *mut u64 {
     // If size is greater then 1 page, allocate multiple pages straight through PFA
     if size > 4096 {}
 
     // Must align block
     size = align(size);
 
-    print_serial!("SIZE IS {}\n", size);
-
     let (index, wrapped_memory_block) = find_first_fit(size);
 
     match wrapped_memory_block {
         Some(memory_block) => {
             // If block is larger then memory required, split region and add parts to list
-            // WARNING: Size's aren't calculated exactly so there may be times in which this doesn't work effectively
             if memory_block.size > size {
                 // Remove old memory block
                 MEMORY_BLOCK_LIST.lock().remove_at(index as usize);
                 MEMORY_BLOCK_LIST.free();
 
                 // Create new memory block for malloc'd memory
-                let mut address = unsafe { memory_block.get_header_address() };
-
-                let size_of_node = core::mem::size_of::<Node<MemoryBlock>>();
-                let dp_address = unsafe { address.offset((size_of_node / 8) as isize) };
-
-                let new_memory_block = MemoryBlock::new(dp_address, size);
-
-                MEMORY_BLOCK_LIST
-                    .lock()
-                    .push(address as u64, new_memory_block);
-                MEMORY_BLOCK_LIST.free();
+                let mut address = unsafe { get_header_address(memory_block.data) };
+                let dp = create_new_memory_block(size, address, false);
 
                 // Add remaining section of block
-                address = unsafe { dp_address.offset((size / 8) as isize) };
+                address = unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE + size as isize) };
+                create_new_memory_block(memory_block.size - size, address, true);
 
-                let dp_address = unsafe { address.offset((size_of_node / 8) as isize) };
-
-                let new_memory_block = MemoryBlock::new(dp_address, (memory_block.size - size));
-
-                MEMORY_BLOCK_LIST
-                    .lock()
-                    .push(address as u64, new_memory_block);
-                MEMORY_BLOCK_LIST.free();
-                
+                return dp;
             } else {
-                return Some(memory_block.data);
+                return memory_block.data;
             }
         }
         None => {
@@ -104,9 +85,43 @@ pub fn malloc(mut size: u64) -> Option<*mut u64> {
             return malloc(size);
         }
     }
-    MEMORY_BLOCK_LIST.free();
+}
 
-    return None;
+/*
+    Recives pointer to memory address
+    Frees a memory region which can later be allocated
+*/
+pub fn free(dp: *mut u64) {
+    let header_address = unsafe { get_header_address(dp) };
+    let header =  unsafe { &mut *(header_address as *mut Node<MemoryBlock>) };
+
+    // System will merge memory regions together to alleviate fragmentation
+
+    header.payload.is_free = true;
+
+    // Check previous node to merge
+    if header.prev.is_some() {
+        // Work on previous node
+        let node = header.prev.unwrap();
+        unsafe {
+            (*node).payload.size += header.payload.size;
+            (*node).payload.is_free += true;
+        }
+
+        // Remove region from linked list
+        MEMORY_BLOCK_LIST.lock().remove(&header);
+        MEMORY_BLOCK_LIST.free();
+    }
+
+    // Check next node to merge
+    if header.next.is_some() {
+        // Get total size of other region and update memory block
+        header.payload.size += unsafe { (*header.next.unwrap()).payload.size };
+        
+        // Remove other region from linked list
+        MEMORY_BLOCK_LIST.lock().remove(&header);
+        MEMORY_BLOCK_LIST.free();
+    }
 }
 
 /*
@@ -124,6 +139,7 @@ fn align(size: u64) -> u64 {
 fn find_first_fit(size: u64) -> (u64, Option<MemoryBlock>) {
     for (i, memory_block) in MEMORY_BLOCK_LIST.lock().into_iter().enumerate() {
         if memory_block.unwrap().payload.is_free && memory_block.unwrap().payload.size > size {
+            MEMORY_BLOCK_LIST.free();
             return (i as u64, Some(memory_block.unwrap().payload.clone()));
         }
     }
@@ -138,21 +154,28 @@ pub fn extend_memory_region() {
     let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap();
     PAGE_FRAME_ALLOCATOR.free();
 
-    print_serial!("ADDRESS OF MEMORY {:p}\n", address);
+    create_new_memory_block(page_frame_allocator::PAGE_SIZE as u64, address, true);
+}
 
-    // Calculate data pointer address
-    let size = core::mem::size_of::<Node<MemoryBlock>>();
-    // Divide by 8 as u64 is 8 bytes
-    let dp_address = unsafe { address.offset((size / 8) as isize) };
-
-    print_serial!("Size of memory is {}\n", size);
-    print_serial!("DATA ADDRESS is {:p}\n", dp_address);
-
-    let new_memory_block = MemoryBlock::new(dp_address, page_frame_allocator::PAGE_SIZE as u64);
-
+/*
+    Create a new memory block of a certain size
+    Recieves size of block and address in which to create a new block
+*/
+fn create_new_memory_block(size: u64, address: *mut u64, is_free: bool) -> *mut u64 {
+    let dp_address = unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE) };
+    let new_memory_block = MemoryBlock::new(dp_address, size, is_free);
     // Add to linked list
     MEMORY_BLOCK_LIST
         .lock()
         .push(address as u64, new_memory_block);
     MEMORY_BLOCK_LIST.free();
+    return dp_address;
+}
+
+/*
+    Recives pointer to data
+    Returns pointer to address of header
+*/
+unsafe fn get_header_address(dp: *mut u64) -> *mut u64 {
+    return dp.offset(-1 * (NODE_MEMORY_BLOCK_SIZE / 8) as isize);
 }

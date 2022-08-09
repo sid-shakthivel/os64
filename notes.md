@@ -39,6 +39,6 @@ On alloc, do we want to split a section of memory? YES
 On free, just make the space INACTIVE
 If size is too big - just allocate multiple consecutive pages
 
-Ensure correct pointer values WORKS
-Attempt to corrupt the memory and see what happens
-Remove, split, etc stuff
+TESTING
+Free list?
+Bigger then 1 page allocation stuff
