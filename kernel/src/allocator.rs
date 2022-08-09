@@ -2,11 +2,8 @@
 
 /*
     Contains implementations for malloc, free, brk, etc
-    TODO: Implement some version of brk, sbrk, syscalls etc
     Uses a free list allocator, which traverses a list of memory blocks until it finds a block which can fit the size
 */
-
-use x86_64::structures::idt::HandlerFuncWithErrCode;
 
 use crate::{
     list::{Node, Stack},
@@ -42,7 +39,7 @@ impl MemoryBlock {
     }
 }
 
-static MEMORY_BLOCK_LIST: Lock<Stack<MemoryBlock>> = Lock::new(Stack::<MemoryBlock>::new());
+static FREE_MEMORY_BLOCK_LIST: Lock<Stack<MemoryBlock>> = Lock::new(Stack::<MemoryBlock>::new());
 
 /*
     Recives the size of variables in bytes which are to be used
@@ -50,7 +47,14 @@ static MEMORY_BLOCK_LIST: Lock<Stack<MemoryBlock>> = Lock::new(Stack::<MemoryBlo
 */
 pub fn malloc(mut size: u64) -> *mut u64 {
     // If size is greater then 1 page, allocate multiple pages straight through PFA
-    if size > 4096 {}
+    if size > 4096 {
+        // Round to nearest page and then allocate
+        let address = PAGE_FRAME_ALLOCATOR
+            .lock()
+            .alloc_frames(page_frame_allocator::round_to_nearest_page(size));
+        PAGE_FRAME_ALLOCATOR.free();
+        return address;
+    }
 
     // Must align block
     size = align(size);
@@ -62,8 +66,8 @@ pub fn malloc(mut size: u64) -> *mut u64 {
             // If block is larger then memory required, split region and add parts to list
             if memory_block.size > size {
                 // Remove old memory block
-                MEMORY_BLOCK_LIST.lock().remove_at(index as usize);
-                MEMORY_BLOCK_LIST.free();
+                FREE_MEMORY_BLOCK_LIST.lock().remove_at(index as usize);
+                FREE_MEMORY_BLOCK_LIST.free();
 
                 // Create new memory block for malloc'd memory
                 let mut address = unsafe { get_header_address(memory_block.data) };
@@ -93,34 +97,28 @@ pub fn malloc(mut size: u64) -> *mut u64 {
 */
 pub fn free(dp: *mut u64) {
     let header_address = unsafe { get_header_address(dp) };
-    let header =  unsafe { &mut *(header_address as *mut Node<MemoryBlock>) };
+    let header = unsafe { &mut *(header_address as *mut Node<MemoryBlock>) };
 
-    // System will merge memory regions together to alleviate fragmentation
-
+    // Add node to linked list of free nodes
     header.payload.is_free = true;
+    FREE_MEMORY_BLOCK_LIST
+        .lock()
+        .push(header_address as u64, header.payload.clone());
+    FREE_MEMORY_BLOCK_LIST.free();
 
-    // Check previous node to merge
-    if header.prev.is_some() {
-        // Work on previous node
-        let node = header.prev.unwrap();
-        unsafe {
-            (*node).payload.size += header.payload.size;
-            (*node).payload.is_free += true;
-        }
+    FREE_MEMORY_BLOCK_LIST.free();
 
-        // Remove region from linked list
-        MEMORY_BLOCK_LIST.lock().remove(&header);
-        MEMORY_BLOCK_LIST.free();
-    }
-
-    // Check next node to merge
+    // Check next node to merge memory regions together to alleviate fragmentation
+    // NOTE: Since a stack is used, the node is added to the top of the stack so there is only a next value
     if header.next.is_some() {
+        let next_header = unsafe { &mut *header.next.unwrap() };
+
         // Get total size of other region and update memory block
-        header.payload.size += unsafe { (*header.next.unwrap()).payload.size };
-        
-        // Remove other region from linked list
-        MEMORY_BLOCK_LIST.lock().remove(&header);
-        MEMORY_BLOCK_LIST.free();
+        header.payload.size += next_header.payload.size;
+
+        // Remove other region from linked list since updated
+        FREE_MEMORY_BLOCK_LIST.lock().remove(next_header);
+        FREE_MEMORY_BLOCK_LIST.free();
     }
 }
 
@@ -137,21 +135,21 @@ fn align(size: u64) -> u64 {
     Returns first memory block which fits the size
 */
 fn find_first_fit(size: u64) -> (u64, Option<MemoryBlock>) {
-    for (i, memory_block) in MEMORY_BLOCK_LIST.lock().into_iter().enumerate() {
+    for (i, memory_block) in FREE_MEMORY_BLOCK_LIST.lock().into_iter().enumerate() {
         if memory_block.unwrap().payload.is_free && memory_block.unwrap().payload.size > size {
-            MEMORY_BLOCK_LIST.free();
+            FREE_MEMORY_BLOCK_LIST.free();
             return (i as u64, Some(memory_block.unwrap().payload.clone()));
         }
     }
-    MEMORY_BLOCK_LIST.free();
+    FREE_MEMORY_BLOCK_LIST.free();
     return (0, None);
 }
 
 // Extends accessible memory region of kernel heap by another page (4096 bytes)
-// WARNING: May want to expand when having a functional userspace
+// WARNING: May want to change when having a functional userspace
 pub fn extend_memory_region() {
     // Allocate another page
-    let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap();
+    let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
     PAGE_FRAME_ALLOCATOR.free();
 
     create_new_memory_block(page_frame_allocator::PAGE_SIZE as u64, address, true);
@@ -164,11 +162,20 @@ pub fn extend_memory_region() {
 fn create_new_memory_block(size: u64, address: *mut u64, is_free: bool) -> *mut u64 {
     let dp_address = unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE) };
     let new_memory_block = MemoryBlock::new(dp_address, size, is_free);
-    // Add to linked list
-    MEMORY_BLOCK_LIST
-        .lock()
-        .push(address as u64, new_memory_block);
-    MEMORY_BLOCK_LIST.free();
+
+    if is_free {
+        // Push to linked list
+        FREE_MEMORY_BLOCK_LIST
+            .lock()
+            .push(address as u64, new_memory_block);
+        FREE_MEMORY_BLOCK_LIST.free();
+    } else {
+        // Add meta data regardless
+        unsafe {
+            *(address as *mut MemoryBlock) = new_memory_block;
+        }
+    }
+
     return dp_address;
 }
 
@@ -177,5 +184,5 @@ fn create_new_memory_block(size: u64, address: *mut u64, is_free: bool) -> *mut 
     Returns pointer to address of header
 */
 unsafe fn get_header_address(dp: *mut u64) -> *mut u64 {
-    return dp.offset(-1 * (NODE_MEMORY_BLOCK_SIZE / 8) as isize);
+    return dp.offset(-1 * (NODE_MEMORY_BLOCK_SIZE) as isize);
 }

@@ -34,9 +34,10 @@ extern crate multiboot2;
 extern crate bitflags;
 extern crate x86_64;
 
+use crate::allocator::free;
 use crate::framebuffer::DESKTOP;
 use crate::mouse::MOUSE;
-use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
+use crate::page_frame_allocator::{PAGE_FRAME_ALLOCATOR, FrameAllocator};
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
@@ -82,7 +83,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     // grub::initialise_userland(&boot_info);
 
     allocator::extend_memory_region();
-    allocator::malloc(5);
 
     print_serial!("End of execution\n");
 

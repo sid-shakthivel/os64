@@ -168,7 +168,7 @@ fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {
 
     // Allocate memory for the segment
     // TODO: Implement system to have continuous memory range 
-    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap();
+    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
     PAGE_FRAME_ALLOCATOR.free();
     let source = source_raw as *mut u64;
 

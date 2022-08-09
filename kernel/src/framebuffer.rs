@@ -63,7 +63,7 @@ impl Desktop {
         let new_window = Window::new(x, y, width, height, WINDOW_BACKGROUND_COLOUR);
 
         self.windows.push(
-            PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+            PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
             new_window,
         );
         PAGE_FRAME_ALLOCATOR.free();
@@ -323,7 +323,7 @@ impl Rectangle {
             self.left = new_rect.right;
 
             split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
                 new_rect,
             );
             PAGE_FRAME_ALLOCATOR.free();
@@ -337,7 +337,7 @@ impl Rectangle {
             self.top = new_rect.bottom;
 
             split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
                 new_rect,
             );
             PAGE_FRAME_ALLOCATOR.free();
@@ -349,7 +349,7 @@ impl Rectangle {
             self.left = clipping_rect.left;
 
             split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
                 new_rect,
             );
             PAGE_FRAME_ALLOCATOR.free();
@@ -361,7 +361,7 @@ impl Rectangle {
             self.left = clipping_rect.left;
 
             split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
                 new_rect,
             );
             PAGE_FRAME_ALLOCATOR.free();

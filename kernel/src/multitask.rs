@@ -102,7 +102,7 @@ impl Process {
         let new_p4: *mut Table = paging::deep_clone();
         
         // Create and setup a stack as though an interrupt has been fired
-        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap(); 
+        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frame(); 
         PAGE_FRAME_ALLOCATOR.free();
 
         unsafe {

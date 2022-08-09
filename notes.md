@@ -4,7 +4,6 @@ Bochs magic breakpoint is xchg bx, bx
 
 TODO:
 - Basic GUI (Window Manager)
-- Malloc/Free (Memory allocator)
 - Port newlib C library and use actual C userland processes
 - Extend usermode/syscall capabilities 
 - Port dart (git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash)
@@ -23,7 +22,7 @@ Copy each window buffer to screen buffer and use compare memory - if different w
 Give mouse/keyboard event to each window and let them decide whether to process (check position overlaps)
 
 Now:
-Malloc/Free
+Make memory stuff generic
 Background (https://forum.osdev.org/viewtopic.php?f=13&t=30154) or render background (rbg file) (https://wiki.osdev.org Drawing_In_a_Linear_Framebuffer)
 Improve performance (https://wiki.osdev.org/GUI)
 
@@ -32,13 +31,3 @@ Dirty rectangles when dragging windows
 Double buffering (back/front buffer)
 Implement closing windows
 Dragging only upon title bar
-
-Nuance to memory manager:
-What happens when we allocate more then 1 page and need more memory? ALLOCATE ANOTHER PAGE
-On alloc, do we want to split a section of memory? YES
-On free, just make the space INACTIVE
-If size is too big - just allocate multiple consecutive pages
-
-TESTING
-Free list?
-Bigger then 1 page allocation stuff

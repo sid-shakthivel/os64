@@ -2,7 +2,7 @@
 
 use crate::{
     page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
-    print_serial,
+    print_serial, CONSOLE,
 };
 
 // Each node stores a reference to the next/previous node within the list along with a payload
@@ -92,6 +92,8 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
     pub fn pop(&mut self) -> *mut Node<T> {
         let head = self.head.clone();
         if self.head.is_some() {
+            self.length -= 1;
+
             unsafe {
                 // Update head to become next value and update the prev value if it's not None
                 self.head = (*self.head.unwrap()).next;
@@ -105,16 +107,16 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
             }
         }
 
-        self.length -= 1;
         head.expect("Attempted to pop from an empty item")
     }
 
-    // Removes a node from linked list given position
+    // Removes a node from linked list given position within list
     pub fn remove_at(&mut self, index: usize) -> *mut Node<T> {
         if index > self.length {
             panic!("Index out of bounds")
         };
-        if index == self.length {
+
+        if index == (self.length - 1) {
             return self.pop_tail();
         }
 
@@ -157,7 +159,7 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
                 break;
             }
             new_stack.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as u64,
+                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
                 node.unwrap().payload.clone(),
             );
             PAGE_FRAME_ALLOCATOR.free();

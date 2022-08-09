@@ -108,7 +108,7 @@ impl Table {
         if self.get_table(index).is_none() {
             let page_frame = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
             PAGE_FRAME_ALLOCATOR.free();
-            self.entries[index] = Page::new(page_frame.unwrap() as u64);
+            self.entries[index] = Page::new(page_frame as u64);
         } 
         return self.get_table(index).expect("why not working");
     }
@@ -202,23 +202,23 @@ pub fn identity_map_from(start: u64, megabytes: u64) {
 pub fn deep_clone() -> *mut Table {
     unsafe {
         let p4 = &mut *P4;
-        let new_p4: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+        let new_p4: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
         PAGE_FRAME_ALLOCATOR.free();
         for i in 0..(*p4).entries.len() - 1 {
             if (*p4).entries[i].entry != 0 {
-                let new_p3: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+                let new_p3: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
                 PAGE_FRAME_ALLOCATOR.free();
                 let p3 = p4.get_table(i).unwrap();
 
                 for j in 0..(*p3).entries.len() {
                     if (*p3).entries[j].entry != 0 {
-                        let new_p2: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+                        let new_p2: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
                         PAGE_FRAME_ALLOCATOR.free();
                         let p2 = p3.get_table(j).unwrap();
 
                         for k in 0..(*p2).entries.len() {
                             if (*p2).entries[k].entry != 0 {
-                                let new_p1: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut _;
+                                let new_p1: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
                                 PAGE_FRAME_ALLOCATOR.free();
                                 let p1 = p2.get_table(k).unwrap();
 

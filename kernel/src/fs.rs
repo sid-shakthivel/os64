@@ -360,7 +360,7 @@ pub fn init(start_address: u32) {
     FS.lock().first_data_sector_address = first_data_sector;
     FS.lock().root_directory_size = convert_sector_to_bytes(root_directory_size);
 
-    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frame().unwrap() as *mut u8;
+    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut u8;
     PAGE_FRAME_ALLOCATOR.free();
 
     let initrd: File = File::new(root_directory_sector, 512, FileType::Directory);

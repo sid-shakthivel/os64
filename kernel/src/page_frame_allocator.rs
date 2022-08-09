@@ -19,34 +19,55 @@ pub struct PageFrameAllocator {
 }
 
 pub trait FrameAllocator {
-    fn alloc_frame(&mut self) -> Option<*mut u64>;
+    fn alloc_frame(&mut self) -> *mut u64;
     fn free_frame(&mut self, frame_address: *mut u64) -> ();
+
+    fn alloc_frames(&mut self, pages_required: u64) -> *mut u64;
+    fn free_frames(&mut self, frame_address: *mut u64, pages_required: u64) -> ();
 }
 
 impl FrameAllocator for PageFrameAllocator {
-    /*
-    Check the free frames stack for frames and pop it from the stack and return the address
-    Else increment the address to the next frame and return that
-    */
-    fn alloc_frame(&mut self) -> Option<*mut u64> {
+    //  Allocates 1 physical page of memory
+    fn alloc_frame(&mut self) -> *mut u64 {
         if self.free_frames.is_empty() {
-            if (self.current_page + 4096) < self.memory_end {
-                self.current_page += 4096;
-                return Some(self.current_page as *mut u64);
-            } else {
-                // Reached memory limit
-                return None;
+            // If the free frames list is empty, bump the address and return that
+            let address = self.current_page;
+
+            if address > self.memory_end {
+                panic!("KERNEL RAN OUT OF MEMORY");
             }
+
+            self.current_page += 4096;
+
+            return address as *mut u64;
         } else {
-            return Some(self.free_frames.pop() as *mut u64);
+            // Pop from free frames and return that address
+            return self.free_frames.pop() as *mut u64;
+        }
+    }
+
+    // Allocates a continuous amount of pages
+    fn alloc_frames(&mut self, pages_required: u64) -> *mut u64 {
+        let address = self.current_page;
+        for i in 0..pages_required {
+            self.current_page += 4096;
+        }
+        return address as *mut u64;
+    }
+
+    // Frees a continuous amount of memory
+    fn free_frames(&mut self, frame_address: *mut u64, pages_required: u64) {
+        for i in 0..pages_required {
+            unsafe { self.free_frame(frame_address.offset(i as isize)) }
         }
     }
 
     /*
-    Store reference to frame struct in memory and add to start of stack
-    Freed page isn't used by any process and thus can be safely written to
+        Frees a page of memory by adding to stack
+        NOTE: Freed page isn't used by any process and thus can be safely written to
     */
     fn free_frame(&mut self, frame_address: *mut u64) {
+        // Create new node which stores the page
         self.free_frames.push(frame_address as u64, self.page_count);
         self.page_count += 1;
     }
@@ -80,6 +101,10 @@ impl PageFrameAllocator {
     }
 }
 
-pub static PAGE_FRAME_ALLOCATOR: Lock<PageFrameAllocator> = Lock::new(PageFrameAllocator::new()); 
+pub fn round_to_nearest_page(size: u64) -> u64 {
+    ((size as i64 + 4095) & (-4096)) as u64
+}
+
+pub static PAGE_FRAME_ALLOCATOR: Lock<PageFrameAllocator> = Lock::new(PageFrameAllocator::new());
 
 pub const PAGE_SIZE: usize = 4096;
