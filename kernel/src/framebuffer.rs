@@ -16,14 +16,13 @@
     Glyphs are bitmaps of 8*16
 */
 
-// TODO: Make a malloc
 // TODO: Make a trait to handle clear, paint, etc
 
-use crate::paging;
 use crate::spinlock::Lock;
 use crate::writer::Writer;
 use crate::CONSOLE;
 use crate::{list::Stack, print_serial};
+use crate::{page_frame_allocator, paging};
 use lazy_static::lazy_static;
 use multiboot2::FramebufferTag;
 
@@ -62,10 +61,8 @@ impl Desktop {
     pub fn create_window(&mut self, x: u64, y: u64, width: u64, height: u64) {
         let new_window = Window::new(x, y, width, height, WINDOW_BACKGROUND_COLOUR);
 
-        self.windows.push(
-            PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-            new_window,
-        );
+        self.windows
+            .push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_window);
         PAGE_FRAME_ALLOCATOR.free();
     }
 
@@ -78,7 +75,14 @@ impl Desktop {
         }
 
         // Paint mouse
-        Framebuffer::fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00);
+        FRAMEBUFFER
+            .lock()
+            .fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00);
+        FRAMEBUFFER.free();
+
+        // Update frontbuffer to match
+        FRAMEBUFFER.lock().write_to_frontbuffer();
+        FRAMEBUFFER.free();
     }
 
     // Move window to front and handle dragging of windows
@@ -119,7 +123,7 @@ impl Desktop {
             if mouse_x >= temp.x
                 && mouse_x <= (temp.x + temp.width)
                 && mouse_y >= temp.y
-                && mouse_y <= (temp.y + temp.height)
+                && mouse_y <= (temp.y + 21)
             {
                 // Update drag window, etc
                 let const_ptr = &window.unwrap().payload as *const Window;
@@ -211,7 +215,8 @@ impl Window {
             window_title_colour = BACKGROUND_COLOUR;
         }
 
-        Framebuffer::fill_rect(
+        // Paint main background
+        FRAMEBUFFER.lock().fill_rect(
             Some(&self.clipped_rectangles),
             self.x,
             self.y,
@@ -219,9 +224,10 @@ impl Window {
             self.height,
             window_background_colour,
         );
+        FRAMEBUFFER.free();
 
-        // Render window border
-        Framebuffer::draw_rect_outline(
+        // Paint window border
+        FRAMEBUFFER.lock().draw_rect_outline(
             Some(&self.clipped_rectangles),
             self.x,
             self.y,
@@ -229,9 +235,10 @@ impl Window {
             self.height,
             window_border_colour,
         );
+        FRAMEBUFFER.free();
 
-        // Render window bar
-        Framebuffer::fill_rect(
+        // Paint window bar
+        FRAMEBUFFER.lock().fill_rect(
             Some(&self.clipped_rectangles),
             self.x + 3,
             self.y + 3,
@@ -239,18 +246,19 @@ impl Window {
             20,
             window_title_colour,
         );
+        FRAMEBUFFER.free();
 
-        // Render window bar bottom line
-        Framebuffer::draw_horizontal_line(
+        // // Paint window bar bottom line
+        FRAMEBUFFER.lock().draw_horizontal_line(
             Some(&self.clipped_rectangles),
             self.x,
             self.y + 21,
             self.width,
             window_border_colour,
         );
+        FRAMEBUFFER.free();
     }
 
-    // WARNING: May not work with multiple calls to paint/multiple windows
     // Directly punches out areas from rectangle and returns a list of rectangles which can be output upon the screen
     fn subtract_rectangle(&mut self, mut clipping_rect: Rectangle) {
         let mut subject = Rectangle::from_window(&self);
@@ -322,10 +330,7 @@ impl Rectangle {
             // Update current rectangle to match (update left)
             self.left = new_rect.right;
 
-            split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                new_rect,
-            );
+            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
         }
 
@@ -336,10 +341,7 @@ impl Rectangle {
             // Update current rectange to match (update top)
             self.top = new_rect.bottom;
 
-            split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                new_rect,
-            );
+            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
         }
 
@@ -348,10 +350,7 @@ impl Rectangle {
             let new_rect = Rectangle::new(self.top, self.bottom, self.left, clipping_rect.left);
             self.left = clipping_rect.left;
 
-            split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                new_rect,
-            );
+            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
         }
 
@@ -360,10 +359,7 @@ impl Rectangle {
             let new_rect = Rectangle::new(self.top, clipping_rect.top, self.left, self.right);
             self.left = clipping_rect.left;
 
-            split_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                new_rect,
-            );
+            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
         }
 
@@ -372,9 +368,10 @@ impl Rectangle {
 }
 
 pub struct Framebuffer {
-    framebuffer: &'static mut [u32; 786432],
     pitch: u64,
     bpp: u64,
+    backbuffer: u64,
+    frontbuffer: u64,
 }
 
 #[derive(Copy, Clone)]
@@ -389,20 +386,24 @@ struct PsfFont {
     width: u32,           // In pixels
 }
 
-lazy_static! {
-    pub static ref FRAMEBUFFER: spin::Mutex<Framebuffer> = spin::Mutex::new(Framebuffer {
-        framebuffer: unsafe { &mut *(0x180000 as *mut [u32; 786432]) },
-        pitch: 0,
-        bpp: 0,
-    });
-}
+pub static FRAMEBUFFER: Lock<Framebuffer> = Lock::new(Framebuffer::new());
 
 impl Framebuffer {
+    pub const fn new() -> Framebuffer {
+        Framebuffer {
+            pitch: 0,
+            bpp: 0,
+            backbuffer: 0,
+            frontbuffer: 0,
+        }
+    }
+
     /*  Recives a list of clipped rectangles (these rectangles are not to be rendered upon the screen)
         Loops through that list and clamps the clipping rects to the window before drawing
         If clipped rectangles are not supplied, simply clamps to the screen and draws pixels
     */
     pub fn fill_rect(
+        &mut self,
         clipped_rectangles: Option<&Stack<Rectangle>>,
         mut x: u64,
         mut y: u64,
@@ -424,12 +425,12 @@ impl Framebuffer {
 
                         for i in x_base..x_limit {
                             for j in y_base..y_limit {
-                                Framebuffer::draw_pixel(i, j, colour);
+                                self.draw_pixel(i, j, colour);
                             }
                         }
                     }
                 } else {
-                    return Framebuffer::fill_rect(None, x, y, width, height, colour);
+                    return self.fill_rect(None, x, y, width, height, colour);
                 }
             }
             None => {
@@ -442,7 +443,7 @@ impl Framebuffer {
 
                     for i in x..x_limit {
                         for j in y..y_limit {
-                            Framebuffer::draw_pixel(i, j, colour);
+                            self.draw_pixel(i, j, colour);
                         }
                     }
                 }
@@ -452,6 +453,7 @@ impl Framebuffer {
 
     // Draws outline of rectangle only
     pub fn draw_rect_outline(
+        &mut self,
         clipped_rectangles: Option<&Stack<Rectangle>>,
         x: u64,
         y: u64,
@@ -460,40 +462,52 @@ impl Framebuffer {
         colour: u32,
     ) {
         if x.checked_add(width).is_some() && y.checked_add(height).is_some() {
-            Framebuffer::draw_horizontal_line(clipped_rectangles, x, y, width, colour);
-            Framebuffer::draw_horizontal_line(clipped_rectangles, x, y + height, width, colour);
+            self.draw_horizontal_line(clipped_rectangles, x, y, width, colour);
+            self.draw_horizontal_line(clipped_rectangles, x, y + height, width, colour);
 
-            Framebuffer::draw_vertical_line(clipped_rectangles, x, y, height, colour);
-            Framebuffer::draw_vertical_line(clipped_rectangles, x + width, y, height, colour);
+            self.draw_vertical_line(clipped_rectangles, x, y, height, colour);
+            self.draw_vertical_line(clipped_rectangles, x + width, y, height, colour);
         }
     }
 
-    pub fn draw_pixel(x: u64, y: u64, byte: u32) {
+    pub fn draw_pixel(&mut self, x: u64, y: u64, byte: u32) {
+        let offset = (self.backbuffer + (y * 4096) + ((x * 32) / 8)) as *mut u32;
         unsafe {
-            // TODO: make this use framebuffer array for safety
-            let offset = (0x180000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
             *offset = byte;
         }
     }
 
+    pub fn write_to_frontbuffer(&mut self) {
+        let backbuffer_p = self.backbuffer as *mut u8;
+        let frontbuffer_p = self.frontbuffer as *mut u8;
+
+        for i in 0..3145728 {
+            unsafe {
+                *frontbuffer_p.offset(i) = *backbuffer_p.offset(i);
+            }
+        }
+    }
+
     fn draw_horizontal_line(
+        &mut self,
         clipped_rectangles: Option<&Stack<Rectangle>>,
         x: u64,
         y: u64,
         length: u64,
         colour: u32,
     ) {
-        Framebuffer::fill_rect(clipped_rectangles, x, y, length, 3, colour);
+        self.fill_rect(clipped_rectangles, x, y, length, 3, colour);
     }
 
     fn draw_vertical_line(
+        &mut self,
         clipped_rectangles: Option<&Stack<Rectangle>>,
         x: u64,
         y: u64,
         length: u64,
         colour: u32,
     ) {
-        Framebuffer::fill_rect(clipped_rectangles, x, y, 3, length, colour);
+        self.fill_rect(clipped_rectangles, x, y, 3, length, colour);
     }
 
     fn draw_character(&mut self, _character: char) {
@@ -518,7 +532,7 @@ impl Framebuffer {
 
 impl Writer for Framebuffer {
     fn clear(&mut self) {
-        Framebuffer::fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x00);
+        self.fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x00);
     }
 
     fn put_char(&mut self, character: char) {
@@ -528,6 +542,14 @@ impl Writer for Framebuffer {
     }
 }
 
+/*
+    Utilise 2 buffers which are used to write to graphics memory
+    Front buffer - buffer which maps to video memory
+    Backbuffer - buffer in which work is completed upon
+    Swapping the buffers refers to when memory is copied from backbuffer to frontbuffer
+    Main advantage is that users do not see pixel modification, writing to vm is expensive
+*/
+
 pub fn init(framebuffer_tag: FramebufferTag) {
     // Setup font information
     let font_end = unsafe { &_binary_font_psf_end as *const _ as u32 };
@@ -536,13 +558,39 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     let _font = unsafe { &*(font_start as *const PsfFont) };
 
     FRAMEBUFFER.lock().pitch = framebuffer_tag.pitch as u64;
+    FRAMEBUFFER.free();
     FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;
+    FRAMEBUFFER.free();
 
-    // Map the framebuffer into accessible memory
-    paging::identity_map_from(framebuffer_tag.address, 3);
+    // Calulate sizes of the framebuffer
+    let size = (framebuffer_tag.bpp as u64)
+        * (framebuffer_tag.width as u64)
+        * (framebuffer_tag.height as u64);
+    let size_mb = page_frame_allocator::convert_bytes_to_mb(size);
+    let number_of_pages = page_frame_allocator::convert_bits_to_pages(size);
 
-    // Make background blank
-    Framebuffer::fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BACKGROUND_COLOUR);
+    // Setup the front buffer 
+    let frontbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
+    PAGE_FRAME_ALLOCATOR.free();
+
+    // Identity map this buffer so it maps to video memory
+    paging::identity_map_from(framebuffer_tag.address, frontbuffer_address, size_mb);
+
+    FRAMEBUFFER.lock().frontbuffer = frontbuffer_address;
+    FRAMEBUFFER.free();
+
+    // Setup the back buffer 
+    let backbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
+    PAGE_FRAME_ALLOCATOR.free();
+
+    FRAMEBUFFER.lock().backbuffer = backbuffer_address;
+    FRAMEBUFFER.free();
+
+    // Set background colour
+    FRAMEBUFFER
+        .lock()
+        .fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BACKGROUND_COLOUR);
+    FRAMEBUFFER.free();
 }
 
 extern "C" {

@@ -36,7 +36,7 @@ const VBE_DISPI_INDEX_Y_OFFSET: u16 = 9;
 const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
 pub fn initialise_userland(boot_info: &BootInformation) {
-    let mut i = 0; // TODO: Find a cleaner solution when have wifi
+    let mut i = 0; 
     for module in boot_info.module_tags() {
         // First module will be filesystem if given && constant is true
         if FILESYSTEM_ON && i == 0 { 

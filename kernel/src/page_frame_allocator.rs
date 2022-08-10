@@ -10,7 +10,7 @@ A stack of free pages along with a pointer to the first page will be used in ord
 use crate::{list::Stack, spinlock::Lock};
 use core::prelude::v1::Some;
 use multiboot2::BootInformation;
-
+use crate::{print_serial, CONSOLE};
 pub struct PageFrameAllocator {
     pub free_frames: Stack<u64>,
     pub current_page: u64,
@@ -85,16 +85,14 @@ impl PageFrameAllocator {
 
     pub fn init(&mut self, boot_info: &BootInformation) {
         let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-        let mut memory_start: u64 =
-            (boot_info.end_address() as u64) + (500000 as u64) & 0x000fffff_fffff000;
-        memory_start = 4714496 & 0x000fffff_fffff000; // TODO: Fix this temp fix (memory starts after framebuffer)
 
-        let memory_end: u64 = memory_map_tag
+        let mut memory_start: u64 = round_to_nearest_page((boot_info.end_address() as u64));
+
+        let memory_end: u64 = round_to_nearest_page(memory_map_tag
             .memory_areas()
             .last()
             .expect("Unknown Length")
-            .end_address()
-            & 0x000fffff_fffff000;
+            .end_address());
 
         self.current_page = memory_start;
         self.memory_end = memory_end;
@@ -105,6 +103,14 @@ pub fn round_to_nearest_page(size: u64) -> u64 {
     ((size as i64 + 4095) & (-4096)) as u64
 }
 
-pub static PAGE_FRAME_ALLOCATOR: Lock<PageFrameAllocator> = Lock::new(PageFrameAllocator::new());
+pub fn convert_bits_to_pages(mb: u64) -> u64 {
+    mb  / (PAGE_SIZE as u64) / 8
+}
+
+pub fn convert_bytes_to_mb(bytes: u64) -> u64 {
+    bytes / 1024 / 1024
+}
 
 pub const PAGE_SIZE: usize = 4096;
+
+pub static PAGE_FRAME_ALLOCATOR: Lock<PageFrameAllocator> = Lock::new(PageFrameAllocator::new());

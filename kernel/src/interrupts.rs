@@ -5,6 +5,7 @@ Interrupts are signal which stop the operation flow of a computer in order to pe
 After the CPU performs the action it returns to whatever it was doing
 Interrupts are far more efficient then the CPU polling a device
 An interrupt descriptor table defines what each interrupt will do
+TODO: Clean and refactor (use Lock)
 */
 
 use crate::print_serial;
@@ -85,7 +86,6 @@ pub struct IretStack {
     ss: u64
 }
 
-// TODO: Swap these global statics to a mutex or similar
 #[no_mangle]
 pub static mut IDTR: idtr = idtr { limit: 0, base: 0 };
 pub static mut IDT: [idt_entry; 256] = [idt_entry { isr_low: 0, kernel_cs: 0x08, ist: 0, attributes: 0, isr_mid: 0, isr_high: 0, reserved: 0}; 256];
@@ -163,7 +163,6 @@ pub extern fn interrupt_handler(registers: Registers) {
     }
 }
 
-// TODO: Clean and refactor
 #[no_mangle]
 pub extern fn pit_handler(iret_stack: IretStack) -> *const u64 {
     // Acknowledge interrupt and timer

@@ -26,7 +26,7 @@ const NODE_MEMORY_BLOCK_SIZE: isize = (core::mem::size_of::<Node<MemoryBlock>>()
 struct MemoryBlock {
     is_free: bool, // Indicates whether the memory block is available to be used
     size: u64,
-    data: *mut u64, // Pointer to any data which is held within TODO: make this generic?
+    data: *mut u64, // Pointer to any data which is held within
 }
 
 impl MemoryBlock {
@@ -45,7 +45,7 @@ static FREE_MEMORY_BLOCK_LIST: Lock<Stack<MemoryBlock>> = Lock::new(Stack::<Memo
     Recives the size of variables in bytes which are to be used
     Returns pointer to data region
 */
-pub fn malloc(mut size: u64) -> *mut u64 {
+pub fn kmalloc(mut size: u64) -> *mut u64 {
     // If size is greater then 1 page, allocate multiple pages straight through PFA
     if size > 4096 {
         // Round to nearest page and then allocate
@@ -95,7 +95,7 @@ pub fn malloc(mut size: u64) -> *mut u64 {
     Recives pointer to memory address
     Frees a memory region which can later be allocated
 */
-pub fn free(dp: *mut u64) {
+pub fn kfree(dp: *mut u64) {
     let header_address = unsafe { get_header_address(dp) };
     let header = unsafe { &mut *(header_address as *mut Node<MemoryBlock>) };
 

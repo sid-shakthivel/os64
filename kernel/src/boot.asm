@@ -3,6 +3,50 @@
 extern long_mode_start
 global start
 
+section .multiboot_header
+header_start:
+    dd 0xe85250d6                ; Magic number (multiboot 2) which identifies header
+    dd 0                         ; Architecture 0 (protected mode i386)
+    dd header_end - header_start ; Length of multiboot header in bytes (including magic fields)
+    dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start)) ; Checksum 
+
+    ; insert optional multiboot tags here
+    dw 5 ; Type
+    dw 1 ; Flags, optional
+    dd 20; Size
+    dd 1024 ; Width
+    dd 768 ; Height 
+    dd 32 ; Depth 
+
+    ; required end tag to terminate
+    dw 0    ; Type
+    dw 0    ; Flagsw
+    dd 0    ; Size
+header_end:
+
+section .rodata
+gdt64:
+    dq 0 ; null entry
+    dq 0x002098000000ffff ; kernel code segment
+.pointer:
+    dw $ - gdt64 - 1
+    dq gdt64
+
+; Identity map function 
+section .bss
+align 4096
+p4_table:
+    resb 4096
+p3_table:
+    resb 4096
+p2_table:
+    resb 4096
+p1_tables:
+    resb 49152 ; Identity map the first 24MB
+stack_bottom:
+    resb 16384
+stack_top:
+
 section .text
 bits 32
 start:
@@ -84,26 +128,3 @@ enable_paging:
     mov cr0, eax
 
     ret
-
-section .rodata
-gdt64:
-    dq 0 ; null entry
-    dq 0x002098000000ffff ; kernel code segment
-.pointer:
-    dw $ - gdt64 - 1
-    dq gdt64
-
-; Identity map function 
-section .bss
-align 4096
-p4_table:
-    resb 4096
-p3_table:
-    resb 4096
-p2_table:
-    resb 4096
-p1_tables:
-    resb 49152 ; Identity map the first 24MB
-stack_bottom:
-    resb 16384
-stack_top:

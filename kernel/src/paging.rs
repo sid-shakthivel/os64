@@ -7,9 +7,9 @@ This ensures different processes cannot overwrite memory nor access the memory o
 Page tables specify which frame an address points to
 Order is: Page Map Level Table(P4), Page Directory Pointer Table(P3), Page Directory Table(P2), Page Table(P1)
 
-Recursive mapping sets the last entry of P4 to itself 
+Recursive mapping sets the last entry of P4 to itself
 To access a page table (and edit it), the CPU loops twice through the P4, on second run it acts as a P3, which then points to a P2 which points to a page table entry itself
-By modifying the address passed, CPU can access different parts of the paging hierarchy as different tables act as upper tables 
+By modifying the address passed, CPU can access different parts of the paging hierarchy as different tables act as upper tables
 */
 
 /*
@@ -24,7 +24,7 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::{page_frame_allocator::{PAGE_FRAME_ALLOCATOR, FrameAllocator}};
+use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use core::prelude::v1::Some;
 
 #[allow(dead_code)]
@@ -42,7 +42,7 @@ enum Flags {
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 pub struct Page {
-    pub entry: u64
+    pub entry: u64,
 }
 
 impl Page {
@@ -52,16 +52,17 @@ impl Page {
     }
 
     fn set_flag(&mut self, flag: Flags) {
-        self.entry |= 1 << match flag {
-            Flags::Present => 0,
-            Flags::Writable => 1,
-            Flags::UserAccessible => 2,
-            Flags::WriteThrough => 3,
-            Flags::DisableCache => 4,
-            Flags::Dirty => 5,
-            Flags::Huge => 6,
-            Flags::Global => 7
-        };
+        self.entry |= 1
+            << match flag {
+                Flags::Present => 0,
+                Flags::Writable => 1,
+                Flags::UserAccessible => 2,
+                Flags::WriteThrough => 3,
+                Flags::DisableCache => 4,
+                Flags::Dirty => 5,
+                Flags::Huge => 6,
+                Flags::Global => 7,
+            };
     }
 
     pub fn is_unused(&self) -> bool {
@@ -80,7 +81,7 @@ impl Page {
 
 #[repr(C, packed)]
 pub struct Table {
-    pub entries: [Page; 512]
+    pub entries: [Page; 512],
 }
 
 impl Table {
@@ -89,13 +90,15 @@ impl Table {
         let i = 0;
         for i in 0..self.entries.len() {
             if self.entries[i].entry != 0 {
-                break
+                break;
             }
         }
-        
+
         // If there are 512 empty entries, the table may be freed
         if i == 512 {
-            PAGE_FRAME_ALLOCATOR.lock().free_frame(self as *const _ as *mut u64);
+            PAGE_FRAME_ALLOCATOR
+                .lock()
+                .free_frame(self as *const _ as *mut u64);
             PAGE_FRAME_ALLOCATOR.free();
         }
     }
@@ -109,7 +112,7 @@ impl Table {
             let page_frame = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
             PAGE_FRAME_ALLOCATOR.free();
             self.entries[index] = Page::new(page_frame as u64);
-        } 
+        }
         return self.get_table(index).expect("why not working");
     }
 
@@ -117,14 +120,14 @@ impl Table {
     fn get_table<'a>(&'a mut self, index: usize) -> Option<&'a mut Table> {
         if self.entries[index].entry & 1 > 0 {
             let table_address = self.entries[index].entry & 0x000fffff_fffff000;
-            return unsafe { Some(&mut *(table_address as *mut _)) }
+            return unsafe { Some(&mut *(table_address as *mut _)) };
         } else {
             None
         }
     }
 
     /*
-        A p1 address looks like this in ocal: 0o177777_777_WWWW_XXX_YYY_ZZZ	
+        A p1 address looks like this in ocal: 0o177777_777_WWWW_XXX_YYY_ZZZ
         WWW is the index for P4
         XXX is the index for P3
         YYY is the index for P2
@@ -143,8 +146,12 @@ impl Table {
 pub const P4: *mut Table = 0xffffffff_fffff000 as *mut _;
 
 // The index from the address is used to go to or create tables
-pub fn map_page(physical_address: u64, virtual_address: u64, is_user: bool) {   
-    assert!(virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000, "invalid address: 0x{:x}", virtual_address);
+pub fn map_page(physical_address: u64, virtual_address: u64, is_user: bool) {
+    assert!(
+        virtual_address < 0x0000_8000_0000_0000 || virtual_address >= 0xffff_8000_0000_0000,
+        "invalid address: 0x{:x}",
+        virtual_address
+    );
 
     let p4 = unsafe { &mut *P4 };
 
@@ -157,7 +164,9 @@ pub fn map_page(physical_address: u64, virtual_address: u64, is_user: bool) {
     p1.entries[p1_index] = Page::new(physical_address);
 
     // Translation lookaside buffer - cashes the translation of virtual to physical addresses and needs to be updated manually
-    unsafe { flush_tlb(); }
+    unsafe {
+        flush_tlb();
+    }
 }
 
 pub fn unmap_page(virtual_address: u64) {
@@ -175,30 +184,37 @@ pub fn unmap_page(virtual_address: u64) {
 
     let frame = p1.entries[p1_index];
     if frame.is_unused() == false {
-        PAGE_FRAME_ALLOCATOR.lock().free_frame(frame.get_physical_address());
+        PAGE_FRAME_ALLOCATOR
+            .lock()
+            .free_frame(frame.get_physical_address());
         PAGE_FRAME_ALLOCATOR.free();
         p1.entries[p1_index].set_unused();
 
-        unsafe { flush_tlb(); }
+        unsafe {
+            flush_tlb();
+        }
     }
 }
 
-pub fn identity_map(megabytes: u64, optional_p4: Option<*mut Table>) {
+/*
+    Identity maps a specified amount of megabytes from address 0
+    Usage identity_map(16) would identity map the first 16 MB of memory
+*/
+pub fn identity_map(megabytes: u64) {
     for address in 0..(megabytes * 256) {
         map_page(address * 4096, address * 4096, true);
     }
 }
 
-pub fn identity_map_from(start: u64, megabytes: u64) {
-    // let mut test = 0;
+pub fn identity_map_from(physical_address: u64, virtual_address: u64, megabytes: u64) {
     for address in 0..(megabytes * 256) {
-        let p_address = start + (address * 4096);
-        let v_address = 0x180000 + (address * 4096);
+        let p_address = physical_address + (address * 4096);
+        let v_address = virtual_address + (address * 4096);
         map_page(p_address, v_address, false);
     }
 }
 
-// Creates a deep clone of the paging system 
+// Creates a deep clone of the paging system
 pub fn deep_clone() -> *mut Table {
     unsafe {
         let p4 = &mut *P4;
@@ -212,19 +228,22 @@ pub fn deep_clone() -> *mut Table {
 
                 for j in 0..(*p3).entries.len() {
                     if (*p3).entries[j].entry != 0 {
-                        let new_p2: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
+                        let new_p2: *mut Table =
+                            PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
                         PAGE_FRAME_ALLOCATOR.free();
                         let p2 = p3.get_table(j).unwrap();
 
                         for k in 0..(*p2).entries.len() {
                             if (*p2).entries[k].entry != 0 {
-                                let new_p1: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
+                                let new_p1: *mut Table =
+                                    PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
                                 PAGE_FRAME_ALLOCATOR.free();
                                 let p1 = p2.get_table(k).unwrap();
 
                                 for l in 0..(*p1).entries.len() {
                                     if (*p1).entries[l].entry != 0 {
-                                        (*new_p1).entries[l] = Page::new((*p1).entries[l].entry as u64);
+                                        (*new_p1).entries[l] =
+                                            Page::new((*p1).entries[l].entry as u64);
                                     }
                                 }
 

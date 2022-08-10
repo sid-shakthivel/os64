@@ -16,6 +16,7 @@
 */
 
 use crate::framebuffer;
+use crate::framebuffer::FRAMEBUFFER;
 use crate::ps2;
 use crate::spinlock::Lock;
 use crate::DESKTOP;
@@ -92,7 +93,15 @@ impl Mouse {
         // }
 
         // Clear mouse coordiantes before updating
-        crate::framebuffer::Framebuffer::fill_rect(None, self.mouse_x, self.mouse_y, 5, 5, framebuffer::BACKGROUND_COLOUR);
+        FRAMEBUFFER.lock().fill_rect(
+            None,
+            self.mouse_x,
+            self.mouse_y,
+            5,
+            5,
+            framebuffer::BACKGROUND_COLOUR,
+        );
+        FRAMEBUFFER.free();
 
         // X movement and Y movement values must be read as a 9 bit or greater SIGNED value if bit is enabled
         if self.mouse_packets[0] & (1 << 4) == 0x10 {
