@@ -1,7 +1,7 @@
 // src/vga_text.rs
 
 /*
-The vga buffer located at 0xb8000 allows characters to be printed to the screen. 
+The vga buffer located at 0xb8000 allows characters to be printed to the screen.
 Actual values in memory are not written to as this is only a buffer which maps to VRAM.
 Screen has 25 rows of 80 length.
 Each entry in the buffer must be formatted like this:
@@ -14,8 +14,9 @@ Each entry in the buffer must be formatted like this:
 
 // TODO: Fix having to import use crate::vga_text::TERMINAL; on each file
 
-use lazy_static::lazy_static;
+use crate::writer::Writer;
 use core::fmt;
+use lazy_static::lazy_static;
 
 #[allow(dead_code)]
 enum VgaColours {
@@ -23,7 +24,7 @@ enum VgaColours {
     Bue = 1,
     Green = 2,
     Cyan = 3,
-    Red = 4,  
+    Red = 4,
     Magenta = 5,
     Brown = 6,
     LightGrey = 7,
@@ -40,7 +41,7 @@ enum VgaColours {
 pub struct Terminal {
     terminal_row: usize,
     terminal_col: usize,
-    vga_buffer: &'static mut [[u16; VGA_WIDTH]; VGA_HEIGHT], 
+    vga_buffer: &'static mut [[u16; VGA_WIDTH]; VGA_HEIGHT],
 }
 
 lazy_static! {
@@ -54,8 +55,8 @@ lazy_static! {
 const VGA_WIDTH: usize = 80;
 const VGA_HEIGHT: usize = 25;
 
-#[macro_export] 
-macro_rules! print {
+#[macro_export]
+macro_rules! print_vga {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
         TERMINAL.lock().write_fmt(format_args!($($arg)*)).unwrap();
@@ -72,9 +73,9 @@ impl fmt::Write for Terminal {
 
 impl Terminal {
     fn scroll(&mut self) {
-        for i in 0..(VGA_HEIGHT-1) {
+        for i in 0..(VGA_HEIGHT - 1) {
             for j in 0..VGA_WIDTH {
-                self.vga_buffer[i][j] = (self.vga_buffer[i+1][j]).clone()
+                self.vga_buffer[i][j] = (self.vga_buffer[i + 1][j]).clone()
             }
         }
         self.terminal_row = VGA_HEIGHT - 1;
@@ -92,10 +93,16 @@ impl Terminal {
         if self.terminal_col == 0 {
             self.terminal_col = 79;
             self.terminal_row -= 1;
-            self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(VgaColours::get_attributes((VgaColours::Black, VgaColours::White)), ' ' as u8);
+            self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(
+                VgaColours::get_attributes((VgaColours::Black, VgaColours::White)),
+                ' ' as u8,
+            );
         } else {
             self.terminal_col -= 1;
-            self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(VgaColours::get_attributes((VgaColours::Black, VgaColours::White)), ' ' as u8);
+            self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(
+                VgaColours::get_attributes((VgaColours::Black, VgaColours::White)),
+                ' ' as u8,
+            );
         }
     }
 }
@@ -108,33 +115,38 @@ impl VgaColours {
 
     fn get_attributes(colours: (VgaColours, VgaColours)) -> u8 {
         // Background Color, Foreground Color
-        return (colours.0 as u8) << 4 | (colours.1 as u8)
+        return (colours.0 as u8) << 4 | (colours.1 as u8);
     }
 }
 
 impl Writer for Terminal {
     fn put_char(&mut self, character: char) {
-        match byte {
-            '\n' => { self.new_line() },
+        match character {
+            '\n' => self.newline(),
             _ => {
                 let attributes = VgaColours::get_attributes((VgaColours::Black, VgaColours::White));
-                self.vga_buffer[self.terminal_row][self.terminal_col] = VgaColours::get_vga_entry(attributes, character as u8);
+                self.vga_buffer[self.terminal_row][self.terminal_col] =
+                    VgaColours::get_vga_entry(attributes, character as u8);
                 self.terminal_col += 1;
-                if self.terminal_col >= VGA_WIDTH { self.new_line(); }
+                if self.terminal_col >= VGA_WIDTH {
+                    self.newline();
+                }
             }
         }
     }
 
-    fn new_line(&mut self) {
+    fn newline(&mut self) {
         self.terminal_row += 1;
         self.terminal_col = 0;
-        if self.terminal_row >= VGA_HEIGHT { self.scroll(); } 
-    } 
+        if self.terminal_row >= VGA_HEIGHT {
+            self.scroll();
+        }
+    }
 
     fn clear(&mut self) {
         for _i in 0..VGA_HEIGHT {
             for _j in 0..VGA_WIDTH {
-                self.put_char(' ', VgaColours::get_attributes((VgaColours::Black, VgaColours::White)));
+                self.put_char(' ');
             }
         }
         self.terminal_row = 0;

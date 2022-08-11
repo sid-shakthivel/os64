@@ -9,7 +9,7 @@ Large Tasks:
 - Port dart (git clone https://kernel.googlesource.com/pub/scm/utils/dash/dash)
 
 Smaller Tasks:
-- Free memory/switch to malloc
+- Free memory/switch to malloc everywhere
 - Address todos 
 - Bitflags
 - Improve spinlock
@@ -19,11 +19,16 @@ Smaller Tasks:
 Think:
 - Switch to usize
 - Make things like page frame allocator generic of types - large array would be of certain types
+- Make an idle user space process with low priority which always runs
+- Communicate with VM with syscalls?
+- Syscall management - which ones to write, design of basic syscall functions within syscalls.c
+- Edit multiboot_header.asm
 
 Potential problems:
 - New framebuffer stuff may not work with fs
 - Background should clip windows too (may be resolved with DR)
-- Double buffering drastically reduces performance
+- Double buffering significantly reduces performance
+- Modify allocator address when using modules
 
 Strategy:
 Each window is a doubley linked list of windows of linked list of views (stuff like menus, etc) which contain a buffer of their size which is written to, coordinates, etc
@@ -33,12 +38,22 @@ Copy each window buffer to screen buffer and use compare memory - if different w
 Give mouse/keyboard event to each window and let them decide whether to process (check position overlaps)
 
 Now:
-C user space programs (No elf?)
+General protection fault
 Dirty rectangles when dragging windows
 
 Future:
 Implement closing windows
 Handle keyboard events
 
-- Just compile a c file into a binary which can be used 
-- Figure out how to compile with a standard library, etc
+ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
+ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
+ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
+ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
+ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
+
+/Users/siddharth/Code/rust/os64/userland/newlib_build/build_raw/x86_64-sidos
+
+
+3) Write a makefile to fully compile everything for ease of use
+
+Write makefile to fully compile everything - autoconf, newlib, automake, binutils, gcc, etc

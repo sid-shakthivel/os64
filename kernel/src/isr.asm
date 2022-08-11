@@ -68,6 +68,7 @@ handle_interrupt%1:
 global handle_pit_interrupt
 handle_pit_interrupt:
     call pit_handler
+
     mov rsp, [old_process + 24]
     push qword [old_process + 32]
     push qword [old_process + 24]

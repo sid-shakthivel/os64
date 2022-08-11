@@ -111,6 +111,10 @@ pub fn convert_bytes_to_mb(bytes: u64) -> u64 {
     bytes / 1024 / 1024
 }
 
+pub fn get_page_number(size: u64) -> u64 {
+    size / (PAGE_SIZE as u64)
+}
+
 pub const PAGE_SIZE: usize = 4096;
 
 pub static PAGE_FRAME_ALLOCATOR: Lock<PageFrameAllocator> = Lock::new(PageFrameAllocator::new());

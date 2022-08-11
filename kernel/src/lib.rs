@@ -6,7 +6,7 @@
 #![feature(const_option)]
 #![feature(const_mut_refs)]
 
-// mod vga_text;
+mod allocator;
 mod elf;
 mod framebuffer;
 mod fs;
@@ -26,21 +26,22 @@ mod ps2;
 mod spinlock;
 mod syscalls;
 mod uart;
+mod vga_text;
 mod writer;
-mod allocator;
 
 extern crate multiboot2;
 #[macro_use]
 extern crate bitflags;
 extern crate x86_64;
 
-use crate::allocator::free;
 use crate::framebuffer::DESKTOP;
 use crate::mouse::MOUSE;
-use crate::page_frame_allocator::{PAGE_FRAME_ALLOCATOR, FrameAllocator};
+use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
+use crate::vga_text::TERMINAL;
+use crate::writer::Writer;
 use core::panic::PanicInfo;
 use multiboot2::load;
 
@@ -52,39 +53,41 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     PAGE_FRAME_ALLOCATOR.lock().init(&boot_info);
     PAGE_FRAME_ALLOCATOR.free();
 
-    grub::bga_set_video_mode();
+    // allocator::extend_memory_region();
 
-    framebuffer::init(boot_info.framebuffer_tag().unwrap());
- 
-    uart::init();
+    // uart::init();
 
     gdt::init();
     PIT.lock().init();
-    ps2::init().unwrap();
+    // ps2::init().unwrap();
     interrupts::init();
     PICS.lock().init();
+ 
+    TERMINAL.lock().clear();
+
+    grub::initialise_userland(&boot_info);
+
+    print_vga!("Execution finished\n");
 
     interrupts::enable();
 
-    DESKTOP.lock().create_window(10, 10, 300, 300); 
-    DESKTOP.free();
+    // grub::bga_set_video_mode();
 
-    DESKTOP.lock().create_window(200, 150, 400, 400); 
-    DESKTOP.free();
+    // framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
-    let mouse_x = MOUSE.lock().mouse_x;
-    MOUSE.free();
-    let mouse_y = MOUSE.lock().mouse_y;
-    MOUSE.free();
+    // DESKTOP.lock().create_window(10, 10, 300, 300);
+    // DESKTOP.free();
 
-    DESKTOP.lock().paint(mouse_x, mouse_y);
-    DESKTOP.free();
+    // DESKTOP.lock().create_window(200, 150, 400, 400);
+    // DESKTOP.free();
 
-    print_serial!("End of execution\n");
+    // let mouse_x = MOUSE.lock().mouse_x;
+    // MOUSE.free();
+    // let mouse_y = MOUSE.lock().mouse_y;
+    // MOUSE.free();
 
-    // grub::initialise_userland(&boot_info);
-
-    // allocator::extend_memory_region();
+    // DESKTOP.lock().paint(mouse_x, mouse_y);
+    // DESKTOP.free();
 
     // fs::init(multiboot_information_address);
 
@@ -95,6 +98,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 #[no_mangle]
 fn panic(info: &PanicInfo) -> ! {
     print_serial!("Error: {}", info);
+    print_vga!("Error: {}", info);
     loop {}
 }
-

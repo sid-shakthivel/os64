@@ -18,9 +18,9 @@
     +------+-------------+------+-----------------+
 */
 
-use crate::ports::outb;
 use crate::ports::inb;
 use crate::ports::io_wait;
+use crate::ports::outb;
 use spin::Mutex;
 
 const PIC1_PORT_COMMAND: u16 = 0x20;
@@ -37,12 +37,12 @@ const PIC_ACK: u8 = 0x20;
 struct Pic {
     offset: u8,
     command: u16,
-    data: u16
+    data: u16,
 }
 
 pub struct ChainedPics {
     master: Pic,
-    slave: Pic
+    slave: Pic,
 }
 
 pub trait PicFunctions {
@@ -82,14 +82,14 @@ impl ChainedPics {
         io_wait();
 
         // ECW4 Enable 8086 Mode
-        outb(self.master.data, 1); 
-        outb(self.slave.data, 1);        
+        outb(self.master.data, 1);
+        outb(self.slave.data, 1);
         io_wait();
- 
+
         // f9 - kbd, slave
         // fb - slave
         // ef - mouse
-        outb(self.master.data, 0xf9);  // Enable just keyboard and slave
+        outb(self.master.data, 0xf8); // Enable just keyboard and slave
         outb(self.slave.data, 0xef); // Mouse
         io_wait();
     }
@@ -142,4 +142,5 @@ impl PicFunctions for Pic {
     }
 }
 
-pub static PICS: Mutex<ChainedPics> = Mutex::new(ChainedPics::new(PIC1_START_INTERRUPT, PIC2_START_INTERRUPT));
+pub static PICS: Mutex<ChainedPics> =
+    Mutex::new(ChainedPics::new(PIC1_START_INTERRUPT, PIC2_START_INTERRUPT));

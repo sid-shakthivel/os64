@@ -20,7 +20,7 @@ SECTIONS
         *(.data) *(.data.*)
     }
 
-.data.rel.ro : ALIGN(4K)
+    .data.rel.ro : ALIGN(4K)
     {
          *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
      }

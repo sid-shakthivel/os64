@@ -7,10 +7,10 @@ run-bochs: all
 all:
 	# Userspace modules
 	# docker run --rm -v /Users/siddharth/Code/rust/os64/:/code os64/toolchain bash -c "cd code/userland/program && make all"
-	# docker run --rm -v /Users/siddharth/Code/rust/os64/:/code os64/toolchain bash -c "cd code/userland/program2 && make all"
+	cd /Users/siddharth/Code/rust/os64/userland/hello-c && make 
 
 	# Kernel
-	cd kernel && make run
+	cd /Users/siddharth/Code/rust/os64/kernel && make run
 
 clean:
 	rm -f os64.iso

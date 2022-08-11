@@ -4,14 +4,16 @@
     Preemptive multitasking is when the CPU splits up its time between various processes to give the illusion they are happening simultaneously
 */
 
-use core::prelude::v1::Some;
+use crate::page_frame_allocator::FrameAllocator;
 use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::page_frame_allocator::PAGE_SIZE;
-use core::mem::size_of;
-use crate::spinlock::Lock;
-use crate::page_frame_allocator::FrameAllocator;
-use crate::paging::Table;
 use crate::paging;
+use crate::paging::Table;
+use crate::print_serial;
+use crate::spinlock::Lock;
+use crate::CONSOLE;
+use core::mem::size_of;
+use core::prelude::v1::Some;
 
 /*
     Processes are running programs with an individual address space, stack and data
@@ -52,7 +54,7 @@ impl ProcessSchedular {
             tasks: [None; MAX_PROCESS_NUM],
             is_from_kernel: true,
             process_count: 0,
-            current_process_index: 0
+            current_process_index: 0,
         }
     }
 
@@ -61,33 +63,44 @@ impl ProcessSchedular {
         TODO: Switch to priority based round robin
     */
     pub fn schedule_process(&mut self, mut old_rsp: u64) -> Option<*const u64> {
-        if self.tasks[0].is_none() { return None; }
+        if self.tasks[0].is_none() {
+            return None;
+        }
 
         if self.is_from_kernel == true {
             // If this is the first process to be called, it stems from kernel and that stack need not be saved
-            unsafe { KERNEL_STACK = old_rsp; }
+            unsafe {
+                KERNEL_STACK = old_rsp;
+            }
             self.is_from_kernel = false;
         } else {
             // TODO: Find more efficient way
             // Save the old RSP into the process but adjust the value as certain values are pushed
-            old_rsp -= 0x60; 
-            let updated_process = Process { rsp: old_rsp as *const _, ..self.tasks[self.current_process_index].unwrap() }; 
-            self.tasks[self.current_process_index] = Some(updated_process);
-            self.current_process_index += 1;
+            old_rsp -= 0x60;
+            let updated_process = Process {
+                rsp: old_rsp as *const _,
+                ..self.tasks[0].unwrap()
+            };
+            self.tasks[0] = Some(updated_process);
+            // self.current_process_index += 1;
         }
 
-        // Select next process and ensure it's not empty
-        let mut current_task = self.tasks[self.current_process_index];
-        if current_task.is_none() {
-            self.current_process_index = 0;
-            current_task = self.tasks[self.current_process_index];
-        }
+        // // Select next process and ensure it's not empty
+        // let mut current_task = self.tasks[self.current_process_index];
+        // if current_task.is_none() {
+        //     self.current_process_index = 0;
+        //     current_task = self.tasks[self.current_process_index];
+        // }
 
-        return Some(current_task.unwrap().rsp);
+        // return Some(current_task.unwrap().rsp);
+
+        return Some(self.tasks[0].unwrap().rsp);
     }
 
     pub fn add_process(&mut self, process: Process) {
-        if self.process_count > MAX_PROCESS_NUM { panic!("Memory maxed") }
+        if self.process_count > MAX_PROCESS_NUM {
+            panic!("Memory maxed")
+        }
         self.tasks[self.process_count] = Some(process);
         self.process_count += 1;
     }
@@ -100,15 +113,15 @@ impl Process {
 
         // Copy current address space by creating a new P4
         let new_p4: *mut Table = paging::deep_clone();
-        
+
         // Create and setup a stack as though an interrupt has been fired
-        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frame(); 
+        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
         PAGE_FRAME_ALLOCATOR.free();
 
         unsafe {
             let stack_top = rsp.offset(511) as u64;
             rsp = rsp.offset(511); // Stack grows downwards towards decreasing memory addresses
-            
+
             // These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
             // When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
 
@@ -132,7 +145,7 @@ impl Process {
             pid: 0,
             rsp: rsp,
             process_priority: process_priority,
-            cr3: new_p4
+            cr3: new_p4,
         }
     }
 }

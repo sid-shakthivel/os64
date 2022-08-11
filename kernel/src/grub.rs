@@ -1,24 +1,24 @@
-#[warn(non_camel_case_types)]
-
-// src/grub.rs
-
-/*
-    Grub 2 (GNU bootloader) is a bootloader which uses a header file to configure options
-    Grub loads a number of modules(user programs) into certain memory locations which need to be mapped into user pages
-    Grub emulates VGA card 
-    BGA (Bochs Graphic Updator) is accessible via 2 ports (index, data) in which it's possible to enable/disable VBE extentions
-    Includes changing screen resolution, dit depth | Latest version is 0xB0C5
-
-
-*/
-
-use multiboot2::{BootInformation};
 use crate::elf;
 use crate::framebuffer;
 use crate::fs;
 use crate::multitask;
 use crate::ports::inpw;
 use crate::ports::outpw;
+use crate::print_serial;
+use crate::CONSOLE;
+#[warn(non_camel_case_types)]
+// src/grub.rs
+
+/*
+    Grub 2 (GNU bootloader) is a bootloader which uses a header file to configure options
+    Grub loads a number of modules(user programs) into certain memory locations which need to be mapped into user pages
+    Grub emulates VGA card
+    BGA (Bochs Graphic Updator) is accessible via 2 ports (index, data) in which it's possible to enable/disable VBE extentions
+    Includes changing screen resolution, dit depth | Latest version is 0xB0C5
+
+
+*/
+use multiboot2::BootInformation;
 
 const FILESYSTEM_ON: bool = false;
 const VBE_DISPI_IOPORT_INDEX: u16 = 0x01CE;
@@ -36,27 +36,31 @@ const VBE_DISPI_INDEX_Y_OFFSET: u16 = 9;
 const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
 pub fn initialise_userland(boot_info: &BootInformation) {
-    let mut i = 0; 
+    let mut i = 0;
     for module in boot_info.module_tags() {
         // First module will be filesystem if given && constant is true
-        if FILESYSTEM_ON && i == 0 { 
-            fs::init(module.start_address()); 
-        }
-        else if FILESYSTEM_ON {
-            // Else, modules are userspace programs 
+        if FILESYSTEM_ON && i == 0 {
+            fs::init(module.start_address());
+        } else if !FILESYSTEM_ON {
+            print_serial!("SIZE IS {}\n", module.module_size());
+            // Else, modules are userspace programs
             elf::parse(module.start_address() as u64);
             let user_process = multitask::Process::init(multitask::ProcessPriority::High);
 
             // Add process to list of processes
-            multitask::PROCESS_SCHEDULAR.lock().add_process(user_process);
-            multitask::PROCESS_SCHEDULAR.free();   
+            multitask::PROCESS_SCHEDULAR
+                .lock()
+                .add_process(user_process);
+            multitask::PROCESS_SCHEDULAR.free();
         }
         i += 1;
     }
 }
 
 pub fn bga_set_video_mode() {
-    if !is_bga_available() { panic!("BGA is not available"); }
+    if !is_bga_available() {
+        panic!("BGA is not available");
+    }
     write_bga_register(VBE_DISPI_INDEX_ENABLE, 0x00); // To modify contents of other registers, VBE extensions must be disabled
     write_bga_register(VBE_DISPI_INDEX_XRES, framebuffer::SCREEN_WIDTH as u16);
     write_bga_register(VBE_DISPI_INDEX_YRES, framebuffer::SCREEN_HEIGHT as u16);
@@ -67,7 +71,7 @@ pub fn bga_set_video_mode() {
 
 fn write_bga_register(index: u16, value: u16) {
     outpw(VBE_DISPI_IOPORT_INDEX, index);
-    outpw(VBE_DISPI_IOPORT_DATA, value); 
+    outpw(VBE_DISPI_IOPORT_DATA, value);
 }
 
 fn read_bga_register(index: u16) -> u16 {
@@ -76,5 +80,5 @@ fn read_bga_register(index: u16) -> u16 {
 }
 
 fn is_bga_available() -> bool {
-    return read_bga_register(VBE_DISPI_INDEX_ID) == 0xB0C5
+    return read_bga_register(VBE_DISPI_INDEX_ID) == 0xB0C5;
 }

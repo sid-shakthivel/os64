@@ -18,14 +18,16 @@
 
 use crate::interrupts::Registers;
 use crate::print_serial;
+use crate::print_vga;
 use crate::CONSOLE;
+use crate::TERMINAL;
 
 // TODO: Add support for more syscalls
 
 #[no_mangle]
-pub extern fn syscall_handler(registers: Registers) {
+pub extern "C" fn syscall_handler(registers: Registers) {
     let syscall_id = registers.rax;
-    
+
     match syscall_id {
         4 => {
             // sys_write
@@ -33,10 +35,12 @@ pub extern fn syscall_handler(registers: Registers) {
             let data = registers.rcx;
 
             for i in 0..message_length {
-                let char = unsafe { *((data + i) as *const u8) };
-                print_serial!("{}", char as char);
+                let test = unsafe { *((data + i) as *const u8) };
+                print_serial!("{}", test as char);
             }
         }
-        _ => panic!("Unknown Syscall\n")
+        _ => panic!("Unknown Syscall\n"),
     };
+
+    print_vga!("FINISHED SYSCALL\n");
 }

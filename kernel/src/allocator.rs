@@ -86,7 +86,7 @@ pub fn kmalloc(mut size: u64) -> *mut u64 {
             // No memory blocks can be found, thus must allocate more memory
             extend_memory_region();
 
-            return malloc(size);
+            return kmalloc(size);
         }
     }
 }
@@ -146,7 +146,6 @@ fn find_first_fit(size: u64) -> (u64, Option<MemoryBlock>) {
 }
 
 // Extends accessible memory region of kernel heap by another page (4096 bytes)
-// WARNING: May want to change when having a functional userspace
 pub fn extend_memory_region() {
     // Allocate another page
     let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();

@@ -123,7 +123,7 @@ impl Desktop {
             if mouse_x >= temp.x
                 && mouse_x <= (temp.x + temp.width)
                 && mouse_y >= temp.y
-                && mouse_y <= (temp.y + 21)
+                && mouse_y <= (temp.y + temp.height)
             {
                 // Update drag window, etc
                 let const_ptr = &window.unwrap().payload as *const Window;
@@ -569,7 +569,7 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     let size_mb = page_frame_allocator::convert_bytes_to_mb(size);
     let number_of_pages = page_frame_allocator::convert_bits_to_pages(size);
 
-    // Setup the front buffer 
+    // Setup the front buffer
     let frontbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
     PAGE_FRAME_ALLOCATOR.free();
 
@@ -579,7 +579,7 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     FRAMEBUFFER.lock().frontbuffer = frontbuffer_address;
     FRAMEBUFFER.free();
 
-    // Setup the back buffer 
+    // Setup the back buffer
     let backbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
     PAGE_FRAME_ALLOCATOR.free();
 
