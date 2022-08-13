@@ -42,7 +42,6 @@ pub fn initialise_userland(boot_info: &BootInformation) {
         if FILESYSTEM_ON && i == 0 {
             fs::init(module.start_address());
         } else if !FILESYSTEM_ON {
-            print_serial!("SIZE IS {}\n", module.module_size());
             // Else, modules are userspace programs
             elf::parse(module.start_address() as u64);
             let user_process = multitask::Process::init(multitask::ProcessPriority::High);
