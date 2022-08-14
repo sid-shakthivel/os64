@@ -86,10 +86,9 @@ impl ChainedPics {
         outb(self.slave.data, 1);
         io_wait();
 
-        // f9 - kbd, slave
-        // fb - slave
+        // f9 - kbd, slave, 
         // ef - mouse
-        outb(self.master.data, 0xf8); // Enable just keyboard and slave
+        outb(self.master.data, 0xf9); // Enable just keyboard and slave
         outb(self.slave.data, 0xef); // Mouse
         io_wait();
     }

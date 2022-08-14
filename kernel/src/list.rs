@@ -58,7 +58,7 @@ impl<'a, T> Iterator for StackIntoIterator<'a, T> {
     }
 }
 
-impl<T: Clone + core::cmp::PartialEq> Stack<T> {
+impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
     pub const fn new() -> Self {
         Self {
             head: None,
@@ -113,7 +113,7 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
     // Removes a node from linked list given position within list
     pub fn remove_at(&mut self, index: usize) -> *mut Node<T> {
         if index > self.length {
-            panic!("Index out of bounds")
+            panic!("Index out of bounds at {}\n", index);
         };
 
         if index == (self.length - 1) {
@@ -124,6 +124,9 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
             0 => self.pop(),
             _ => {
                 self.length -= 1;
+                unsafe{
+                    print_serial!("{}", index);
+                }
                 let node = self.into_iter().nth(index).unwrap().unwrap();
                 unsafe {
                     (*node.prev.unwrap()).next = node.next;
@@ -140,8 +143,7 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
     pub fn remove(&mut self, target_node: &Node<T>) -> *mut Node<T> {
         let raw_value = target_node.payload.clone();
         for (i, node) in &mut self.into_iter().enumerate() {
-            let unwrapped_node = node.unwrap().payload.clone();
-            if unwrapped_node == raw_value {
+            if node.unwrap().payload.clone() == raw_value {
                 return self.remove_at(i);
             }
         }
@@ -149,13 +151,14 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
     }
 
     /*
-        Takes in index to return from
-        NOTE: Utilises page frame allocator to create new list
+        Returns stack of nodes in higher position then the target node
+        NOTE: Uses page frame allocator
     */
-    pub fn get_above_nodes(&self, index: usize) -> Stack<T> {
+    pub fn get_higher_nodes(&mut self, target_node: T) -> Stack<T> {
         let mut new_stack = Stack::<T>::new();
+        let mut length = 0;
         for (i, node) in self.into_iter().enumerate() {
-            if i == index {
+            if node.unwrap().payload.clone() == target_node {
                 break;
             }
             new_stack.push(
@@ -163,11 +166,35 @@ impl<T: Clone + core::cmp::PartialEq> Stack<T> {
                 node.unwrap().payload.clone(),
             );
             PAGE_FRAME_ALLOCATOR.free();
+            length += 1;
         }
-        new_stack.length = index;
-        return new_stack;
+        new_stack.length = length;
+        new_stack
     }
 
+    // Appends another list onto this one
+    pub fn append(&mut self, stack: Stack<T>) {
+        // Replace the tail with the head of the new stack
+        unsafe {
+            (*self.tail.unwrap()).next = stack.head;
+        }
+
+        // Set the tail to the new stack's tail
+        self.tail = stack.tail;
+
+        // Update length
+        self.length += stack.length;
+    }
+
+    // Removes every element from a list
+    pub fn empty(&mut self) {
+        for i in 0..(self.length - 1) {
+            self.remove_at(i);
+        }
+        self.length = 0;
+    }
+
+    // Removes the last element from the list
     fn pop_tail(&mut self) -> *mut Node<T> {
         unsafe {
             let clone = self.tail;

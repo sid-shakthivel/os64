@@ -19,7 +19,6 @@ use crate::framebuffer;
 use crate::framebuffer::FRAMEBUFFER;
 use crate::ps2;
 use crate::spinlock::Lock;
-use crate::DESKTOP;
 
 #[derive(PartialEq)]
 pub enum MouseState {
@@ -136,10 +135,10 @@ impl Mouse {
         //     self.mouse_y = 10;
         // }
 
-        DESKTOP
-            .lock()
-            .handle_mouse_movement(self.mouse_x, self.mouse_y, is_left_clicked);
-        DESKTOP.free();
+        // DESKTOP
+        //     .lock()
+        //     .handle_mouse_movement(self.mouse_x, self.mouse_y, is_left_clicked);
+        // DESKTOP.free();
     }
 
     fn enable_scanning(&self) {

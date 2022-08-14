@@ -93,11 +93,9 @@ handle_pit_interrupt:
 global handle_syscall
 handle_syscall:
     cld
-    ; xchg bx, bx
     pushaq
     call syscall_handler
     popq
-    xchg bx, bx
     iretq
 
 handle_no_err_exception 0

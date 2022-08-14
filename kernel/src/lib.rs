@@ -34,7 +34,8 @@ extern crate multiboot2;
 extern crate bitflags;
 extern crate x86_64;
 
-use crate::framebuffer::DESKTOP;
+use crate::framebuffer::{Rectangle, Window, DESKTOP};
+use crate::list::Stack;
 use crate::mouse::MOUSE;
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::pic::PICS;
@@ -53,43 +54,38 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     PAGE_FRAME_ALLOCATOR.lock().init(&boot_info);
     PAGE_FRAME_ALLOCATOR.free();
 
-    // allocator::extend_memory_region();
+    allocator::extend_memory_region();
 
-    // uart::init();
+    uart::init();
 
     gdt::init();
     PIT.lock().init();
-    // ps2::init().unwrap();
+    ps2::init().unwrap();
     interrupts::init();
     PICS.lock().init();
- 
+
     TERMINAL.lock().clear();
 
-    grub::initialise_userland(&boot_info);
+    grub::bga_set_video_mode();
 
-    print_vga!("Execution finished\n");
+    framebuffer::init(boot_info.framebuffer_tag().unwrap());
+
+    let window1 = Window::new(10, 10, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
+    DESKTOP.free();
+
+    DESKTOP.lock().add_sub_window(window1);
+    DESKTOP.free();
+
+    DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
+    DESKTOP.free();
+
+    // fs::init(multiboot_information_address);
 
     interrupts::enable();
 
-    // grub::bga_set_video_mode();
+    // grub::initialise_userland(&boot_info);
 
-    // framebuffer::init(boot_info.framebuffer_tag().unwrap());
-
-    // DESKTOP.lock().create_window(10, 10, 300, 300);
-    // DESKTOP.free();
-
-    // DESKTOP.lock().create_window(200, 150, 400, 400);
-    // DESKTOP.free();
-
-    // let mouse_x = MOUSE.lock().mouse_x;
-    // MOUSE.free();
-    // let mouse_y = MOUSE.lock().mouse_y;
-    // MOUSE.free();
-
-    // DESKTOP.lock().paint(mouse_x, mouse_y);
-    // DESKTOP.free();
-
-    // fs::init(multiboot_information_address);
+    print_vga!("Execution finished\n");
 
     loop {}
 }

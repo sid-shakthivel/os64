@@ -5,7 +5,7 @@ int main()
     // In at&t - source, destionation
     char *message = "Hello World";
 
-    asm("xchg %bx, %bx");
+    // asm("xchg %bx, %bx");
 
     // Message to write
     asm("mov $11, %%rdx \n\t\

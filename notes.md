@@ -9,15 +9,15 @@ Large Tasks:
 - Polish (GUI (background), Code, etc)
 
 Smaller Tasks:
-- Edit multiboot_header.asm
+- REP MOVSB instruction
 - Bitflags
 - Make malloc multipage (when extending, merge memory)
 - Free memory/switch to malloc everywhere
-- Address todos 
 - Improve spinlock
 - Fix rust borrow stuff (https://www.youtube.com/watch?v=79phqVpE7cU)
-- Optimize memcpy
 - Add syslinks to newlib makefile
+- Mutable into_iter_mut method
+- Replace enumerate() with map
 
 Think:
 - Switch to usize
@@ -27,24 +27,18 @@ Think:
 
 Potential problems:
 - New framebuffer stuff may not work with fs
-- Background should clip windows too (may be resolved with DR)
 - Double buffering significantly reduces performance
-- Fix binutils and get ld to work properly
-
-Strategy:
-Each window is a doubley linked list of windows of linked list of views (stuff like menus, etc) which contain a buffer of their size which is written to, coordinates, etc
-Selected(with mouse)/new windows to the start of linked list with highest Z
-Start with the deepest window to the shallowest (recursive algorithm)
-Copy each window buffer to screen buffer and use compare memory - if different write (perhaps using SSE)
-Give mouse/keyboard event to each window and let them decide whether to process (check position overlaps)
+- Fix binutils and get ld to work properly (doesn't build on MacOS)
 
 Now:
-General protection fault
-Dirty rectangles when dragging windows
+Dirty rectangles when dragging windows/raising em
+Compare memory - if different write (perhaps using SSE)
+Handle keyboard events
+General protection fault from syscall
 
 Future:
-Implement closing windows
-Handle keyboard events
+Handle title bar inactivity, activity
+Handle closing of windows
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
@@ -52,4 +46,19 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
-/Users/siddharth/Code/rust/os64/userland/newlib_build/build_raw/x86_64-sidos
+No extendability for windows below yet (clipping)
+
+Window_apply_bound_clipping(Window* window, int in_recursion, List* dirty_regions)
+Window_paint(Window* window, List* dirty_regions, uint8_t paint_children)
+Window_move(Window* window, int new_x, int new_y) - method called within the mouse handler method
+
+CLIP the background by making it a window itself
+
+Currently parent => child but only 1 parent and lots of children (for now)
+
+For now - have the main  stuff within window and have smaller helper functions within Desktop (for now)
+
+Should clip against self just in case?
+Intersect clipping rects?
+
+
