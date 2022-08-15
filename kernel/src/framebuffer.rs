@@ -3,11 +3,12 @@
 /*
     Framebuffer is portion of RAM which contains a bitmap which maps to the display (pixels)
     GRUB sets the correct video mode before loading the &kernel as specified within the multiboot header
-    Pitch is& n&umber of bytes per row, BPP is bit depth
+    Pitch is number of bytes per row, BPP is bit depth
     Rectangles are arranged like this:
         Top
     Left    Right
         Bottom
+    The order of windows is maintained through the stack in which the top most window is at the front and the bottom window is at the back
     Clipping is a method to enable/disable rendering of certain areas by only rendering the topmost pixels in which overlapping regions are not rendered
     A dirty rectangle list is a way to keep track of regions of the screen which need to be repainted which can be used upon the dragging of windows
 */
@@ -17,7 +18,7 @@
     Glyphs are bitmaps of 8*16
 */
 
-// TODO: Make a trait to handle clear, paint, etc
+use core::panic;
 
 use crate::interrupts::new_process_rsp;
 use crate::spinlock::Lock;
@@ -38,13 +39,6 @@ const WINDOW_BORDER_COLOUR: u32 = 0xFF000000;
 const WINDOW_TITLE_COLOUR: u32 = 0x7092be;
 const WINDOW_TITLE_HEIGHT: u64 = 20;
 
-#[derive(Debug, Clone)]
-pub struct Desktop {
-    pub window: Window,
-}
-
-// pub static DESKTOP: Lock<Desktop> = Lock::new(Desktop::new());
-
 pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
     0,
     0,
@@ -54,73 +48,35 @@ pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
     BACKGROUND_COLOUR,
 ));
 
-impl Desktop {
-    // The order of windows is maintained through the stack in which the top most window is at the front and the bottom window is at the back
-    // pub const fn new() -> Desktop {
-    //     Desktop {
-    //         window: Window::new(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, None, BACKGROUND_COLOUR)
-    //     }
-    // }
+// Moves window to the top of the stack
+// fn raise_window(&mut self, window: Option<Window>, index: usize) {
+//     // WARNING: Only do this maneuver if it's not head for performance
+//     let unwrapped_window = window.unwrap().clone();
 
-    // Move window to front and handle dragging of windows
-    // pub fn handle_mouse_movement(&mut self, mouse_x: u64, mouse_y: u64, is_left_pressed: bool) {
-    //     if is_left_pressed {
-    //         // self.move_window(mouse_x, mouse_y);
-    //         let (index, window) = self.get_clicked_window(mouse_x, mouse_y);
-    //         if window.is_some() {
-    //             // self.raise_window(window, index);
-    //         }
-    //     } else {
-    //         self.drag_window = None;
-    //     }
+//     // Remove from linked list
+//     self.windows.remove_at(index);
 
-    //     FRAMEBUFFER
-    //         .lock()
-    //         .fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00);
-    //     FRAMEBUFFER.free();
-    // }
+//     // WARNING: Should really preserve old window and move it (make a method within list)
+//     self.windows.push(
+//         PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
+//         unwrapped_window,
+//     );
+//     PAGE_FRAME_ALLOCATOR.free();
+// }// Moves window to the top of the stack
+// fn raise_window(&mut self, window: Option<Window>, index: usize) {
+//     // WARNING: Only do this maneuver if it's not head for performance
+//     let unwrapped_window = window.unwrap().clone();
 
-    /*
-        Loops through windows to find window in which mouse coordinates are within
-        Returns both the index of the window along with the window itself
-    */
-    // fn get_clicked_window(&mut self, mouse_x: u64, mouse_y: u64) -> (usize, Option<Window>) {
-    //     for (i, window) in self.windows.into_iter().enumerate() {
-    //         let temp = window.unwrap().payload.clone();
-    //         if mouse_x >= temp.x
-    //             && mouse_x <= (temp.x + temp.width)
-    //             && mouse_y >= temp.y
-    //             && mouse_y <= (temp.y + temp.height)
-    //         {
-    //             // Update drag window, etc
-    //             let const_ptr = &window.unwrap().payload as *const Window;
-    //             let mut_ptr = const_ptr as *mut Window;
-    //             self.drag_window = Some(mut_ptr);
-    //             self.drag_x_offset = mouse_x - temp.x;
-    //             self.drag_y_offset = mouse_y - temp.y;
-    //             return (i, Some(temp));
-    //         }
-    //     }
+//     // Remove from linked list
+//     self.windows.remove_at(index);
 
-    //     return (0, None);
-    // }
-
-    // Moves window to the top of the stack
-    // fn raise_window(&mut self, window: Option<Window>, index: usize) {
-    //     // WARNING: Only do this maneuver if it's not head for performance
-    //     let unwrapped_window = window.unwrap().clone();
-
-    //     // Remove from linked list
-    //     self.windows.remove_at(index);
-
-    //     // WARNING: Should really preserve old window and move it (make a method within list)
-    //     self.windows.push(
-    //         PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-    //         unwrapped_window,
-    //     );
-    //     PAGE_FRAME_ALLOCATOR.free();
-    // }
-}
+//     // WARNING: Should really preserve old window and move it (make a method within list)
+//     self.windows.push(
+//         PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
+//         unwrapped_window,
+//     );
+//     PAGE_FRAME_ALLOCATOR.free();
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Window {
@@ -179,51 +135,101 @@ impl Window {
         self.draw_window();
 
         // Clear clipping rects
-        // self.clipped_rectangles.empty();
+        self.clipped_rectangles.empty();
 
         // Optionally paint children (Might be temporary)
         if paint_children {
             for (i, child) in self.children.into_iter().enumerate() {
-                // child
-                //     .unwrap()
-                //     .payload
-                //     .clone()
-                //     .paint(dirty_rectangles.clone(), false);
+                child
+                    .unwrap()
+                    .payload
+                    .clone()
+                    .paint(dirty_rectangles.clone(), false);
             }
         }
+    }
+
+    pub fn handle_mouse(&mut self, mouse_x: u64, mouse_y: u64, is_left_pressed: bool) {
+        // Check if mouse is actually pressed
+        if is_left_pressed {
+            // Obtain window which mouse is over
+            let (index, window) = self.get_selected_child(mouse_x, mouse_y);
+
+            // Update location of window being dragged
+            if let Some(dragged_window) = self.drag_child {
+                unsafe {
+                    (*dragged_window).update_location(
+                        mouse_x,
+                        mouse_y,
+                        self.drag_x_offset,
+                        self.drag_y_offset,
+                    );
+                }
+            }
+        } else {
+            self.drag_child = None;
+        }
+
+        // Paint mouse
+        FRAMEBUFFER
+            .lock()
+            .fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00FF);
+        FRAMEBUFFER.free();
+    }
+
+    /*
+        Loops through windows to find window in which mouse coordinates are within
+        Returns both the index of the window along with the window itself
+    */
+    fn get_selected_child(&mut self, mouse_x: u64, mouse_y: u64) -> (usize, Option<Window>) {
+        for (i, window) in self.children.into_iter().enumerate() {
+            let temp = window.unwrap().payload.clone();
+            if mouse_x >= temp.x
+                && mouse_x <= (temp.x + temp.width)
+                && mouse_y >= temp.y
+                && mouse_y <= (temp.y + temp.height)
+            {
+                // Update drag window, etc
+                let const_ptr = &window.unwrap().payload as *const Window;
+                let mut_ptr = const_ptr as *mut Window;
+                self.drag_child = Some(mut_ptr);
+                self.drag_x_offset = mouse_x - temp.x;
+                self.drag_y_offset = mouse_y - temp.y;
+                return (i, Some(temp));
+            }
+        }
+
+        return (0, None);
     }
 
     // Applies clipping to a window against dirty rectangles, windows, titlebar, children
     fn clip(&mut self, dirty_rectangles: Stack<Rectangle>) {
         let mut subject_rect = Rectangle::from_window(self);
 
-        // Apply clipping against titlebar
-        let titlebar_rectangle = Rectangle::new(
-            self.x,
-            self.y,
-            self.x + self.width,
-            self.y + self.y + WINDOW_TITLE_HEIGHT,
-        );
+        // Apply clipping against titlebar if has one
+        // let titlebar_rectangle = Rectangle::new(
+        //     self.x,
+        //     self.y,
+        //     self.x + self.width,
+        //     self.y + self.y + WINDOW_TITLE_HEIGHT,
+        // );
 
         // self.clipped_rectangles = subject_rect.subtract_rectangle(&titlebar_rectangle);
 
-        // Apply clipping against dirty rectangles
+        // Add dirty rectangles since these regions must be rerendered
         for (i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
-            self.clipped_rectangles
-                .append(subject_rect.subtract_rectangle(&dirty_rectangle.unwrap().payload.clone()));
+            self.clipped_rectangles.push(
+                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
+                dirty_rectangle.unwrap().payload.clone(),
+            );
+            PAGE_FRAME_ALLOCATOR.free();
         }
 
         // Apply clipping against children
         for (i, child) in self.children.into_iter().enumerate() {
             let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
-
-            print_serial!("{:?}\n", child_rectangle);
-
-            // self.clipped_rectangles
-            //     .append(subject_rect.subtract_rectangle(&child_rectangle));
-
-            let test = subject_rect.subtract_rectangle(&child_rectangle);
-            self.clipped_rectangles.head = test.head;
+            self.clipped_rectangles
+                .append(subject_rect.subtract_rectangle(&child_rectangle));
         }
 
         // Get windows above
@@ -240,28 +246,59 @@ impl Window {
     }
 
     // Update coordinates of window whilst taking care to update other windows
-    fn update_location(&mut self, mouse_x: u64, mouse_y: u64) {
-        // Apply clipping to obtain the visible portins of rectangle
+    fn update_location(
+        &mut self,
+        mouse_x: u64,
+        mouse_y: u64,
+        drag_x_offset: u64,
+        drag_y_offset: u64,
+    ) {
+        self.clipped_rectangles.empty();
+        let mut subject_rect = Rectangle::from_window(self);
 
-        // Update window positions temporally whilst
+        // self.clip(Stack::<Rectangle>::new());
 
-        // Extract out section which doesn't need to be updated
+        // Update window positions temporally whilst maintaining old ones
+        let new_x = mouse_x.wrapping_sub(drag_x_offset);
+        let new_y = mouse_y.wrapping_sub(drag_y_offset);
+        // let new_x = self.x;
+        // let new_y = self.y;
+
+        let mut clipping_rect = Rectangle::new(new_x, new_y, new_x + self.width, new_y + self.height);
+
+        // Extract out section which doesn't need to be updated (overlap) and returns sections which need to be updated
+        self.clipped_rectangles
+            .append(subject_rect.clone().subtract_rectangle(&clipping_rect));
+
+        // Sections that need to be updated are dirty rectangles
+        let dirty_rectangles = self.clipped_rectangles.clone();
+
+        self.clipped_rectangles.empty();
 
         // All windows below the current window may need to be updated upon a move
 
-        // Paint parent (most likely the background)
+        // print_serial!("NEW\n");
+        // for (i, dr) in dirty_rectangles.into_iter().enumerate() {
+        //     print_serial!("{:?}\n", dr.unwrap());
+        // }
 
-        // Finally update our coordinates and update position
+        // Finally update our coordinates which updates position
+        self.x = new_x;
+        self.y = new_y;
 
-        // Update window coordinates while taking care to preserve the old values
+        // Repaint parent given the dirty regions (most likely the background)
+        if let Some(parent) = self.parent {
+            unsafe {
+                (*parent).paint(dirty_rectangles.clone(), false);
+            }
+        }
 
-        // let window = unsafe { &mut *self.drag_window.unwrap() };
-        // let old_window = window.clone();
+        // Only repaint sections of window which have been updated
+        // self.clipped_rectangles.append(clipping_rect.split(&subject_rect));
+        // let test = self.clipped_rectangles.clone();
+        // self.clipped_rectangles.empty();
 
-        // window.x = mouse_x.wrapping_sub(self.drag_x_offset);
-        // window.y = mouse_y.wrapping_sub(self.drag_y_offset);
-
-        // let another_subject_rect = Rectangle::from_window(window);
+        self.paint(Stack::<Rectangle>::new(), false);
     }
 
     fn draw_window(&mut self) {
@@ -276,16 +313,30 @@ impl Window {
         );
         FRAMEBUFFER.free();
 
-        // Paint window bar
-        // FRAMEBUFFER.lock().fill_rect(
-        //     Some(&self.clipped_rectangles),
-        //     self.x + 3,
-        //     self.y + 3,
-        //     self.width - 3,
-        //     WINDOW_TITLE_HEIGHT,
-        //     WINDOW_TITLE_COLOUR,
-        // );
-        // FRAMEBUFFER.free();
+        // If not the background complete painting
+        if self.parent.is_some() {
+            // Paint window outline
+            FRAMEBUFFER.lock().draw_rect_outline(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                WINDOW_BORDER_COLOUR,
+            );
+            FRAMEBUFFER.free();
+
+            // Paint window bar
+            FRAMEBUFFER.lock().fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x + 3,
+                self.y + 3,
+                self.width - 3,
+                WINDOW_TITLE_HEIGHT,
+                WINDOW_TITLE_COLOUR,
+            );
+            FRAMEBUFFER.free();
+        }
     }
 }
 
@@ -373,7 +424,7 @@ impl Rectangle {
             && clipping_rect.top <= self.bottom
             && clipping_rect.bottom >= self.top)
         {
-            panic!("complete overlap?\n");
+            return Stack::<Rectangle>::new();
         }
 
         self.split(clipping_rect)
@@ -438,22 +489,26 @@ impl Framebuffer {
     ) {
         match clipped_rectangles {
             Some(rectangles) => {
-                for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
-                    let clip = clipped_rectangle.unwrap().payload;
+                if rectangles.head.is_some() {
+                    for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
+                        let clip = clipped_rectangle.unwrap().payload;
 
-                    // Clamp of printable area to clipped region itself
-                    let x_base = core::cmp::max(x, clip.left);
-                    let y_base = core::cmp::max(y, clip.top);
-                    let x_limit = core::cmp::min(x + width, clip.right);
-                    let y_limit = core::cmp::min(y + height, clip.bottom);
+                        // Clamp of printable area to clipped region itself
+                        let x_base = core::cmp::max(x, clip.left);
+                        let y_base = core::cmp::max(y, clip.top);
+                        let x_limit = core::cmp::min(x + width, clip.right);
+                        let y_limit = core::cmp::min(y + height, clip.bottom);
 
-                    print_serial!("{} {} {} {}\n", x_base, x_limit, y_base, y_limit);
+                        // print_serial!("{} {} {} {}\n", y_base, y_limit, x_base, x_limit);
 
-                    for i in x_base..x_limit {
-                        for j in y_base..y_limit {
-                            self.draw_pixel(i, j, colour);
+                        for i in x_base..x_limit {
+                            for j in y_base..y_limit {
+                                self.draw_pixel(i, j, colour);
+                            }
                         }
                     }
+                } else {
+                    return self.fill_rect(None, x, y, width, height, colour);
                 }
             }
             None => {

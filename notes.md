@@ -18,6 +18,7 @@ Smaller Tasks:
 - Add syslinks to newlib makefile
 - Mutable into_iter_mut method
 - Replace enumerate() with map
+- Replace any is_some() with if lets
 
 Think:
 - Switch to usize
@@ -46,21 +47,9 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
-No extendability for windows below yet (clipping)
+Dragging issues - 
+Doesn't update on realtime
+Don't need to update overlap section (should clip against something else)
+Other sections don't actually need to be updated - performance issue?
 
-Window_apply_bound_clipping(Window* window, int in_recursion, List* dirty_regions)
-Window_paint(Window* window, List* dirty_regions, uint8_t paint_children)
-Window_move(Window* window, int new_x, int new_y) - method called within the mouse handler method
-
-CLIP the background by making it a window itself
-
-Currently parent => child but only 1 parent and lots of children (for now)
-
-For now - have the main  stuff within window and have smaller helper functions within Desktop (for now)
-
-Should clip against self just in case?
-Intersect clipping rects?
-
-Doesn't seem to clip properly - removes the top
-
-
+Phantom rectangles?

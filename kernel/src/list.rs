@@ -78,7 +78,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
                 (*self.head.unwrap()).prev = Some(new_node);
             }
         } else {
-            // Set tail
+            // Set tail to head too
             self.tail = Some(new_node);
         }
 
@@ -171,13 +171,22 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
 
     // Appends another list onto this one
     pub fn append(&mut self, stack: Stack<T>) {
-        // Replace the tail with the head of the new stack
-        unsafe {
-            (*self.tail.unwrap()).next = stack.head;
-        }
+        // If head is none, completely append the new list
+        if self.head.is_none() {
+            self.head = stack.head;
+            self.tail = stack.tail;
+        } else {
+            if stack.head.is_some() {
+                // Append the head onto the tail if it's actually full
+                unsafe {
+                    (*self.tail.unwrap()).next = stack.head;
+                    (*stack.head.unwrap()).prev = self.tail;
+                }
 
-        // Set the tail to the new stack's tail
-        self.tail = stack.tail;
+                // Set the tail to the new stack's tail
+                self.tail = stack.tail;
+            }
+        }
 
         // Update length
         self.length += stack.length;
@@ -185,10 +194,9 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
 
     // Removes every element from a list
     pub fn empty(&mut self) {
-        for i in 0..(self.length - 1) {
-            self.remove_at(i);
+        while self.head.is_some() {
+            self.pop();
         }
-        self.length = 0;
     }
 
     // Removes the last element from the list

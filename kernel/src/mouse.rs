@@ -19,6 +19,7 @@ use crate::framebuffer;
 use crate::framebuffer::FRAMEBUFFER;
 use crate::ps2;
 use crate::spinlock::Lock;
+use crate::DESKTOP;
 
 #[derive(PartialEq)]
 pub enum MouseState {
@@ -92,15 +93,15 @@ impl Mouse {
         // }
 
         // Clear mouse coordiantes before updating
-        FRAMEBUFFER.lock().fill_rect(
-            None,
-            self.mouse_x,
-            self.mouse_y,
-            5,
-            5,
-            framebuffer::BACKGROUND_COLOUR,
-        );
-        FRAMEBUFFER.free();
+        // FRAMEBUFFER.lock().fill_rect(
+        //     None,
+        //     self.mouse_x,
+        //     self.mouse_y,
+        //     5,
+        //     5,
+        //     framebuffer::BACKGROUND_COLOUR,
+        // );
+        // FRAMEBUFFER.free();
 
         // X movement and Y movement values must be read as a 9 bit or greater SIGNED value if bit is enabled
         if self.mouse_packets[0] & (1 << 4) == 0x10 {
@@ -135,10 +136,10 @@ impl Mouse {
         //     self.mouse_y = 10;
         // }
 
-        // DESKTOP
-        //     .lock()
-        //     .handle_mouse_movement(self.mouse_x, self.mouse_y, is_left_clicked);
-        // DESKTOP.free();
+        DESKTOP
+            .lock()
+            .handle_mouse(self.mouse_x, self.mouse_y, is_left_clicked);
+        DESKTOP.free();
     }
 
     fn enable_scanning(&self) {
