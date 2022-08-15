@@ -124,9 +124,6 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
             0 => self.pop(),
             _ => {
                 self.length -= 1;
-                unsafe{
-                    print_serial!("{}", index);
-                }
                 let node = self.into_iter().nth(index).unwrap().unwrap();
                 unsafe {
                     (*node.prev.unwrap()).next = node.next;

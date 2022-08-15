@@ -61,4 +61,6 @@ For now - have the main  stuff within window and have smaller helper functions w
 Should clip against self just in case?
 Intersect clipping rects?
 
+Doesn't seem to clip properly - removes the top
+
 

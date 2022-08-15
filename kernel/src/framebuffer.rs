@@ -184,11 +184,11 @@ impl Window {
         // Optionally paint children (Might be temporary)
         if paint_children {
             for (i, child) in self.children.into_iter().enumerate() {
-                child
-                    .unwrap()
-                    .payload
-                    .clone()
-                    .paint(dirty_rectangles.clone(), false);
+                // child
+                //     .unwrap()
+                //     .payload
+                //     .clone()
+                //     .paint(dirty_rectangles.clone(), false);
             }
         }
     }
@@ -205,7 +205,7 @@ impl Window {
             self.y + self.y + WINDOW_TITLE_HEIGHT,
         );
 
-        self.clipped_rectangles = subject_rect.subtract_rectangle(&titlebar_rectangle);
+        // self.clipped_rectangles = subject_rect.subtract_rectangle(&titlebar_rectangle);
 
         // Apply clipping against dirty rectangles
         for (i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
@@ -216,8 +216,14 @@ impl Window {
         // Apply clipping against children
         for (i, child) in self.children.into_iter().enumerate() {
             let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
-            self.clipped_rectangles
-                .append(subject_rect.subtract_rectangle(&child_rectangle));
+
+            print_serial!("{:?}\n", child_rectangle);
+
+            // self.clipped_rectangles
+            //     .append(subject_rect.subtract_rectangle(&child_rectangle));
+
+            let test = subject_rect.subtract_rectangle(&child_rectangle);
+            self.clipped_rectangles.head = test.head;
         }
 
         // Get windows above
@@ -319,7 +325,7 @@ impl Rectangle {
             let new_rect = Rectangle::new(self.left, self.top, clipping_rect.left, self.bottom);
 
             // Update current rectangle to match (update left)
-            self.left = new_rect.right;
+            self.left = clipping_rect.left;
 
             split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
@@ -327,10 +333,10 @@ impl Rectangle {
 
         // Check if clipping rect top side intersects with subject
         if clipping_rect.top > self.top && clipping_rect.top < self.bottom {
-            let new_rect = Rectangle::new(self.left, clipping_rect.top, self.right, self.bottom);
+            let new_rect = Rectangle::new(self.left, self.top, self.right, clipping_rect.top);
 
             // Update current rectange to match (update top)
-            self.top = new_rect.bottom;
+            self.top = clipping_rect.top;
 
             split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
@@ -338,8 +344,8 @@ impl Rectangle {
 
         // Check if clipping rect right side intersects with subject
         if clipping_rect.right > self.left && clipping_rect.right < self.right {
-            let new_rect = Rectangle::new(clipping_rect.left, self.top, self.left, self.bottom);
-            self.left = self.left;
+            let new_rect = Rectangle::new(clipping_rect.right, self.top, self.right, self.bottom);
+            self.right = clipping_rect.right;
 
             split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
@@ -347,8 +353,8 @@ impl Rectangle {
 
         // Check if clipping rect bottom intersects with subject
         if clipping_rect.bottom > self.top && clipping_rect.bottom < self.bottom {
-            let new_rect = Rectangle::new(self.left, clipping_rect.top, self.right, self.bottom);
-            self.left = clipping_rect.left;
+            let new_rect = Rectangle::new(self.left, clipping_rect.bottom, self.right, self.bottom);
+            self.bottom = clipping_rect.bottom;
 
             split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
             PAGE_FRAME_ALLOCATOR.free();
@@ -441,7 +447,7 @@ impl Framebuffer {
                     let x_limit = core::cmp::min(x + width, clip.right);
                     let y_limit = core::cmp::min(y + height, clip.bottom);
 
-                    print_serial!("{} {} {} {}\n", x_base, y_base, x_limit, y_limit);
+                    print_serial!("{} {} {} {}\n", x_base, x_limit, y_base, y_limit);
 
                     for i in x_base..x_limit {
                         for j in y_base..y_limit {
