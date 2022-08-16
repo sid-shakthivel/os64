@@ -225,11 +225,13 @@ impl Window {
             PAGE_FRAME_ALLOCATOR.free();
         }
 
-        // Apply clipping against children
-        for (i, child) in self.children.into_iter().enumerate() {
-            let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
-            self.clipped_rectangles
-                .append(subject_rect.subtract_rectangle(&child_rectangle));
+        // Apply clipping against children only if there aren't any dirty rectangles (dirty rectangles are the only regions which need to be updated)
+        if dirty_rectangles.length == 0 {
+            for (i, child) in self.children.into_iter().enumerate() {
+                let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
+                self.clipped_rectangles
+                    .append(subject_rect.subtract_rectangle(&child_rectangle));
+            }
         }
 
         // Get windows above
@@ -254,17 +256,15 @@ impl Window {
         drag_y_offset: u64,
     ) {
         self.clipped_rectangles.empty();
-        let mut subject_rect = Rectangle::from_window(self);
+        let subject_rect = Rectangle::from_window(self);
 
         // self.clip(Stack::<Rectangle>::new());
 
         // Update window positions temporally whilst maintaining old ones
         let new_x = mouse_x.wrapping_sub(drag_x_offset);
         let new_y = mouse_y.wrapping_sub(drag_y_offset);
-        // let new_x = self.x;
-        // let new_y = self.y;
 
-        let mut clipping_rect = Rectangle::new(new_x, new_y, new_x + self.width, new_y + self.height);
+        let clipping_rect = Rectangle::new(new_x, new_y, new_x + self.width, new_y + self.height);
 
         // Extract out section which doesn't need to be updated (overlap) and returns sections which need to be updated
         self.clipped_rectangles
@@ -273,69 +273,84 @@ impl Window {
         // Sections that need to be updated are dirty rectangles
         let dirty_rectangles = self.clipped_rectangles.clone();
 
-        self.clipped_rectangles.empty();
-
-        // All windows below the current window may need to be updated upon a move
-
-        // print_serial!("NEW\n");
+        // print_serial!("SUBJECT = {:?}\n", subject_rect);
+        // print_serial!("CLIP = {:?}\n", clipping_rect);
         // for (i, dr) in dirty_rectangles.into_iter().enumerate() {
         //     print_serial!("{:?}\n", dr.unwrap());
         // }
+
+        self.clipped_rectangles.empty();
+
+        // All windows below the current window may need to be updated upon a move
 
         // Finally update our coordinates which updates position
         self.x = new_x;
         self.y = new_y;
 
-        // Repaint parent given the dirty regions (most likely the background)
-        if let Some(parent) = self.parent {
-            unsafe {
-                (*parent).paint(dirty_rectangles.clone(), false);
+        // Ensure that there are regions which need to be updated before updating
+        if dirty_rectangles.length > 0 {
+            if let Some(parent) = self.parent {
+                unsafe {
+                    // Repaint parent given the dirty regions (most likely the background)
+                    (*parent).paint(dirty_rectangles.clone(), false);
+                }
             }
         }
-
-        // Only repaint sections of window which have been updated
-        // self.clipped_rectangles.append(clipping_rect.split(&subject_rect));
-        // let test = self.clipped_rectangles.clone();
-        // self.clipped_rectangles.empty();
 
         self.paint(Stack::<Rectangle>::new(), false);
     }
 
     fn draw_window(&mut self) {
-        // Paint window background
-        FRAMEBUFFER.lock().fill_rect(
-            Some(&self.clipped_rectangles),
-            self.x,
-            self.y,
-            self.width,
-            self.height,
-            self.colour,
-        );
-        FRAMEBUFFER.free();
+        match self.parent {
+            Some(parent) => {
+                // If window has parent, implies it is a proper window
 
-        // If not the background complete painting
-        if self.parent.is_some() {
-            // Paint window outline
-            FRAMEBUFFER.lock().draw_rect_outline(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y,
-                self.width,
-                self.height,
-                WINDOW_BORDER_COLOUR,
-            );
-            FRAMEBUFFER.free();
+                // Paint the main window portion
+                FRAMEBUFFER.lock().fill_rect(
+                    Some(&self.clipped_rectangles),
+                    self.x + 3,
+                    self.y + WINDOW_TITLE_HEIGHT + 3,
+                    self.width - 6,
+                    self.height - WINDOW_TITLE_HEIGHT - 6,
+                    self.colour,
+                );
+                FRAMEBUFFER.free();
 
-            // Paint window bar
-            FRAMEBUFFER.lock().fill_rect(
-                Some(&self.clipped_rectangles),
-                self.x + 3,
-                self.y + 3,
-                self.width - 3,
-                WINDOW_TITLE_HEIGHT,
-                WINDOW_TITLE_COLOUR,
-            );
-            FRAMEBUFFER.free();
+                // Paint the top title bar
+                FRAMEBUFFER.lock().fill_rect(
+                    Some(&self.clipped_rectangles),
+                    self.x + 3,
+                    self.y + 3,
+                    self.width - 6,
+                    WINDOW_TITLE_HEIGHT,
+                    WINDOW_TITLE_COLOUR,
+                );
+                FRAMEBUFFER.free();
+
+                // Paint the outline of the window
+                FRAMEBUFFER.lock().draw_rect_outline(
+                    Some(&self.clipped_rectangles),
+                    self.x,
+                    self.y,
+                    self.width,
+                    self.height,
+                    WINDOW_BORDER_COLOUR,
+                );
+                FRAMEBUFFER.free();
+            }
+            None => {
+                // Most likely the background
+
+                FRAMEBUFFER.lock().fill_rect(
+                    Some(&self.clipped_rectangles),
+                    self.x,
+                    self.y,
+                    self.width,
+                    self.height,
+                    self.colour,
+                );
+                FRAMEBUFFER.free();
+            }
         }
     }
 }
@@ -359,7 +374,12 @@ impl Rectangle {
     }
 
     pub fn from_window(window: &Window) -> Self {
-        Self::new(window.x, window.y, window.x + window.width, window.height)
+        Self::new(
+            window.x,
+            window.y,
+            window.x + window.width,
+            window.y + window.height,
+        )
     }
 
     /*
@@ -371,7 +391,7 @@ impl Rectangle {
         let mut split_rectangles = Stack::<Rectangle>::new();
 
         // Check if clipping rect left side intersects with subject
-        if clipping_rect.left > self.left && clipping_rect.left < self.right {
+        if clipping_rect.left >= self.left && clipping_rect.left <= self.right {
             // Make new rect with updated coordinates
             let new_rect = Rectangle::new(self.left, self.top, clipping_rect.left, self.bottom);
 
@@ -383,7 +403,7 @@ impl Rectangle {
         }
 
         // Check if clipping rect top side intersects with subject
-        if clipping_rect.top > self.top && clipping_rect.top < self.bottom {
+        if clipping_rect.top >= self.top && clipping_rect.top <= self.bottom {
             let new_rect = Rectangle::new(self.left, self.top, self.right, clipping_rect.top);
 
             // Update current rectange to match (update top)
@@ -394,7 +414,7 @@ impl Rectangle {
         }
 
         // Check if clipping rect right side intersects with subject
-        if clipping_rect.right > self.left && clipping_rect.right < self.right {
+        if clipping_rect.right >= self.left && clipping_rect.right <= self.right {
             let new_rect = Rectangle::new(clipping_rect.right, self.top, self.right, self.bottom);
             self.right = clipping_rect.right;
 
@@ -403,7 +423,7 @@ impl Rectangle {
         }
 
         // Check if clipping rect bottom intersects with subject
-        if clipping_rect.bottom > self.top && clipping_rect.bottom < self.bottom {
+        if clipping_rect.bottom >= self.top && clipping_rect.bottom <= self.bottom {
             let new_rect = Rectangle::new(self.left, clipping_rect.bottom, self.right, self.bottom);
             self.bottom = clipping_rect.bottom;
 
@@ -490,6 +510,7 @@ impl Framebuffer {
         match clipped_rectangles {
             Some(rectangles) => {
                 if rectangles.head.is_some() {
+                    // print_serial!("SET\n");
                     for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
                         let clip = clipped_rectangle.unwrap().payload;
 
@@ -540,11 +561,17 @@ impl Framebuffer {
         colour: u32,
     ) {
         if x.checked_add(width).is_some() && y.checked_add(height).is_some() {
+            // Top bar
             self.draw_horizontal_line(clipped_rectangles, x, y, width, colour);
-            self.draw_horizontal_line(clipped_rectangles, x, y + height, width, colour);
 
+            // Bottom bar
+            self.draw_horizontal_line(clipped_rectangles, x, (y + height - 3), width, colour);
+
+            // Left bar
             self.draw_vertical_line(clipped_rectangles, x, y, height, colour);
-            self.draw_vertical_line(clipped_rectangles, x + width, y, height, colour);
+
+            // Right bar
+            self.draw_vertical_line(clipped_rectangles, (x + width - 3), y, height, colour);
         }
     }
 
