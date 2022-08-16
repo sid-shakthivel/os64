@@ -183,13 +183,16 @@ fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader) {
         let section_header = unsafe { &*(address as *const ElfSectionHeader) };
 
         // TODO: Add support for .bss by checking flags etc
-        if section_header.sh_type == 8 { panic!("BSS!?"); }
+        if section_header.sh_type == 8 {
+            panic!("BSS!?");
+        }
     }
 }
 
 fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {
     // Get page number needed for the segment
-    let pages_required = page_frame_allocator::get_page_number(page_frame_allocator::round_to_nearest_page(size));
+    let pages_required =
+        page_frame_allocator::get_page_number(page_frame_allocator::round_to_nearest_page(size));
 
     // Allocate memory for the segment
     let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(pages_required);

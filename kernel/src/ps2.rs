@@ -1,7 +1,7 @@
 // src/ps2.rs
 
 /*
-    PS/2 (Personal System 2) controller is part of AIP which is linked to the 8042 chip 
+    PS/2 (Personal System 2) controller is part of AIP which is linked to the 8042 chip
     Green/purple ports which connect directly to keyboards and mice
     Scan codes are sets of codes which determine when a key is pressed/repeated/released
     Has 2 buffers for data (one for data recieved and one for data written before it's sent)
@@ -12,8 +12,8 @@
 
 use crate::keyboard::KEYBOARD;
 use crate::mouse::MOUSE;
-use crate::ports::outb;
 use crate::ports::inb;
+use crate::ports::outb;
 use crate::print_serial;
 use crate::uart::CONSOLE;
 
@@ -49,16 +49,25 @@ pub fn init() -> Result<(), &'static str> {
     ps2_write(PS2_CMD, 0xAD)?;
     ps2_write(PS2_CMD, 0xA7)?;
 
-    // Flush output buffer as data can be stuck in PS2 controller buffer 
+    // Flush output buffer as data can be stuck in PS2 controller buffer
     inb(PS2_DATA);
 
     // Set controller configuration byte to disable IRQ's, disable translation
     ps2_write(PS2_CMD, 0x20)?;
     let mut controller_config_byte = ps2_read(PS2_DATA)?;
     let mut controller_config = ControllerRegister::from_bits_truncate(controller_config_byte);
-    ControllerRegister::remove(&mut controller_config, ControllerRegister::KEYBOARD_INTERRUPT_ENABLE);
-    ControllerRegister::remove(&mut controller_config, ControllerRegister::MOUSE_INTERRUPT_ENABLE);
-    ControllerRegister::remove(&mut controller_config, ControllerRegister::KEYBOARD_TRANSLATION);
+    ControllerRegister::remove(
+        &mut controller_config,
+        ControllerRegister::KEYBOARD_INTERRUPT_ENABLE,
+    );
+    ControllerRegister::remove(
+        &mut controller_config,
+        ControllerRegister::MOUSE_INTERRUPT_ENABLE,
+    );
+    ControllerRegister::remove(
+        &mut controller_config,
+        ControllerRegister::KEYBOARD_TRANSLATION,
+    );
 
     // controller_config_byte = controller_config_byte & !(1 << 0) & !(1 << 1) & !(1 << 6);
     ps2_write(PS2_CMD, 0x60)?;
@@ -71,7 +80,7 @@ pub fn init() -> Result<(), &'static str> {
     }
 
     ps2_write(PS2_CMD, 0xA8)?; // Enable second PS2 port
-    ps2_write(PS2_CMD, 0x20)?; 
+    ps2_write(PS2_CMD, 0x20)?;
     controller_config_byte = ps2_read(PS2_DATA)?;
     controller_config = ControllerRegister::from_bits_truncate(controller_config_byte);
     if controller_config.contains(ControllerRegister::MOUSE_ENABLE) {
@@ -100,9 +109,21 @@ pub fn init() -> Result<(), &'static str> {
     controller_config_byte = ps2_read(PS2_DATA)?;
     controller_config = ControllerRegister::from_bits_truncate(controller_config_byte);
 
-    ControllerRegister::set(&mut controller_config, ControllerRegister::KEYBOARD_INTERRUPT_ENABLE, true);
-    ControllerRegister::set(&mut controller_config, ControllerRegister::MOUSE_INTERRUPT_ENABLE, true);
-    ControllerRegister::set(&mut controller_config, ControllerRegister::KEYBOARD_TRANSLATION, true);
+    ControllerRegister::set(
+        &mut controller_config,
+        ControllerRegister::KEYBOARD_INTERRUPT_ENABLE,
+        true,
+    );
+    ControllerRegister::set(
+        &mut controller_config,
+        ControllerRegister::MOUSE_INTERRUPT_ENABLE,
+        true,
+    );
+    ControllerRegister::set(
+        &mut controller_config,
+        ControllerRegister::KEYBOARD_TRANSLATION,
+        true,
+    );
 
     ps2_write(PS2_CMD, 0x60)?;
     ps2_write(PS2_DATA, controller_config.bits)?;
@@ -127,12 +148,12 @@ pub fn init() -> Result<(), &'static str> {
         match ps2_identify_device_type(i).unwrap() {
             PS2Device::MF2KeyboardTranslation => {
                 KEYBOARD.lock().init();
-            },
+            }
             PS2Device::PS2Mouse => {
                 MOUSE.lock().init();
                 MOUSE.free();
-            },
-            _ => panic!("Unknown device"), 
+            }
+            _ => panic!("Unknown device"),
         }
     }
 
@@ -174,14 +195,14 @@ pub fn ps2_write_device(device_num: u16, byte: u8) -> Result<u8, &'static str> {
         0 => {
             ps2_write(PS2_DATA, byte)?;
             return Ok(0);
-        },
+        }
         1 => {
             ps2_write(PS2_CMD, 0xD4)?;
             ps2_write(PS2_DATA, byte)?;
             return Ok(0);
-        },
+        }
         _ => Err("Unknown device"),
-    }
+    };
 }
 
 // Must wait to recieve acknowledgement from device (0xFA)
@@ -208,9 +229,9 @@ pub fn ps2_identify_device_type(device_num: u16) -> Result<PS2Device, &'static s
                 0x41 => Ok(PS2Device::MF2KeyboardTranslation),
                 0xC1 => Ok(PS2Device::MF2KeyboardTranslation),
                 0x83 => Ok(PS2Device::MF2Keyboard),
-                _ => Err("Unknown device")
-            }
+                _ => Err("Unknown device"),
+            };
         }
-        _ => Err("Unknown device")
-    }
+        _ => Err("Unknown device"),
+    };
 }

@@ -70,17 +70,17 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
-    let window1 = Window::new(10, 10, 200, 200, Some(DESKTOP.lock()), 0xFFBBBBBB);
+    let window1 = Window::new(10, 10, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
     DESKTOP.free();
 
-    let window2 = Window::new(400, 400, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
+    let window2 = Window::new(150, 150, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
+    DESKTOP.free();
+
+    DESKTOP.lock().add_sub_window(window2);
     DESKTOP.free();
 
     DESKTOP.lock().add_sub_window(window1);
     DESKTOP.free();
-
-    // DESKTOP.lock().add_sub_window(window2);
-    // DESKTOP.free();
 
     DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
     DESKTOP.free();

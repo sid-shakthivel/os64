@@ -15,7 +15,7 @@ pub struct Pit {
 }
 
 const INPUT_CLOCK: u64 = 1193180;
-const FREQUENCY: u64  = 100;
+const FREQUENCY: u64 = 100;
 
 pub static PIT: Mutex<Pit> = Mutex::new(Pit::new(FREQUENCY));
 
@@ -45,4 +45,3 @@ impl Pit {
         outb(0x40, (self.divisor >> 8) as u8);
     }
 }
-

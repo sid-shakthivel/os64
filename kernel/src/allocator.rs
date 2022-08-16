@@ -110,8 +110,8 @@ pub fn kfree(dp: *mut u64) {
 
     // Check next node to merge memory regions together to alleviate fragmentation
     // NOTE: Since a stack is used, the node is added to the top of the stack so there is only a next value
-    if header.next.is_some() {
-        let next_header = unsafe { &mut *header.next.unwrap() };
+    if let Some(next_node) = header.next {
+        let next_header = unsafe { &mut *next_node };
 
         // Get total size of other region and update memory block
         header.payload.size += next_header.payload.size;

@@ -48,10 +48,11 @@ impl<'a, T> Iterator for StackIntoIterator<'a, T> {
         }
 
         let next = self.current.unwrap().next;
-        if next.is_some() {
-            self.current = unsafe { Some(&*next.unwrap()) }
-        } else {
-            self.current = None;
+        match next {
+            Some(value) => self.current = unsafe { Some(&*next.unwrap()) },
+            None => {
+                self.current = None;
+            }
         }
 
         return Some(saved_current);
@@ -71,15 +72,18 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
     pub fn push(&mut self, address: u64, value: T) {
         let new_node = Node::new(address, value);
 
-        if self.head.is_some() {
-            unsafe {
-                // Update next of new node to head and head prev to new node
-                (*new_node).next = self.head;
-                (*self.head.unwrap()).prev = Some(new_node);
+        match self.head {
+            Some(head) => {
+                unsafe {
+                    // Update next of new node to head and head prev to new node
+                    (*new_node).next = self.head;
+                    (*self.head.unwrap()).prev = Some(new_node);
+                }
             }
-        } else {
-            // Set tail to head too
-            self.tail = Some(new_node);
+            None => {
+                // Set tail to head too
+                self.tail = Some(new_node);
+            }
         }
 
         // Push to front of list
@@ -95,14 +99,12 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
             self.length -= 1;
 
             unsafe {
-                // Update head to become next value and update the prev value if it's not None
+                // Update head to become next value and update the prev vlue if it's not None
                 self.head = (*self.head.unwrap()).next;
-                if self.head.is_some() {
-                    (*self.head.unwrap()).prev = None;
-                }
 
-                if self.head.is_none() {
-                    self.tail = None;
+                match self.head {
+                    Some(head) => (*self.head.unwrap()).prev = None,
+                    None => self.tail = None,
                 }
             }
         }
@@ -157,7 +159,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
     }
 
     /*
-        Returns stack of nodes in higher position then the target node
+        Returns stack of nodes in higher position then the target node (moves towards target from head)
         NOTE: Uses page frame allocator
     */
     pub fn get_higher_nodes(&mut self, target_node: T) -> Stack<T> {
@@ -178,6 +180,31 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
         new_stack
     }
 
+    /*
+        Returns stack of nodes in a lower position then target node (moves from target towards tail)
+        NOTE: Utilises page frame allocator
+    */
+    pub fn get_lower_nodes(&mut self, target_node: T) -> Stack<T> {
+        let mut new_stack = Stack::<T>::new();
+        let mut can_push = false;
+
+        for (i, node) in self.into_iter().enumerate() {
+            if can_push {
+                new_stack.push(
+                    PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
+                    node.unwrap().payload.clone(),
+                );
+                PAGE_FRAME_ALLOCATOR.free();
+            }
+
+            if node.unwrap().payload.clone() == target_node {
+                can_push = true;
+            }
+        }
+
+        new_stack
+    }
+
     // Appends another list onto this one
     pub fn append(&mut self, stack: Stack<T>) {
         // If head is none, completely append the new list
@@ -185,11 +212,11 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
             self.head = stack.head;
             self.tail = stack.tail;
         } else {
-            if stack.head.is_some() {
+            if let Some(stack_head) = stack.head {
                 // Append the head onto the tail if it's actually full
                 unsafe {
-                    (*self.tail.unwrap()).next = stack.head;
-                    (*stack.head.unwrap()).prev = self.tail;
+                    (*self.tail.unwrap()).next = Some(stack_head);
+                    (*stack_head).prev = self.tail;
                 }
 
                 // Set the tail to the new stack's tail

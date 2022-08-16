@@ -24,13 +24,13 @@ TSS:
 +------------+-----------+-------+------+-----------+---------+-------------+-----------+---------+-------------+------------+------------+---------+
 */
 
-use x86_64::structures::tss::TaskStateSegment;
 use lazy_static::lazy_static;
 use x86_64::structures::gdt::SegmentSelector;
+use x86_64::structures::tss::TaskStateSegment;
 
 pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
 
-use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor};
+use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable};
 
 lazy_static! {
     static ref GDT: (GlobalDescriptorTable, Selectors) = {
@@ -41,7 +41,14 @@ lazy_static! {
             let _user_code_selector = gdt.add_entry(Descriptor::user_code_segment());
             let _user_data_selector = gdt.add_entry(Descriptor::user_data_segment());
             let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
-            (gdt, Selectors { kernel_code_selector, kernel_data_selector, tss_selector })
+            (
+                gdt,
+                Selectors {
+                    kernel_code_selector,
+                    kernel_data_selector,
+                    tss_selector,
+                },
+            )
         }
     };
 }
@@ -53,9 +60,9 @@ struct Selectors {
 }
 
 pub fn init() {
+    use x86_64::instructions::segmentation::{Segment, CS, DS, ES, FS, GS, SS};
     use x86_64::instructions::tables::load_tss;
-    use x86_64::instructions::segmentation::{CS, Segment, SS, DS, ES, FS, GS};
-    
+
     GDT.0.load();
     unsafe {
         // Reload all segment registers

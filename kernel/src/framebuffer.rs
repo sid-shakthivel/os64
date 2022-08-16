@@ -24,11 +24,12 @@ use core::panic;
 use crate::interrupts::new_process_rsp;
 use crate::spinlock::Lock;
 use crate::writer::Writer;
-use crate::CONSOLE;
 use crate::{list::Stack, print_serial};
+use crate::{mouse, CONSOLE};
 use crate::{page_frame_allocator, paging};
 use lazy_static::lazy_static;
 use multiboot2::FramebufferTag;
+use x86_64::structures::paging::page;
 
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 
@@ -62,6 +63,8 @@ pub struct Window {
     drag_child: Option<*mut Window>,
     drag_x_offset: u64,
     drag_y_offset: u64,
+    mouse_x: u64,
+    mouse_y: u64,
 }
 
 impl Window {
@@ -85,6 +88,8 @@ impl Window {
             drag_child: None,
             drag_x_offset: 0,
             drag_y_offset: 0,
+            mouse_x: 0,
+            mouse_y: 0,
         }
     }
 
@@ -122,14 +127,19 @@ impl Window {
         // Check if mouse is actually pressed
         if is_left_pressed {
             // Obtain window which mouse is over
-            let (index, window) = self.get_selected_child(mouse_x, mouse_y);
+            let (index, wrapped_window) = self.get_selected_child(self.mouse_x, self.mouse_y);
+
+            // Raise window
+            if let Some(mut window) = wrapped_window {
+                window.raise(index);
+            }
 
             // Update location of window being dragged
             if let Some(dragged_window) = self.drag_child {
                 unsafe {
                     (*dragged_window).update_location(
-                        mouse_x,
-                        mouse_y,
+                        self.mouse_x,
+                        self.mouse_y,
                         self.drag_x_offset,
                         self.drag_y_offset,
                     );
@@ -139,11 +149,27 @@ impl Window {
             self.drag_child = None;
         }
 
+        let mouse_rect = Rectangle::new(
+            self.mouse_x,
+            self.mouse_y,
+            self.mouse_x + 5,
+            self.mouse_y + 5,
+        );
+        let mut dirty_rectangles = Stack::<Rectangle>::new();
+        dirty_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, mouse_rect);
+        PAGE_FRAME_ALLOCATOR.free();
+
+        // Repaint given background
+        self.paint(dirty_rectangles, true);
+
         // Paint mouse
         FRAMEBUFFER
             .lock()
             .fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00FF);
         FRAMEBUFFER.free();
+
+        self.mouse_x = mouse_x;
+        self.mouse_y = mouse_y;
     }
 
     /*
@@ -192,6 +218,7 @@ impl Window {
     fn clip(&mut self, dirty_rectangles: Stack<Rectangle>) {
         let mut subject_rect = Rectangle::from_window(self);
 
+        // Dirty rectangles are the only regions which need to be updated
         if dirty_rectangles.length > 0 {
             // Add dirty rectangles since these regions must be rerendered
             for (i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
@@ -205,24 +232,24 @@ impl Window {
             // Clip against self
             self.add_rectangle(&subject_rect);
 
-            // Apply clipping against children only if there aren't any dirty rectangles (dirty rectangles are the only regions which need to be updated)
-            if dirty_rectangles.length == 0 {
-                for (i, child) in self.children.clone().into_iter().enumerate() {
-                    let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
-                    self.subtract_rectangle(&child_rectangle);
-                }
+            for (i, child) in self.children.clone().into_iter().enumerate() {
+                let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
+                self.subtract_rectangle(&child_rectangle);
             }
 
             // Get windows above
-            // if let Some(parent) = self.parent {
-            //     let windows_above = unsafe { (*parent).children.get_higher_nodes(self.clone()) };
+            if let Some(parent) = self.parent {
+                let windows_above = unsafe { (*parent).children.get_higher_nodes(self.clone()) };
 
-            //     // Apply clipping against windows above
-            //     for (i, window) in windows_above.into_iter().enumerate() {
-            //         let window_rectangle = Rectangle::from_window(&window.unwrap().payload);
-            //         self.subtract_rectangle(&window_rectangle);
-            //     }
-            // }
+                // Apply clipping against windows above
+                // Conditional statement exists because windows above includes the background
+                for (i, window) in windows_above.into_iter().enumerate() {
+                    if i > windows_above.length - 1 {
+                        let window_rectangle = Rectangle::from_window(&window.unwrap().payload);
+                        self.subtract_rectangle(&window_rectangle);
+                    }
+                }
+            }
         }
     }
 
@@ -264,6 +291,16 @@ impl Window {
                 unsafe {
                     // Repaint parent given the dirty regions (most likely the background)
                     (*parent).paint(dirty_rectangles.clone(), false);
+
+                    // Repaint windows below the moving window
+                    let windows_below = (*parent).children.get_lower_nodes(self.clone());
+                    for (i, window) in windows_below.into_iter().enumerate() {
+                        window
+                            .unwrap()
+                            .payload
+                            .clone()
+                            .paint(dirty_rectangles.clone(), false);
+                    }
                 }
             }
         }
@@ -277,23 +314,25 @@ impl Window {
     */
     fn subtract_rectangle(&mut self, clipping_rect: &Rectangle) {
         // Loop through the clipping rects
-        for mut i in 0..self.clipped_rectangles.length {
-            let mut raw = self.clipped_rectangles.get_at(i);
+        let mut index = 0;
+
+        while index < self.clipped_rectangles.length {
+            let mut raw = self.clipped_rectangles.get_at(index);
 
             // If the clipping rect intersects with a rectangle (subject) split it or else move onto the next one
-            if clipping_rect.left <= raw.right
-                && clipping_rect.right >= raw.left
-                && clipping_rect.top <= raw.bottom
-                && clipping_rect.bottom >= raw.top
+            if clipping_rect.left < raw.right
+                && clipping_rect.right > raw.left
+                && clipping_rect.top < raw.bottom
+                && clipping_rect.bottom > raw.top
             {
                 // Remove old rectangle and replace with list of rects
-                self.clipped_rectangles.remove_at(i);
                 self.clipped_rectangles.append(raw.split(clipping_rect));
+                self.clipped_rectangles.remove_at(index);
 
                 // Reset the counter
-                i = 0;
+                index = 0;
             } else {
-                i += 1;
+                index += 1;
             }
         }
     }
@@ -473,7 +512,7 @@ impl Framebuffer {
         }
     }
 
-    /*  Recives a list of clipped rectangles (these rectangles are not to be rendered upon the screen)
+    /*  Recives a list of clipped rectangles (these rectangles are to be rendered upon the screen)
         Loops through that list and clamps the clipping rects to the window before drawing
         If clipped rectangles are not supplied, simply clamps to the screen and draws pixels
     */
@@ -488,27 +527,20 @@ impl Framebuffer {
     ) {
         match clipped_rectangles {
             Some(rectangles) => {
-                if rectangles.head.is_some() {
-                    // print_serial!("SET\n");
-                    for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
-                        let clip = clipped_rectangle.unwrap().payload;
+                for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
+                    let clip = clipped_rectangle.unwrap().payload;
 
-                        // Clamp printable area to clipped region itself
-                        let x_base = core::cmp::max(x, clip.left);
-                        let y_base = core::cmp::max(y, clip.top);
-                        let x_limit = core::cmp::min(x + width, clip.right);
-                        let y_limit = core::cmp::min(y + height, clip.bottom);
+                    // Clamp printable area to clipped region itself
+                    let x_base = core::cmp::max(x, clip.left);
+                    let y_base = core::cmp::max(y, clip.top);
+                    let x_limit = core::cmp::min(x + width, clip.right);
+                    let y_limit = core::cmp::min(y + height, clip.bottom);
 
-                        // print_serial!("{} {} {} {}\n", y_base, y_limit, x_base, x_limit);
-
-                        for i in x_base..x_limit {
-                            for j in y_base..y_limit {
-                                self.draw_pixel(i, j, colour);
-                            }
+                    for i in x_base..x_limit {
+                        for j in y_base..y_limit {
+                            self.draw_pixel(i, j, colour);
                         }
                     }
-                } else {
-                    return self.fill_rect(None, x, y, width, height, colour);
                 }
             }
             None => {

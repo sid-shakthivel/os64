@@ -1,9 +1,11 @@
 // /src/ports.rs
 
-// Manages all functions related to input/output 
+// Manages all functions related to input/output
 
 pub fn outb(port: u16, value: u8) {
-    unsafe { outb_raw(port, value); }
+    unsafe {
+        outb_raw(port, value);
+    }
 }
 
 pub fn inb(port: u16) -> u8 {

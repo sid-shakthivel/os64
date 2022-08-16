@@ -8,8 +8,8 @@
 
 use spin::Mutex;
 
-use crate::ports::outb;
 use crate::ports::inb;
+use crate::ports::outb;
 use crate::writer::Writer;
 use core::fmt;
 
@@ -26,18 +26,20 @@ pub fn init() {
     outb(PORT + 4, 0x1e); // Set in loopback mode
     outb(PORT + 0, 0xae); // Test serial chip
 
-    if inb(PORT + 0) != 0xae { panic!("Faulty serial!"); }
+    if inb(PORT + 0) != 0xae {
+        panic!("Faulty serial!");
+    }
 
     outb(PORT + 4, 0x0f); // Set to normal operation mode
 }
 
 pub struct Console {
-    port: u16
+    port: u16,
 }
 
 pub static CONSOLE: Mutex<Console> = Mutex::new(Console { port: PORT });
 
-#[macro_export] 
+#[macro_export]
 macro_rules! print_serial {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
@@ -47,28 +49,27 @@ macro_rules! print_serial {
 
 impl fmt::Write for Console {
     // To support the rust formatting system and use the write! macro, the write_str method must be supported
-   fn write_str(&mut self, s: &str) -> fmt::Result {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
         Ok(())
-   }
+    }
 }
 
-impl Console {    
+impl Console {
     fn write_serial(&mut self, character: char) {
-        while self.is_transmit_empty() == 0 {};
+        while self.is_transmit_empty() == 0 {}
         outb(self.port, character as u8);
     }
-    
+
     fn read_serial(&self) -> u8 {
-        while self.serial_recieved() == 0 {};
+        while self.serial_recieved() == 0 {}
         return inb(self.port);
     }
-    
-    
+
     fn is_transmit_empty(&self) -> u8 {
         return inb(self.port + 5) & 0x20;
     }
-    
+
     fn serial_recieved(&self) -> u8 {
         return inb(self.port + 5) & 1;
     }
