@@ -62,20 +62,6 @@ pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
 //         unwrapped_window,
 //     );
 //     PAGE_FRAME_ALLOCATOR.free();
-// }// Moves window to the top of the stack
-// fn raise_window(&mut self, window: Option<Window>, index: usize) {
-//     // WARNING: Only do this maneuver if it's not head for performance
-//     let unwrapped_window = window.unwrap().clone();
-
-//     // Remove from linked list
-//     self.windows.remove_at(index);
-
-//     // WARNING: Should really preserve old window and move it (make a method within list)
-//     self.windows.push(
-//         PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-//         unwrapped_window,
-//     );
-//     PAGE_FRAME_ALLOCATOR.free();
 // }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -202,19 +188,25 @@ impl Window {
         return (0, None);
     }
 
+    // Moves window to the top of the stack and trigers a repaint
+    fn raise(&mut self, index: usize) {
+        if let Some(parent) = self.parent {
+            unsafe {
+                // Move window if it isn't head (already at the top of the stack)
+                if (&*(*parent).children.head.unwrap()).payload.clone() != self.clone() {
+                    (*parent).children.remove_at(index);
+                    (*parent)
+                        .children
+                        .push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, self);
+                    PAGE_FRAME_ALLOCATOR.free();
+                }
+            }
+        }
+    }
+
     // Applies clipping to a window against dirty rectangles, windows, titlebar, children
     fn clip(&mut self, dirty_rectangles: Stack<Rectangle>) {
         let mut subject_rect = Rectangle::from_window(self);
-
-        // Apply clipping against titlebar if has one
-        // let titlebar_rectangle = Rectangle::new(
-        //     self.x,
-        //     self.y,
-        //     self.x + self.width,
-        //     self.y + self.y + WINDOW_TITLE_HEIGHT,
-        // );
-
-        // self.clipped_rectangles = subject_rect.subtract_rectangle(&titlebar_rectangle);
 
         // Add dirty rectangles since these regions must be rerendered
         for (i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
@@ -229,8 +221,10 @@ impl Window {
         if dirty_rectangles.length == 0 {
             for (i, child) in self.children.into_iter().enumerate() {
                 let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
+                let mut test = Rectangle::from_window(self);
                 self.clipped_rectangles
-                    .append(subject_rect.subtract_rectangle(&child_rectangle));
+                    .append(test.subtract_rectangle(&child_rectangle));
+                break;
             }
         }
 
@@ -258,9 +252,7 @@ impl Window {
         self.clipped_rectangles.empty();
         let subject_rect = Rectangle::from_window(self);
 
-        // self.clip(Stack::<Rectangle>::new());
-
-        // Update window positions temporally whilst maintaining old ones
+        // Make a new rect with the updated coordinates in order to clip the subject
         let new_x = mouse_x.wrapping_sub(drag_x_offset);
         let new_y = mouse_y.wrapping_sub(drag_y_offset);
 
@@ -273,19 +265,13 @@ impl Window {
         // Sections that need to be updated are dirty rectangles
         let dirty_rectangles = self.clipped_rectangles.clone();
 
-        // print_serial!("SUBJECT = {:?}\n", subject_rect);
-        // print_serial!("CLIP = {:?}\n", clipping_rect);
-        // for (i, dr) in dirty_rectangles.into_iter().enumerate() {
-        //     print_serial!("{:?}\n", dr.unwrap());
-        // }
-
         self.clipped_rectangles.empty();
-
-        // All windows below the current window may need to be updated upon a move
 
         // Finally update our coordinates which updates position
         self.x = new_x;
         self.y = new_y;
+
+        // All windows below the current window may need to be updated upon a move
 
         // Ensure that there are regions which need to be updated before updating
         if dirty_rectangles.length > 0 {

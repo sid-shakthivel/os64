@@ -33,8 +33,7 @@ Potential problems:
 - Double buffering significantly reduces performance
 
 Now:
-Dirty rectangles when dragging windows
-Raise windows
+Finish drag stuff with getting windows below (clipping)
 Compare memory - if different write (perhaps using SSE)
 Handle keyboard events
 Mouse pointer - make old mouse dirty, repaint it appropriately
@@ -48,7 +47,4 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
-Phantom's fixed
-Some parts of border still persist 
-Fix how windows look in order to 
-Clip out the top bit?
+Multiple children clipping doesn't work

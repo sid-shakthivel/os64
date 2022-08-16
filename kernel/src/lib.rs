@@ -73,10 +73,16 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     let window1 = Window::new(10, 10, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
     DESKTOP.free();
 
+    let window2 = Window::new(200, 200, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
+    DESKTOP.free();
+
     DESKTOP.lock().add_sub_window(window1);
     DESKTOP.free();
 
-    DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
+    DESKTOP.lock().add_sub_window(window2);
+    DESKTOP.free();
+
+    DESKTOP.lock().paint(Stack::<Rectangle>::new(), false);
     DESKTOP.free();
 
     // fs::init(multiboot_information_address);
