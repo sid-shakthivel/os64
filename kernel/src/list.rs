@@ -136,6 +136,15 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
         }
     }
 
+    pub fn get_at(&mut self, index: usize) -> T {
+        for (i, node) in &mut self.into_iter().enumerate() {
+            if i == index {
+                return node.unwrap().payload.clone();
+            }
+        }
+        panic!("Element not found");
+    }
+
     // Removes a node from linked list given value
     pub fn remove(&mut self, target_node: &Node<T>) -> *mut Node<T> {
         let raw_value = target_node.payload.clone();

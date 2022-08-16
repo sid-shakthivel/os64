@@ -182,9 +182,9 @@ pub extern "C" fn exception_handler(registers: Registers) {
 
     // Print a suitable error messages
     match registers.num {
-        0..=22 => print_vga!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
-        27..=31 => print_vga!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
-        _ => print_vga!("Reserved\n"),
+        0..=22 => print_serial!("{}\n", EXCEPTION_MESSAGES[registers.num as usize]),
+        27..=31 => print_serial!("{}\n", EXCEPTION_MESSAGES[(registers.num as usize) - 6]),
+        _ => print_serial!("Reserved\n"),
     }
 
     print_serial!("Error Code: {:b}\n", aligned_error_code);

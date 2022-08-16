@@ -1,7 +1,7 @@
 // src/framebuffer.rs
 
 /*
-    Framebuffer is portion of RAM which contains a bitmap which maps to the display (pixels)
+    Framebuffer is portion of RAM whi&ch contains a bitmap which maps to the display (pixels)
     GRUB sets the correct video mode before loading the &kernel as specified within the multiboot header
     Pitch is number of bytes per row, BPP is bit depth
     Rectangles are arranged like this:
@@ -18,6 +18,7 @@
     Glyphs are bitmaps of 8*16
 */
 
+use core::f32::consts::E;
 use core::panic;
 
 use crate::interrupts::new_process_rsp;
@@ -47,22 +48,6 @@ pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
     None,
     BACKGROUND_COLOUR,
 ));
-
-// Moves window to the top of the stack
-// fn raise_window(&mut self, window: Option<Window>, index: usize) {
-//     // WARNING: Only do this maneuver if it's not head for performance
-//     let unwrapped_window = window.unwrap().clone();
-
-//     // Remove from linked list
-//     self.windows.remove_at(index);
-
-//     // WARNING: Should really preserve old window and move it (make a method within list)
-//     self.windows.push(
-//         PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-//         unwrapped_window,
-//     );
-//     PAGE_FRAME_ALLOCATOR.free();
-// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Window {
@@ -114,8 +99,6 @@ impl Window {
     pub fn paint(&mut self, dirty_rectangles: Stack<Rectangle>, paint_children: bool) {
         // Apply bound clipping to obtain visible parts of window
         self.clip(dirty_rectangles.clone());
-
-        // Apply titlebar logic and extract from window (for now ain't doing)
 
         // Actually draw window
         self.draw_window();
@@ -195,9 +178,10 @@ impl Window {
                 // Move window if it isn't head (already at the top of the stack)
                 if (&*(*parent).children.head.unwrap()).payload.clone() != self.clone() {
                     (*parent).children.remove_at(index);
-                    (*parent)
-                        .children
-                        .push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, self);
+                    (*parent).children.push(
+                        PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
+                        self.clone(),
+                    );
                     PAGE_FRAME_ALLOCATOR.free();
                 }
             }
@@ -208,36 +192,37 @@ impl Window {
     fn clip(&mut self, dirty_rectangles: Stack<Rectangle>) {
         let mut subject_rect = Rectangle::from_window(self);
 
-        // Add dirty rectangles since these regions must be rerendered
-        for (i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
-            self.clipped_rectangles.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                dirty_rectangle.unwrap().payload.clone(),
-            );
-            PAGE_FRAME_ALLOCATOR.free();
-        }
-
-        // Apply clipping against children only if there aren't any dirty rectangles (dirty rectangles are the only regions which need to be updated)
-        if dirty_rectangles.length == 0 {
-            for (i, child) in self.children.into_iter().enumerate() {
-                let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
-                let mut test = Rectangle::from_window(self);
-                self.clipped_rectangles
-                    .append(test.subtract_rectangle(&child_rectangle));
-                break;
+        if dirty_rectangles.length > 0 {
+            // Add dirty rectangles since these regions must be rerendered
+            for (i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
+                self.clipped_rectangles.push(
+                    PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
+                    dirty_rectangle.unwrap().payload.clone(),
+                );
+                PAGE_FRAME_ALLOCATOR.free();
             }
-        }
+        } else {
+            // Clip against self
+            self.add_rectangle(&subject_rect);
 
-        // Get windows above
-        if let Some(parent) = self.parent {
-            let windows_above = unsafe { (*parent).children.get_higher_nodes(self.clone()) };
-
-            // Apply clipping against windows above
-            for (i, window) in windows_above.into_iter().enumerate() {
-                let window_rectangle = Rectangle::from_window(&window.unwrap().payload);
-                self.clipped_rectangles
-                    .append(subject_rect.subtract_rectangle(&window_rectangle));
+            // Apply clipping against children only if there aren't any dirty rectangles (dirty rectangles are the only regions which need to be updated)
+            if dirty_rectangles.length == 0 {
+                for (i, child) in self.children.clone().into_iter().enumerate() {
+                    let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
+                    self.subtract_rectangle(&child_rectangle);
+                }
             }
+
+            // Get windows above
+            // if let Some(parent) = self.parent {
+            //     let windows_above = unsafe { (*parent).children.get_higher_nodes(self.clone()) };
+
+            //     // Apply clipping against windows above
+            //     for (i, window) in windows_above.into_iter().enumerate() {
+            //         let window_rectangle = Rectangle::from_window(&window.unwrap().payload);
+            //         self.subtract_rectangle(&window_rectangle);
+            //     }
+            // }
         }
     }
 
@@ -250,7 +235,8 @@ impl Window {
         drag_y_offset: u64,
     ) {
         self.clipped_rectangles.empty();
-        let subject_rect = Rectangle::from_window(self);
+
+        self.clip(Stack::<Rectangle>::new());
 
         // Make a new rect with the updated coordinates in order to clip the subject
         let new_x = mouse_x.wrapping_sub(drag_x_offset);
@@ -259,8 +245,7 @@ impl Window {
         let clipping_rect = Rectangle::new(new_x, new_y, new_x + self.width, new_y + self.height);
 
         // Extract out section which doesn't need to be updated (overlap) and returns sections which need to be updated
-        self.clipped_rectangles
-            .append(subject_rect.clone().subtract_rectangle(&clipping_rect));
+        self.subtract_rectangle(&clipping_rect);
 
         // Sections that need to be updated are dirty rectangles
         let dirty_rectangles = self.clipped_rectangles.clone();
@@ -284,6 +269,42 @@ impl Window {
         }
 
         self.paint(Stack::<Rectangle>::new(), false);
+    }
+
+    /*
+        Subtracts regions of an rectangle from another
+        Loops over all previous clips to ensure everything works
+    */
+    fn subtract_rectangle(&mut self, clipping_rect: &Rectangle) {
+        // Loop through the clipping rects
+        for mut i in 0..self.clipped_rectangles.length {
+            let mut raw = self.clipped_rectangles.get_at(i);
+
+            // If the clipping rect intersects with a rectangle (subject) split it or else move onto the next one
+            if clipping_rect.left <= raw.right
+                && clipping_rect.right >= raw.left
+                && clipping_rect.top <= raw.bottom
+                && clipping_rect.bottom >= raw.top
+            {
+                // Remove old rectangle and replace with list of rects
+                self.clipped_rectangles.remove_at(i);
+                self.clipped_rectangles.append(raw.split(clipping_rect));
+
+                // Reset the counter
+                i = 0;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    fn add_rectangle(&mut self, clipping_rect: &Rectangle) {
+        self.subtract_rectangle(clipping_rect);
+        self.clipped_rectangles.push(
+            PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
+            *clipping_rect,
+        );
+        PAGE_FRAME_ALLOCATOR.free();
     }
 
     fn draw_window(&mut self) {
@@ -377,7 +398,7 @@ impl Rectangle {
         let mut split_rectangles = Stack::<Rectangle>::new();
 
         // Check if clipping rect left side intersects with subject
-        if clipping_rect.left >= self.left && clipping_rect.left <= self.right {
+        if clipping_rect.left > self.left && clipping_rect.left < self.right {
             // Make new rect with updated coordinates
             let new_rect = Rectangle::new(self.left, self.top, clipping_rect.left, self.bottom);
 
@@ -389,7 +410,7 @@ impl Rectangle {
         }
 
         // Check if clipping rect top side intersects with subject
-        if clipping_rect.top >= self.top && clipping_rect.top <= self.bottom {
+        if clipping_rect.top > self.top && clipping_rect.top < self.bottom {
             let new_rect = Rectangle::new(self.left, self.top, self.right, clipping_rect.top);
 
             // Update current rectange to match (update top)
@@ -400,7 +421,7 @@ impl Rectangle {
         }
 
         // Check if clipping rect right side intersects with subject
-        if clipping_rect.right >= self.left && clipping_rect.right <= self.right {
+        if clipping_rect.right > self.left && clipping_rect.right < self.right {
             let new_rect = Rectangle::new(clipping_rect.right, self.top, self.right, self.bottom);
             self.right = clipping_rect.right;
 
@@ -409,7 +430,7 @@ impl Rectangle {
         }
 
         // Check if clipping rect bottom intersects with subject
-        if clipping_rect.bottom >= self.top && clipping_rect.bottom <= self.bottom {
+        if clipping_rect.bottom > self.top && clipping_rect.bottom < self.bottom {
             let new_rect = Rectangle::new(self.left, clipping_rect.bottom, self.right, self.bottom);
             self.bottom = clipping_rect.bottom;
 
@@ -418,34 +439,6 @@ impl Rectangle {
         }
 
         return split_rectangles;
-    }
-
-    /*
-        Punches out regions of rectangle which do not overlap given a clipping rectangle
-        Returns a list of rectangles which can be used
-    */
-    fn subtract_rectangle(&mut self, clipping_rect: &Rectangle) -> Stack<Rectangle> {
-        if !(clipping_rect.left <= self.right
-            && clipping_rect.right >= self.left
-            && clipping_rect.top <= self.bottom
-            && clipping_rect.bottom >= self.top)
-        {
-            return Stack::<Rectangle>::new();
-        }
-
-        self.split(clipping_rect)
-    }
-
-    // Applies clipping upon rectangle and then appends the clipping rect upon the list of rects
-    fn add_rectangle(&mut self, clipping_rect: &mut Rectangle) -> Stack<Rectangle> {
-        let mut split_rectangles = self.subtract_rectangle(clipping_rect);
-        split_rectangles.push(
-            PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-            *clipping_rect,
-        );
-        PAGE_FRAME_ALLOCATOR.free();
-
-        split_rectangles
     }
 }
 
@@ -500,7 +493,7 @@ impl Framebuffer {
                     for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
                         let clip = clipped_rectangle.unwrap().payload;
 
-                        // Clamp of printable area to clipped region itself
+                        // Clamp printable area to clipped region itself
                         let x_base = core::cmp::max(x, clip.left);
                         let y_base = core::cmp::max(y, clip.top);
                         let x_limit = core::cmp::min(x + width, clip.right);
@@ -671,10 +664,10 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     FRAMEBUFFER.free();
 
     // Setup the back buffer
-    let backbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
-    PAGE_FRAME_ALLOCATOR.free();
+    // let backbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
+    // PAGE_FRAME_ALLOCATOR.free();
 
-    FRAMEBUFFER.lock().backbuffer = backbuffer_address;
+    FRAMEBUFFER.lock().backbuffer = 0;
     FRAMEBUFFER.free();
 }
 

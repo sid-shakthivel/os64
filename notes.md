@@ -9,12 +9,13 @@ Large Tasks:
 - Polish (GUI (background), Code, etc)
 
 Smaller Tasks:
+- Fix the attriocious formatting
 - REP MOVSB instruction
 - Bitflags
 - Make malloc multipage (when extending, merge memory)
 - Free memory/switch to malloc everywhere
 - Improve spinlock
-- Fix rust borrow stuff (https://www.youtube.com/watch?v=79phqVpE7cU)
+- Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
 - Add syslinks to newlib makefile
 - Mutable into_iter_mut method
 - Replace enumerate() with map
@@ -47,4 +48,7 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
-Multiple children clipping doesn't work
+Why so many rectangles being drawn? so many different components to a window
+Not updating whatsoever
+
+3 redundant rectangles
