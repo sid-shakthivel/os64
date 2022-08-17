@@ -9,18 +9,14 @@ Large Tasks:
 - Polish (GUI (background), Code, etc)
 
 Smaller Tasks:
-- Fix the attriocious formatting
-- Bitflags
-- Make malloc multipage (when extending, merge memory)
-- Free memory/switch to malloc everywhere
+- Fix the attriocious formatting (fixed with jetbrains licence?)
 - Improve spinlock
 - Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
+- Fix binutils and get ld to work properly (doesn't build on MacOS)
 - Add syslinks to newlib makefile
 - Mutable into_iter_mut method
-- Replace enumerate() with map
-- Fix binutils and get ld to work properly (doesn't build on MacOS)
-- Try double buffering once again with REP MOVSB instruction
 - Handle keyboard events
+- Double buffering with REP MOVSB (Bochs is broken, so can't do)
 
 Think:
 - Switch to usize
@@ -33,8 +29,17 @@ Potential problems:
 - Double buffering significantly reduces performance
 - General protection fault from syscall
 
+Now:
+- Switch to malloc
+- Bitflags
+- Images (https://wiki.osdev.org/Loading_Icons)
+- Text with windows (titles, etc)
+
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
+
+Load it as an module - .rgb, targa file
+

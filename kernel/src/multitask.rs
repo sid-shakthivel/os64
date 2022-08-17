@@ -9,9 +9,7 @@ use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::page_frame_allocator::PAGE_SIZE;
 use crate::paging;
 use crate::paging::Table;
-use crate::print_serial;
 use crate::spinlock::Lock;
-use crate::CONSOLE;
 use core::mem::size_of;
 use core::prelude::v1::Some;
 

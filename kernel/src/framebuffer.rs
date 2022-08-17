@@ -18,24 +18,18 @@
     Glyphs are bitmaps of 8*16
 */
 
-use core::f32::consts::E;
-use core::panic;
-
-use crate::interrupts::new_process_rsp;
 use crate::spinlock::Lock;
 use crate::writer::Writer;
+use crate::CONSOLE;
 use crate::{list::Stack, print_serial};
-use crate::{mouse, CONSOLE};
 use crate::{page_frame_allocator, paging};
-use lazy_static::lazy_static;
 use multiboot2::FramebufferTag;
-use x86_64::structures::paging::page;
 
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 
 pub const SCREEN_WIDTH: u64 = 1024;
 pub const SCREEN_HEIGHT: u64 = 768;
-const WINDOW_BACKGROUND_COLOUR: u32 = 0xFFBBBBBB;
+pub const WINDOW_BACKGROUND_COLOUR: u32 = 0xFFBBBBBB;
 pub const BACKGROUND_COLOUR: u32 = 0x3499fe;
 const WINDOW_BORDER_COLOUR: u32 = 0xFF000000;
 const WINDOW_TITLE_COLOUR: u32 = 0x7092be;
@@ -113,7 +107,7 @@ impl Window {
 
         // Optionally paint children (Might be temporary)
         if paint_children {
-            for (i, child) in self.children.into_iter().enumerate() {
+            for (_i, child) in self.children.into_iter().enumerate() {
                 child
                     .unwrap()
                     .payload
@@ -216,12 +210,12 @@ impl Window {
 
     // Applies clipping to a window against dirty rectangles, windows, titlebar, children
     fn clip(&mut self, dirty_rectangles: Stack<Rectangle>) {
-        let mut subject_rect = Rectangle::from_window(self);
+        let subject_rect = Rectangle::from_window(self);
 
         // Dirty rectangles are the only regions which need to be updated
         if dirty_rectangles.length > 0 {
             // Add dirty rectangles since these regions must be rerendered
-            for (i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
+            for (_i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
                 self.clipped_rectangles.push(
                     PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
                     dirty_rectangle.unwrap().payload.clone(),
@@ -232,7 +226,7 @@ impl Window {
             // Clip against self
             self.add_rectangle(&subject_rect);
 
-            for (i, child) in self.children.clone().into_iter().enumerate() {
+            for (_i, child) in self.children.clone().into_iter().enumerate() {
                 let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
                 self.subtract_rectangle(&child_rectangle);
             }
@@ -294,7 +288,7 @@ impl Window {
 
                     // Repaint windows below the moving window
                     let windows_below = (*parent).children.get_lower_nodes(self.clone());
-                    for (i, window) in windows_below.into_iter().enumerate() {
+                    for (_i, window) in windows_below.into_iter().enumerate() {
                         window
                             .unwrap()
                             .payload
@@ -347,56 +341,53 @@ impl Window {
     }
 
     fn draw_window(&mut self) {
-        match self.parent {
-            Some(parent) => {
-                // If window has parent, implies it is a proper window
+        if self.parent.is_some() {
+            // If window has parent, implies it is a proper window
 
-                // Paint the main window portion
-                FRAMEBUFFER.lock().fill_rect(
-                    Some(&self.clipped_rectangles),
-                    self.x + 3,
-                    self.y + WINDOW_TITLE_HEIGHT + 3,
-                    self.width - 6,
-                    self.height - WINDOW_TITLE_HEIGHT - 6,
-                    self.colour,
-                );
-                FRAMEBUFFER.free();
+            // Paint the main window portion
+            FRAMEBUFFER.lock().fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x + 3,
+                self.y + WINDOW_TITLE_HEIGHT + 3,
+                self.width - 6,
+                self.height - WINDOW_TITLE_HEIGHT - 6,
+                self.colour,
+            );
+            FRAMEBUFFER.free();
 
-                // Paint the top title bar
-                FRAMEBUFFER.lock().fill_rect(
-                    Some(&self.clipped_rectangles),
-                    self.x + 3,
-                    self.y + 3,
-                    self.width - 6,
-                    WINDOW_TITLE_HEIGHT,
-                    WINDOW_TITLE_COLOUR,
-                );
-                FRAMEBUFFER.free();
+            // Paint the top title bar
+            FRAMEBUFFER.lock().fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x + 3,
+                self.y + 3,
+                self.width - 6,
+                WINDOW_TITLE_HEIGHT,
+                WINDOW_TITLE_COLOUR,
+            );
+            FRAMEBUFFER.free();
 
-                // Paint the outline of the window
-                FRAMEBUFFER.lock().draw_rect_outline(
-                    Some(&self.clipped_rectangles),
-                    self.x,
-                    self.y,
-                    self.width,
-                    self.height,
-                    WINDOW_BORDER_COLOUR,
-                );
-                FRAMEBUFFER.free();
-            }
-            None => {
-                // Most likely the background
+            // Paint the outline of the window
+            FRAMEBUFFER.lock().draw_rect_outline(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                WINDOW_BORDER_COLOUR,
+            );
+            FRAMEBUFFER.free();
+        } else {
+            // Most likely the background
 
-                FRAMEBUFFER.lock().fill_rect(
-                    Some(&self.clipped_rectangles),
-                    self.x,
-                    self.y,
-                    self.width,
-                    self.height,
-                    self.colour,
-                );
-                FRAMEBUFFER.free();
-            }
+            FRAMEBUFFER.lock().fill_rect(
+                Some(&self.clipped_rectangles),
+                self.x,
+                self.y,
+                self.width,
+                self.height,
+                self.colour,
+            );
+            FRAMEBUFFER.free();
         }
     }
 }
@@ -576,13 +567,13 @@ impl Framebuffer {
             self.draw_horizontal_line(clipped_rectangles, x, y, width, colour);
 
             // Bottom bar
-            self.draw_horizontal_line(clipped_rectangles, x, (y + height - 3), width, colour);
+            self.draw_horizontal_line(clipped_rectangles, x, y + height - 3, width, colour);
 
             // Left bar
             self.draw_vertical_line(clipped_rectangles, x, y, height, colour);
 
             // Right bar
-            self.draw_vertical_line(clipped_rectangles, (x + width - 3), y, height, colour);
+            self.draw_vertical_line(clipped_rectangles, x + width - 3, y, height, colour);
         }
     }
 
@@ -597,11 +588,17 @@ impl Framebuffer {
         let backbuffer_p = self.backbuffer as *mut u8;
         let frontbuffer_p = self.frontbuffer as *mut u8;
 
-        for i in 0..3145728 {
-            unsafe {
-                *frontbuffer_p.offset(i) = *backbuffer_p.offset(i);
-            }
+        unsafe {
+            speedy_write(frontbuffer_p, backbuffer_p, 3145728);
         }
+
+        // for i in 0..3145728 {
+        //     print_serial!("{:p} {:p}\n", backbuffer_p, frontbuffer_p);
+        //     unsafe {
+        //         // *frontbuffer_p.offset(i) = *backbuffer_p.offset(i);
+
+        //     }
+        // }
     }
 
     fn draw_horizontal_line(
@@ -678,6 +675,8 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;
     FRAMEBUFFER.free();
 
+    print_serial!("{:?}\n", framebuffer_tag);
+
     // Calulate sizes of the framebuffer
     let size = (framebuffer_tag.bpp as u64)
         * (framebuffer_tag.width as u64)
@@ -706,4 +705,6 @@ pub fn init(framebuffer_tag: FramebufferTag) {
 extern "C" {
     pub(crate) static _binary_font_psf_end: usize;
     pub(crate) static _binary_font_psf_size: usize;
+
+    fn speedy_write(dest: *mut u8, src: *mut u8, length: u32);
 }

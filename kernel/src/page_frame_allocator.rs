@@ -8,8 +8,6 @@ A stack of free pages along with a pointer to the first page will be used in ord
 */
 
 use crate::{list::Stack, spinlock::Lock};
-use crate::{print_serial, CONSOLE};
-use core::prelude::v1::Some;
 use multiboot2::BootInformation;
 pub struct PageFrameAllocator {
     pub free_frames: Stack<u64>,
@@ -46,10 +44,10 @@ impl FrameAllocator for PageFrameAllocator {
         }
     }
 
-    // Allocates a continuous amount of pages
+    // Allocates a continuous amount of pages subsequently
     fn alloc_frames(&mut self, pages_required: u64) -> *mut u64 {
         let address = self.current_page;
-        for i in 0..pages_required {
+        for _i in 0..pages_required {
             self.current_page += 4096;
         }
         return address as *mut u64;
@@ -86,7 +84,7 @@ impl PageFrameAllocator {
     pub fn init(&mut self, boot_info: &BootInformation) {
         let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
 
-        let mut memory_start: u64 = round_to_nearest_page((boot_info.end_address() as u64));
+        let memory_start: u64 = round_to_nearest_page(boot_info.end_address() as u64);
 
         let memory_end: u64 = round_to_nearest_page(
             memory_map_tag

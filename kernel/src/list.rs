@@ -1,8 +1,7 @@
 // src/list.rs
 
 use crate::{
-    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
-    print_serial, CONSOLE,
+    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR}
 };
 
 // Each node stores a reference to the next/previous node within the list along with a payload
@@ -49,7 +48,7 @@ impl<'a, T> Iterator for StackIntoIterator<'a, T> {
 
         let next = self.current.unwrap().next;
         match next {
-            Some(value) => self.current = unsafe { Some(&*next.unwrap()) },
+            Some(value) => self.current = unsafe { Some(&*value) },
             None => {
                 self.current = None;
             }
@@ -77,7 +76,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
                 unsafe {
                     // Update next of new node to head and head prev to new node
                     (*new_node).next = self.head;
-                    (*self.head.unwrap()).prev = Some(new_node);
+                    (*head).prev = Some(new_node);
                 }
             }
             None => {
@@ -103,7 +102,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
                 self.head = (*self.head.unwrap()).next;
 
                 match self.head {
-                    Some(head) => (*self.head.unwrap()).prev = None,
+                    Some(head) => (*head).prev = None,
                     None => self.tail = None,
                 }
             }
@@ -144,6 +143,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
                 return node.unwrap().payload.clone();
             }
         }
+
         panic!("Element not found");
     }
 
@@ -165,7 +165,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
     pub fn get_higher_nodes(&mut self, target_node: T) -> Stack<T> {
         let mut new_stack = Stack::<T>::new();
         let mut length = 0;
-        for (i, node) in self.into_iter().enumerate() {
+        for (_i, node) in self.into_iter().enumerate() {
             if node.unwrap().payload.clone() == target_node {
                 break;
             }
@@ -188,7 +188,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
         let mut new_stack = Stack::<T>::new();
         let mut can_push = false;
 
-        for (i, node) in self.into_iter().enumerate() {
+        for (_i, node) in self.into_iter().enumerate() {
             if can_push {
                 new_stack.push(
                     PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,

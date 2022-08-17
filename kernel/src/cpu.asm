@@ -42,7 +42,7 @@ flush_tlb:
   pop rax
   ret
 
-global cause_tf:
-  cause_tf:
+global speedy_write
+speedy_write:
   xchg bx, bx
-  mov rax, 0
+  ret

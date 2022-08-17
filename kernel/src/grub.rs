@@ -1,12 +1,3 @@
-use crate::elf;
-use crate::framebuffer;
-use crate::fs;
-use crate::multitask;
-use crate::ports::inpw;
-use crate::ports::outpw;
-use crate::print_serial;
-use crate::CONSOLE;
-#[warn(non_camel_case_types)]
 // src/grub.rs
 
 /*
@@ -15,9 +6,16 @@ use crate::CONSOLE;
     Grub emulates VGA card
     BGA (Bochs Graphic Updator) is accessible via 2 ports (index, data) in which it's possible to enable/disable VBE extentions
     Includes changing screen resolution, dit depth | Latest version is 0xB0C5
-
-
 */
+
+#![allow(unused_variables)]
+
+use crate::elf;
+use crate::framebuffer;
+use crate::fs;
+use crate::multitask;
+use crate::ports::inpw;
+use crate::ports::outpw;
 use multiboot2::BootInformation;
 
 const FILESYSTEM_ON: bool = false;

@@ -8,9 +8,7 @@
 use crate::{
     list::{Node, Stack},
     page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR},
-    paging, print_serial,
     spinlock::Lock,
-    CONSOLE,
 };
 
 // Divide by 8 as u64 is 8 bytes and a *mut u64 points to 8 bytes
@@ -42,21 +40,11 @@ impl MemoryBlock {
 static FREE_MEMORY_BLOCK_LIST: Lock<Stack<MemoryBlock>> = Lock::new(Stack::<MemoryBlock>::new());
 
 /*
-    Recives the size of variables in bytes which are to be used
+    Recives the size of data in bytes which is to be used
     Returns pointer to data region
 */
 pub fn kmalloc(mut size: u64) -> *mut u64 {
-    // If size is greater then 1 page, allocate multiple pages straight through PFA
-    if size > 4096 {
-        // Round to nearest page and then allocate
-        let address = PAGE_FRAME_ALLOCATOR
-            .lock()
-            .alloc_frames(page_frame_allocator::round_to_nearest_page(size));
-        PAGE_FRAME_ALLOCATOR.free();
-        return address;
-    }
-
-    // Must align block
+    // Must align block by 8
     size = align(size);
 
     let (index, wrapped_memory_block) = find_first_fit(size);
@@ -83,8 +71,10 @@ pub fn kmalloc(mut size: u64) -> *mut u64 {
             }
         }
         None => {
-            // No memory blocks can be found, thus must allocate more memory
-            extend_memory_region();
+            // No memory blocks can be found, thus must allocate more memory according to how many bytes needed
+            let pages_required = page_frame_allocator::round_to_nearest_page(size);
+
+            extend_memory_region(pages_required);
 
             return kmalloc(size);
         }
@@ -109,7 +99,7 @@ pub fn kfree(dp: *mut u64) {
     FREE_MEMORY_BLOCK_LIST.free();
 
     // Check next node to merge memory regions together to alleviate fragmentation
-    // NOTE: Since a stack is used, the node is added to the top of the stack so there is only a next value
+    // NOTE: Since a stack is used, the node is added to the top of the stack so there is only a next 
     if let Some(next_node) = header.next {
         let next_header = unsafe { &mut *next_node };
 
@@ -146,12 +136,13 @@ fn find_first_fit(size: u64) -> (u64, Option<MemoryBlock>) {
 }
 
 // Extends accessible memory region of kernel heap by another page (4096 bytes)
-pub fn extend_memory_region() {
+pub fn extend_memory_region(pages: u64) {
     // Allocate another page
-    let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+    let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(pages);
     PAGE_FRAME_ALLOCATOR.free();
 
-    create_new_memory_block(page_frame_allocator::PAGE_SIZE as u64, address, true);
+    let size = (page_frame_allocator::PAGE_SIZE as u64) * pages;
+    create_new_memory_block(size, address, true);
 }
 
 /*

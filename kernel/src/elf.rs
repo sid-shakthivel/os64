@@ -21,16 +21,11 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use x86_64::structures::paging::page;
-
 use crate::multitask::USER_PROCESS_START_ADDRESS;
 use crate::page_frame_allocator;
 use crate::page_frame_allocator::FrameAllocator;
 use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
-use crate::page_frame_allocator::PAGE_SIZE;
 use crate::paging;
-use crate::print_serial;
-use crate::CONSOLE;
 use core::mem;
 
 type Elf64Half = u16;

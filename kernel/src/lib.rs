@@ -1,10 +1,6 @@
 // src/lib.rs
 
 #![no_std] // Don't link with Rust standard library
-#![feature(associated_type_bounds)] // Magic which makes the page frame allocator work
-#![feature(generic_associated_types)]
-#![feature(const_option)]
-#![feature(const_mut_refs)]
 
 mod allocator;
 mod elf;
@@ -34,10 +30,10 @@ extern crate multiboot2;
 extern crate bitflags;
 extern crate x86_64;
 
-use crate::framebuffer::{Rectangle, Window, DESKTOP};
+use crate::framebuffer::{DESKTOP, Rectangle};
 use crate::list::Stack;
-use crate::mouse::MOUSE;
-use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
+use crate::framebuffer::Window;
+use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
@@ -54,7 +50,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     PAGE_FRAME_ALLOCATOR.lock().init(&boot_info);
     PAGE_FRAME_ALLOCATOR.free();
 
-    allocator::extend_memory_region();
+    allocator::extend_memory_region(1);
 
     uart::init();
 
@@ -70,10 +66,26 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
-    let window1 = Window::new(10, 10, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
+    grub::initialise_userland(&boot_info);
+
+    let window1 = Window::new(
+        10,
+        10,
+        300,
+        300,
+        Some(DESKTOP.lock()),
+        framebuffer::WINDOW_BACKGROUND_COLOUR,
+    );
     DESKTOP.free();
 
-    let window2 = Window::new(150, 150, 300, 300, Some(DESKTOP.lock()), 0xFFBBBBBB);
+    let window2 = Window::new(
+        150,
+        150,
+        300,
+        300,
+        Some(DESKTOP.lock()),
+        framebuffer::WINDOW_BACKGROUND_COLOUR,
+    );
     DESKTOP.free();
 
     DESKTOP.lock().add_sub_window(window2);

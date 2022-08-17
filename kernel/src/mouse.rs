@@ -16,7 +16,6 @@
 */
 
 use crate::framebuffer;
-use crate::framebuffer::FRAMEBUFFER;
 use crate::ps2;
 use crate::spinlock::Lock;
 use crate::DESKTOP;
