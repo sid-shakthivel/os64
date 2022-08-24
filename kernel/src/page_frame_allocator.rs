@@ -66,7 +66,8 @@ impl FrameAllocator for PageFrameAllocator {
     */
     fn free_frame(&mut self, frame_address: *mut u64) {
         // Create new node which stores the page
-        self.free_frames.push(frame_address as u64, self.page_count);
+        self.free_frames
+            .push_at_address(frame_address as u64, self.page_count);
         self.page_count += 1;
     }
 }
@@ -101,10 +102,6 @@ impl PageFrameAllocator {
 
 pub fn round_to_nearest_page(size: u64) -> u64 {
     ((size as i64 + 4095) & (-4096)) as u64
-}
-
-pub fn convert_bits_to_pages(mb: u64) -> u64 {
-    mb / (PAGE_SIZE as u64) / 8
 }
 
 pub fn convert_bytes_to_mb(bytes: u64) -> u64 {

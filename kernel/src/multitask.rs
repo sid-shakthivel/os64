@@ -4,8 +4,7 @@
     Preemptive multitasking is when the CPU splits up its time between various processes to give the illusion they are happening simultaneously
 */
 
-use crate::page_frame_allocator::FrameAllocator;
-use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
+use crate::allocator::kmalloc;
 use crate::page_frame_allocator::PAGE_SIZE;
 use crate::paging;
 use crate::paging::Table;
@@ -113,8 +112,7 @@ impl Process {
         let new_p4: *mut Table = paging::deep_clone();
 
         // Create and setup a stack as though an interrupt has been fired
-        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
-        PAGE_FRAME_ALLOCATOR.free();
+        let mut rsp = kmalloc(PAGE_SIZE as u64);
 
         unsafe {
             let stack_top = rsp.offset(511) as u64;

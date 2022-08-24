@@ -1,7 +1,9 @@
 // src/list.rs
 
 use crate::{
-    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR}
+    allocator::{kfree, kmalloc},
+    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
+    print_serial, CONSOLE,
 };
 
 // Each node stores a reference to the next/previous node within the list along with a payload
@@ -67,8 +69,36 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
         }
     }
 
-    // Appends a new node to the start of the stack
-    pub fn push(&mut self, address: u64, value: T) {
+    // Appends a new node to the start of the stack and allocates memory for it
+    pub fn push(&mut self, value: T) {
+        use core::mem::size_of;
+        let size = size_of::<Node<T>>();
+        let address = kmalloc(size as u64);
+
+        let new_node = Node::new(address as u64, value);
+
+        match self.head {
+            Some(head) => {
+                unsafe {
+                    // Update next of new node to head and head prev to new node
+                    (*new_node).next = self.head;
+                    (*head).prev = Some(new_node);
+                }
+            }
+            None => {
+                // Set tail to head too
+                self.tail = Some(new_node);
+            }
+        }
+
+        // Push to front of list
+        self.head = Some(new_node);
+
+        self.length += 1;
+    }
+
+    // Appends a new node to the start of the stack but stores the node at a specific address
+    pub fn push_at_address(&mut self, address: u64, value: T) {
         let new_node = Node::new(address, value);
 
         match self.head {
@@ -169,11 +199,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
             if node.unwrap().payload.clone() == target_node {
                 break;
             }
-            new_stack.push(
-                PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                node.unwrap().payload.clone(),
-            );
-            PAGE_FRAME_ALLOCATOR.free();
+            new_stack.push(node.unwrap().payload.clone());
             length += 1;
         }
         new_stack.length = length;
@@ -190,11 +216,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
 
         for (_i, node) in self.into_iter().enumerate() {
             if can_push {
-                new_stack.push(
-                    PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                    node.unwrap().payload.clone(),
-                );
-                PAGE_FRAME_ALLOCATOR.free();
+                new_stack.push(node.unwrap().payload.clone());
             }
 
             if node.unwrap().payload.clone() == target_node {
@@ -231,7 +253,8 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
     // Removes every element from a list
     pub fn empty(&mut self) {
         while self.head.is_some() {
-            self.pop();
+            let address = self.pop() as *mut u64;
+            // kfree(address);
         }
     }
 

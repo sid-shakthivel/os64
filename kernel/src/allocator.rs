@@ -8,7 +8,9 @@
 use crate::{
     list::{Node, Stack},
     page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR},
+    print_serial,
     spinlock::Lock,
+    CONSOLE,
 };
 
 // Divide by 8 as u64 is 8 bytes and a *mut u64 points to 8 bytes
@@ -22,18 +24,13 @@ const NODE_MEMORY_BLOCK_SIZE: isize = (core::mem::size_of::<Node<MemoryBlock>>()
 
 #[derive(Clone, Debug, PartialEq)]
 struct MemoryBlock {
-    is_free: bool, // Indicates whether the memory block is available to be used
-    size: u64,
+    size: u64, // Value in bytes
     data: *mut u64, // Pointer to any data which is held within
 }
 
 impl MemoryBlock {
-    fn new(data: *mut u64, size: u64, is_free: bool) -> MemoryBlock {
-        MemoryBlock {
-            is_free,
-            size,
-            data,
-        }
+    fn new(data: *mut u64, size: u64) -> MemoryBlock {
+        MemoryBlock { size, data }
     }
 }
 
@@ -44,7 +41,10 @@ static FREE_MEMORY_BLOCK_LIST: Lock<Stack<MemoryBlock>> = Lock::new(Stack::<Memo
     Returns pointer to data region
 */
 pub fn kmalloc(mut size: u64) -> *mut u64 {
-    // Must align block by 8
+    // Size must include the size of a memory block (in bytes)
+    size += (NODE_MEMORY_BLOCK_SIZE as u64) * 8;
+
+    // Must align block size by 8
     size = align(size);
 
     let (index, wrapped_memory_block) = find_first_fit(size);
@@ -59,10 +59,15 @@ pub fn kmalloc(mut size: u64) -> *mut u64 {
 
                 // Create new memory block for malloc'd memory
                 let mut address = unsafe { get_header_address(memory_block.data) };
+
+                // Adjust size correctly for correct offset
+                let size_in_bytes = size / 8;
+
                 let dp = create_new_memory_block(size, address, false);
 
                 // Add remaining section of block
-                address = unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE + size as isize) };
+                address =
+                    unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE + size_in_bytes as isize) };
                 create_new_memory_block(memory_block.size - size, address, true);
 
                 return dp;
@@ -72,7 +77,9 @@ pub fn kmalloc(mut size: u64) -> *mut u64 {
         }
         None => {
             // No memory blocks can be found, thus must allocate more memory according to how many bytes needed
-            let pages_required = page_frame_allocator::round_to_nearest_page(size);
+            let pages_required = page_frame_allocator::get_page_number(page_frame_allocator::round_to_nearest_page(size)) + 1;
+
+            print_serial!("{}\n", pages_required);
 
             extend_memory_region(pages_required);
 
@@ -90,16 +97,13 @@ pub fn kfree(dp: *mut u64) {
     let header = unsafe { &mut *(header_address as *mut Node<MemoryBlock>) };
 
     // Add node to linked list of free nodes
-    header.payload.is_free = true;
     FREE_MEMORY_BLOCK_LIST
         .lock()
-        .push(header_address as u64, header.payload.clone());
-    FREE_MEMORY_BLOCK_LIST.free();
-
+        .push_at_address(header_address as u64, header.payload.clone());
     FREE_MEMORY_BLOCK_LIST.free();
 
     // Check next node to merge memory regions together to alleviate fragmentation
-    // NOTE: Since a stack is used, the node is added to the top of the stack so there is only a next 
+    // NOTE: Since a stack is used, the node is added to the top of the stack so there is only a next
     if let Some(next_node) = header.next {
         let next_header = unsafe { &mut *next_node };
 
@@ -108,6 +112,11 @@ pub fn kfree(dp: *mut u64) {
 
         // Remove other region from linked list since updated
         FREE_MEMORY_BLOCK_LIST.lock().remove(next_header);
+        FREE_MEMORY_BLOCK_LIST.free();
+
+        for (i, block) in FREE_MEMORY_BLOCK_LIST.lock().into_iter().enumerate() {
+            print_serial!("FINAL BLOCK {:?}\n", block);
+        }
         FREE_MEMORY_BLOCK_LIST.free();
     }
 }
@@ -126,7 +135,7 @@ fn align(size: u64) -> u64 {
 */
 fn find_first_fit(size: u64) -> (u64, Option<MemoryBlock>) {
     for (i, memory_block) in FREE_MEMORY_BLOCK_LIST.lock().into_iter().enumerate() {
-        if memory_block.unwrap().payload.is_free && memory_block.unwrap().payload.size > size {
+        if memory_block.unwrap().payload.size > size {
             FREE_MEMORY_BLOCK_LIST.free();
             return (i as u64, Some(memory_block.unwrap().payload.clone()));
         }
@@ -151,13 +160,13 @@ pub fn extend_memory_region(pages: u64) {
 */
 fn create_new_memory_block(size: u64, address: *mut u64, is_free: bool) -> *mut u64 {
     let dp_address = unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE) };
-    let new_memory_block = MemoryBlock::new(dp_address, size, is_free);
+    let new_memory_block = MemoryBlock::new(dp_address, size);
 
     if is_free {
         // Push to linked list
         FREE_MEMORY_BLOCK_LIST
             .lock()
-            .push(address as u64, new_memory_block);
+            .push_at_address(address as u64, new_memory_block);
         FREE_MEMORY_BLOCK_LIST.free();
     } else {
         // Add meta data regardless

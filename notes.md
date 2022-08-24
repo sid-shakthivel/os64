@@ -17,6 +17,8 @@ Smaller Tasks:
 - Mutable into_iter_mut method
 - Handle keyboard events
 - Double buffering with REP MOVSB (Bochs is broken, so can't do)
+- Bitflags
+- Images (https://wiki.osdev.org/Loading_Icons)
 
 Think:
 - Switch to usize
@@ -31,8 +33,6 @@ Potential problems:
 
 Now:
 - Switch to malloc
-- Bitflags
-- Images (https://wiki.osdev.org/Loading_Icons)
 - Text with windows (titles, etc)
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
@@ -40,6 +40,4 @@ ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
-
-Load it as an module - .rgb, targa file
 

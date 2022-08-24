@@ -18,12 +18,14 @@
     Glyphs are bitmaps of 8*16
 */
 
+use crate::allocator::{kfree, kmalloc};
 use crate::spinlock::Lock;
 use crate::writer::Writer;
 use crate::CONSOLE;
 use crate::{list::Stack, print_serial};
 use crate::{page_frame_allocator, paging};
 use multiboot2::FramebufferTag;
+use x86_64::structures::paging::page;
 
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 
@@ -89,9 +91,7 @@ impl Window {
 
     // Creates a new window upon itself (mostly used for the background window)
     pub fn add_sub_window(&mut self, window: Window) {
-        self.children
-            .push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, window);
-        PAGE_FRAME_ALLOCATOR.free();
+        self.children.push(window);
     }
 
     // Paints a window upon the screen
@@ -150,8 +150,7 @@ impl Window {
             self.mouse_y + 5,
         );
         let mut dirty_rectangles = Stack::<Rectangle>::new();
-        dirty_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, mouse_rect);
-        PAGE_FRAME_ALLOCATOR.free();
+        dirty_rectangles.push(mouse_rect);
 
         // Repaint given background
         self.paint(dirty_rectangles, true);
@@ -197,12 +196,9 @@ impl Window {
             unsafe {
                 // Move window if it isn't head (already at the top of the stack)
                 if (&*(*parent).children.head.unwrap()).payload.clone() != self.clone() {
-                    (*parent).children.remove_at(index);
-                    (*parent).children.push(
-                        PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                        self.clone(),
-                    );
-                    PAGE_FRAME_ALLOCATOR.free();
+                    let address = (*parent).children.remove_at(index);
+                    // kfree(address as *mut u64);
+                    (*parent).children.push(self.clone());
                 }
             }
         }
@@ -216,11 +212,8 @@ impl Window {
         if dirty_rectangles.length > 0 {
             // Add dirty rectangles since these regions must be rerendered
             for (_i, dirty_rectangle) in dirty_rectangles.into_iter().enumerate() {
-                self.clipped_rectangles.push(
-                    PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-                    dirty_rectangle.unwrap().payload.clone(),
-                );
-                PAGE_FRAME_ALLOCATOR.free();
+                self.clipped_rectangles
+                    .push(dirty_rectangle.unwrap().payload.clone());
             }
         } else {
             // Clip against self
@@ -233,7 +226,8 @@ impl Window {
 
             // Get windows above
             if let Some(parent) = self.parent {
-                let windows_above = unsafe { (*parent).children.get_higher_nodes(self.clone()) };
+                let mut windows_above =
+                    unsafe { (*parent).children.get_higher_nodes(self.clone()) };
 
                 // Apply clipping against windows above
                 // Conditional statement exists because windows above includes the background
@@ -243,6 +237,8 @@ impl Window {
                         self.subtract_rectangle(&window_rectangle);
                     }
                 }
+
+                // windows_above.empty();
             }
         }
     }
@@ -255,8 +251,6 @@ impl Window {
         drag_x_offset: u64,
         drag_y_offset: u64,
     ) {
-        self.clipped_rectangles.empty();
-
         self.clip(Stack::<Rectangle>::new());
 
         // Make a new rect with the updated coordinates in order to clip the subject
@@ -287,7 +281,7 @@ impl Window {
                     (*parent).paint(dirty_rectangles.clone(), false);
 
                     // Repaint windows below the moving window
-                    let windows_below = (*parent).children.get_lower_nodes(self.clone());
+                    let mut windows_below = (*parent).children.get_lower_nodes(self.clone());
                     for (_i, window) in windows_below.into_iter().enumerate() {
                         window
                             .unwrap()
@@ -295,6 +289,7 @@ impl Window {
                             .clone()
                             .paint(dirty_rectangles.clone(), false);
                     }
+                    // windows_below.empty();
                 }
             }
         }
@@ -333,11 +328,7 @@ impl Window {
 
     fn add_rectangle(&mut self, clipping_rect: &Rectangle) {
         self.subtract_rectangle(clipping_rect);
-        self.clipped_rectangles.push(
-            PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64,
-            *clipping_rect,
-        );
-        PAGE_FRAME_ALLOCATOR.free();
+        self.clipped_rectangles.push(*clipping_rect);
     }
 
     fn draw_window(&mut self) {
@@ -411,6 +402,7 @@ impl Rectangle {
     }
 
     pub fn from_window(window: &Window) -> Self {
+        // print_serial!("{:?} {:p}\n", window, window as *const Window);
         Self::new(
             window.x,
             window.y,
@@ -435,8 +427,7 @@ impl Rectangle {
             // Update current rectangle to match (update left)
             self.left = clipping_rect.left;
 
-            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
-            PAGE_FRAME_ALLOCATOR.free();
+            split_rectangles.push(new_rect);
         }
 
         // Check if clipping rect top side intersects with subject
@@ -446,8 +437,7 @@ impl Rectangle {
             // Update current rectange to match (update top)
             self.top = clipping_rect.top;
 
-            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
-            PAGE_FRAME_ALLOCATOR.free();
+            split_rectangles.push(new_rect);
         }
 
         // Check if clipping rect right side intersects with subject
@@ -455,8 +445,7 @@ impl Rectangle {
             let new_rect = Rectangle::new(clipping_rect.right, self.top, self.right, self.bottom);
             self.right = clipping_rect.right;
 
-            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
-            PAGE_FRAME_ALLOCATOR.free();
+            split_rectangles.push(new_rect);
         }
 
         // Check if clipping rect bottom intersects with subject
@@ -464,8 +453,7 @@ impl Rectangle {
             let new_rect = Rectangle::new(self.left, clipping_rect.bottom, self.right, self.bottom);
             self.bottom = clipping_rect.bottom;
 
-            split_rectangles.push(PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as u64, new_rect);
-            PAGE_FRAME_ALLOCATOR.free();
+            split_rectangles.push(new_rect);
         }
 
         return split_rectangles;
@@ -588,17 +576,11 @@ impl Framebuffer {
         let backbuffer_p = self.backbuffer as *mut u8;
         let frontbuffer_p = self.frontbuffer as *mut u8;
 
-        unsafe {
-            speedy_write(frontbuffer_p, backbuffer_p, 3145728);
+        for i in 0..3145728 {
+            unsafe {
+                *frontbuffer_p.offset(i) = *backbuffer_p.offset(i);
+            }
         }
-
-        // for i in 0..3145728 {
-        //     print_serial!("{:p} {:p}\n", backbuffer_p, frontbuffer_p);
-        //     unsafe {
-        //         // *frontbuffer_p.offset(i) = *backbuffer_p.offset(i);
-
-        //     }
-        // }
     }
 
     fn draw_horizontal_line(
@@ -675,28 +657,25 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;
     FRAMEBUFFER.free();
 
-    print_serial!("{:?}\n", framebuffer_tag);
-
     // Calulate sizes of the framebuffer
-    let size = (framebuffer_tag.bpp as u64)
+    let size_in_bytes = ((framebuffer_tag.bpp as u64)
         * (framebuffer_tag.width as u64)
-        * (framebuffer_tag.height as u64);
-    let size_mb = page_frame_allocator::convert_bytes_to_mb(size);
-    let number_of_pages = page_frame_allocator::convert_bits_to_pages(size);
+        * (framebuffer_tag.height as u64))
+        / 8;
+
+    let size_in_mb = page_frame_allocator::convert_bytes_to_mb(size_in_bytes);
 
     // Setup the front buffer
-    let frontbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
-    PAGE_FRAME_ALLOCATOR.free();
+    let frontbuffer_address = kmalloc(size_in_bytes) as u64;
 
-    // Identity map this buffer so it maps to video memory
-    paging::identity_map_from(framebuffer_tag.address, frontbuffer_address, size_mb);
+    // // Identity map this buffer so it maps to video memory
+    paging::identity_map_from(framebuffer_tag.address, frontbuffer_address, size_in_mb);
 
     FRAMEBUFFER.lock().frontbuffer = frontbuffer_address;
     FRAMEBUFFER.free();
 
     // Setup the back buffer
-    // let backbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as u64;
-    // PAGE_FRAME_ALLOCATOR.free();
+    // let backbuffer_address = malloc(size_in_bytes) as u64;
 
     FRAMEBUFFER.lock().backbuffer = 0;
     FRAMEBUFFER.free();
@@ -705,6 +684,4 @@ pub fn init(framebuffer_tag: FramebufferTag) {
 extern "C" {
     pub(crate) static _binary_font_psf_end: usize;
     pub(crate) static _binary_font_psf_size: usize;
-
-    fn speedy_write(dest: *mut u8, src: *mut u8, length: u32);
 }

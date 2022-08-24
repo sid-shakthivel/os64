@@ -24,7 +24,11 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
+use crate::page_frame_allocator::PAGE_SIZE;
+use crate::{
+    allocator::{kfree, kmalloc},
+    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
+};
 use core::prelude::v1::Some;
 
 #[allow(dead_code)]
@@ -96,10 +100,7 @@ impl Table {
 
         // If there are 512 empty entries, the table may be freed
         if i == 512 {
-            PAGE_FRAME_ALLOCATOR
-                .lock()
-                .free_frame(self as *const _ as *mut u64);
-            PAGE_FRAME_ALLOCATOR.free();
+            kfree(self as *const _ as *mut u64);
         }
     }
 
@@ -109,8 +110,8 @@ impl Table {
     */
     fn create_next_table(&mut self, index: usize) -> &mut Table {
         if self.get_table(index).is_none() {
-            let page_frame = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
-            PAGE_FRAME_ALLOCATOR.free();
+            let page_frame = kmalloc(PAGE_SIZE as u64);
+
             self.entries[index] = Page::new(page_frame as u64);
         }
         return self.get_table(index).expect("why not working");
@@ -184,10 +185,8 @@ pub fn unmap_page(virtual_address: u64) {
 
     let frame = p1.entries[p1_index];
     if frame.is_unused() == false {
-        PAGE_FRAME_ALLOCATOR
-            .lock()
-            .free_frame(frame.get_physical_address());
-        PAGE_FRAME_ALLOCATOR.free();
+        kfree(frame.get_physical_address());
+
         p1.entries[p1_index].set_unused();
 
         unsafe {
@@ -218,26 +217,20 @@ pub fn identity_map_from(physical_address: u64, virtual_address: u64, megabytes:
 pub fn deep_clone() -> *mut Table {
     unsafe {
         let p4 = &mut *P4;
-        let new_p4: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
-        PAGE_FRAME_ALLOCATOR.free();
+        let new_p4: *mut Table = kmalloc(PAGE_SIZE as u64) as *mut _;
         for i in 0..(*p4).entries.len() - 1 {
             if (*p4).entries[i].entry != 0 {
-                let new_p3: *mut Table = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
-                PAGE_FRAME_ALLOCATOR.free();
+                let new_p3: *mut Table = kmalloc(PAGE_SIZE as u64) as *mut _;
                 let p3 = p4.get_table(i).unwrap();
 
                 for j in 0..(*p3).entries.len() {
                     if (*p3).entries[j].entry != 0 {
-                        let new_p2: *mut Table =
-                            PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
-                        PAGE_FRAME_ALLOCATOR.free();
+                        let new_p2: *mut Table = kmalloc(PAGE_SIZE as u64) as *mut _;
                         let p2 = p3.get_table(j).unwrap();
 
                         for k in 0..(*p2).entries.len() {
                             if (*p2).entries[k].entry != 0 {
-                                let new_p1: *mut Table =
-                                    PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut _;
-                                PAGE_FRAME_ALLOCATOR.free();
+                                let new_p1: *mut Table = kmalloc(PAGE_SIZE as u64) as *mut _;
                                 let p1 = p2.get_table(k).unwrap();
 
                                 for l in 0..(*p1).entries.len() {

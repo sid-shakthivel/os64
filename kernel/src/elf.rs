@@ -21,12 +21,11 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use crate::allocator::kmalloc;
 use crate::multitask::USER_PROCESS_START_ADDRESS;
-use crate::page_frame_allocator;
-use crate::page_frame_allocator::FrameAllocator;
-use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::paging;
 use core::mem;
+use crate::page_frame_allocator;
 
 type Elf64Half = u16;
 type Elf64Off = u64;
@@ -185,13 +184,8 @@ fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader) {
 }
 
 fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {
-    // Get page number needed for the segment
-    let pages_required =
-        page_frame_allocator::get_page_number(page_frame_allocator::round_to_nearest_page(size));
-
     // Allocate memory for the segment
-    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(pages_required);
-    PAGE_FRAME_ALLOCATOR.free();
+    let dest = kmalloc(page_frame_allocator::round_to_nearest_page(size));
     let source = source_raw as *mut u64;
 
     // Copy segment data into the memory space
