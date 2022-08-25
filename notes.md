@@ -12,8 +12,8 @@ Smaller Tasks:
 - Fix the attriocious formatting (fixed with jetbrains licence?)
 - Improve spinlock
 - Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
-- Fix binutils and get ld to work properly (doesn't build on MacOS)
-- Add syslinks to newlib makefile
+- Fix binutils and get ld to work properly (doesn't build on MacOS https://github.com/spack/spack/issues/3213)
+- Add syslinks to newlib makefile 
 - Mutable into_iter_mut method
 - Handle keyboard events
 - Double buffering with REP MOVSB (Bochs is broken, so can't do)
@@ -32,7 +32,7 @@ Potential problems:
 - General protection fault from syscall
 
 Now:
-- Switch to malloc
+- Use free more
 - Text with windows (titles, etc)
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
@@ -41,3 +41,4 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
+Hashmap to map id's to file descriptors

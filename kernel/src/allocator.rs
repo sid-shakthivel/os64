@@ -24,7 +24,7 @@ const NODE_MEMORY_BLOCK_SIZE: isize = (core::mem::size_of::<Node<MemoryBlock>>()
 
 #[derive(Clone, Debug, PartialEq)]
 struct MemoryBlock {
-    size: u64, // Value in bytes
+    size: u64,      // Value in bytes
     data: *mut u64, // Pointer to any data which is held within
 }
 
@@ -61,13 +61,12 @@ pub fn kmalloc(mut size: u64) -> *mut u64 {
                 let mut address = unsafe { get_header_address(memory_block.data) };
 
                 // Adjust size correctly for correct offset
-                let size_in_bytes = size / 8;
+                let size_in_u64 = size / 8;
 
                 let dp = create_new_memory_block(size, address, false);
 
                 // Add remaining section of block
-                address =
-                    unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE + size_in_bytes as isize) };
+                address = unsafe { address.offset(NODE_MEMORY_BLOCK_SIZE + size_in_u64 as isize) };
                 create_new_memory_block(memory_block.size - size, address, true);
 
                 return dp;
@@ -77,9 +76,9 @@ pub fn kmalloc(mut size: u64) -> *mut u64 {
         }
         None => {
             // No memory blocks can be found, thus must allocate more memory according to how many bytes needed
-            let pages_required = page_frame_allocator::get_page_number(page_frame_allocator::round_to_nearest_page(size)) + 1;
-
-            print_serial!("{}\n", pages_required);
+            let pages_required = page_frame_allocator::get_page_number(
+                page_frame_allocator::round_to_nearest_page(size),
+            ) + 1;
 
             extend_memory_region(pages_required);
 
@@ -104,21 +103,18 @@ pub fn kfree(dp: *mut u64) {
 
     // Check next node to merge memory regions together to alleviate fragmentation
     // NOTE: Since a stack is used, the node is added to the top of the stack so there is only a next
-    if let Some(next_node) = header.next {
-        let next_header = unsafe { &mut *next_node };
+    // if let Some(next_node) = header.next {
+    // Check if nodes are adjacent
 
-        // Get total size of other region and update memory block
-        header.payload.size += next_header.payload.size;
+    // let next_header = unsafe { &mut *next_node };
 
-        // Remove other region from linked list since updated
-        FREE_MEMORY_BLOCK_LIST.lock().remove(next_header);
-        FREE_MEMORY_BLOCK_LIST.free();
+    // // Get total size of other region and update memory block
+    // header.payload.size += next_header.payload.size;
 
-        for (i, block) in FREE_MEMORY_BLOCK_LIST.lock().into_iter().enumerate() {
-            print_serial!("FINAL BLOCK {:?}\n", block);
-        }
-        FREE_MEMORY_BLOCK_LIST.free();
-    }
+    // // Remove other region from linked list since updated
+    // FREE_MEMORY_BLOCK_LIST.lock().remove(next_header);
+    // FREE_MEMORY_BLOCK_LIST.free();
+    // }
 }
 
 /*
