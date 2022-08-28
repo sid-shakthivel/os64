@@ -18,7 +18,7 @@ use crate::ports::inpw;
 use crate::ports::outpw;
 use multiboot2::BootInformation;
 
-const FILESYSTEM_ON: bool = false;
+const FILESYSTEM_ON: bool = true;
 const VBE_DISPI_IOPORT_INDEX: u16 = 0x01CE;
 const VBE_DISPI_IOPORT_DATA: u16 = 0x01CF;
 const VBE_DISPI_INDEX_ID: u16 = 0;
@@ -35,20 +35,24 @@ const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
 pub fn initialise_userland(boot_info: &BootInformation) {
     let mut i = 0;
+
+    let mut process_index = 0; // This index determines the PID for each process 
     for module in boot_info.module_tags() {
-        // First module will be filesystem if given && constant is true
+        // First module will be filesystem if given and constant is true
         if FILESYSTEM_ON && i == 0 {
             fs::init(module.start_address());
         } else if !FILESYSTEM_ON {
             // Else, modules are userspace programs
             elf::parse(module.start_address() as u64);
-            let user_process = multitask::Process::init(multitask::ProcessPriority::High);
+            let user_process = multitask::Process::init(multitask::ProcessPriority::High, process_index);
 
             // Add process to list of processes
             multitask::PROCESS_SCHEDULAR
                 .lock()
                 .add_process(user_process);
             multitask::PROCESS_SCHEDULAR.free();
+
+            process_index += 1;
         }
         i += 1;
     }

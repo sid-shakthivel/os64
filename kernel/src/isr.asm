@@ -82,9 +82,9 @@ handle_pit_interrupt:
     push rax
 
     mov rsp, [new_process_rsp]
-    
+
     pop rax
-    mov cr3, rax
+    ; mov cr3, rax
     popaq
 
     iretq 
@@ -95,7 +95,7 @@ handle_syscall:
     cld
     pushaq
     call syscall_handler
-    popq
+    popaq
     iretq
 
 handle_no_err_exception 0

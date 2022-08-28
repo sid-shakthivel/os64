@@ -96,11 +96,14 @@ impl Keyboard {
         ps2::ps2_write_device(0, 0).unwrap();
         ps2::ps2_wait_ack().unwrap();
 
-        return match ps2::ps2_read(0x60).unwrap() {
+        let value = ps2::ps2_read(0x60).unwrap();
+
+        return match value {
             0x43 => ScancodeSet::ScancodeSet1,
             0x41 => ScancodeSet::ScancodeSet2,
             0x3f => ScancodeSet::ScancodeSet3,
-            _ => panic!("Unkown scancode set"),
+            // _ => panic!("Unkown scancode set {}", value),
+            _ => ScancodeSet::ScancodeSet1,
         };
     }
 }

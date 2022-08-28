@@ -18,6 +18,9 @@
     Glyphs are bitmaps of 8*16
 */
 
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use crate::allocator::{kfree, kmalloc};
 use crate::spinlock::Lock;
 use crate::writer::Writer;

@@ -6,9 +6,10 @@
 
 use crate::allocator::kmalloc;
 use crate::page_frame_allocator::PAGE_SIZE;
-use crate::paging;
 use crate::paging::Table;
 use crate::spinlock::Lock;
+use crate::CONSOLE;
+use crate::{paging, print_serial};
 use core::mem::size_of;
 use core::prelude::v1::Some;
 
@@ -33,7 +34,7 @@ pub enum ProcessPriority {
 }
 
 pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
-pub static USER_PROCESS_START_ADDRESS: u64 = 0x800000;
+pub static USER_PROCESS_START_ADDRESS: u64 = 0x19ff000;
 
 // Processes schedular holds all tasks and decides which will be serviced
 pub struct ProcessSchedular {
@@ -79,19 +80,17 @@ impl ProcessSchedular {
                 ..self.tasks[0].unwrap()
             };
             self.tasks[0] = Some(updated_process);
-            // self.current_process_index += 1;
+            self.current_process_index += 1;
         }
 
-        // // Select next process and ensure it's not empty
-        // let mut current_task = self.tasks[self.current_process_index];
-        // if current_task.is_none() {
-        //     self.current_process_index = 0;
-        //     current_task = self.tasks[self.current_process_index];
-        // }
+        // Select next process and ensure it's not empty
+        let mut current_task = self.tasks[self.current_process_index];
+        if current_task.is_none() {
+            self.current_process_index = 0;
+            current_task = self.tasks[self.current_process_index];
+        }
 
-        // return Some(current_task.unwrap().rsp);
-
-        return Some(self.tasks[0].unwrap().rsp);
+        return Some(current_task.unwrap().rsp);
     }
 
     pub fn add_process(&mut self, process: Process) {
@@ -105,7 +104,7 @@ impl ProcessSchedular {
 
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
-    pub fn init(process_priority: ProcessPriority) -> Process {
+    pub fn init(process_priority: ProcessPriority, pid: u64) -> Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4
@@ -138,7 +137,7 @@ impl Process {
         }
 
         Process {
-            pid: 0,
+            pid: pid,
             rsp: rsp,
             process_priority: process_priority,
             cr3: new_p4,

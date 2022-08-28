@@ -19,7 +19,6 @@ use crate::pit::PIT;
 use crate::print_serial;
 use crate::print_vga;
 use crate::uart::CONSOLE;
-use crate::TERMINAL;
 use core::arch::asm;
 use core::mem::size_of;
 use x86_64::addr::VirtAddr;
@@ -188,7 +187,6 @@ pub extern "C" fn exception_handler(registers: Registers) {
     }
 
     print_serial!("Error Code: {:b}\n", aligned_error_code);
-    print_vga!("Error Code: {:b}\n", aligned_error_code);
 
     disable();
     unsafe {

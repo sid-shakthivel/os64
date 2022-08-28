@@ -59,6 +59,13 @@ impl Console {
     fn write_serial(&mut self, character: char) {
         while self.is_transmit_empty() == 0 {}
         outb(self.port, character as u8);
+
+        self.write_e9_hack(character);
+    }
+
+    fn write_e9_hack(&mut self, character: char) {
+        while self.is_transmit_empty() == 0 {}
+        outb(0xe9, character as u8);
     }
 
     fn read_serial(&self) -> u8 {

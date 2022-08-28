@@ -19,8 +19,11 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use crate::CONSOLE;
 use core::mem;
 use spin::Mutex;
+
+use crate::print_serial;
 
 struct Fat16 {
     bpb: Option<BiosParameterBlock>,
@@ -28,6 +31,7 @@ struct Fat16 {
     fat_address: u32,
     first_data_sector_address: u32,
     root_directory_size: u32,
+    initrd: Option<File>,
 }
 
 // Boot record occupies one sector and is at the start
@@ -93,7 +97,7 @@ struct LongDirectoryEntry {
 // Inspired by the ubiquitous FILE* data type in C
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
-struct File {
+pub struct File {
     name: [u8; 8],
     flags: u32,
     size: u32,
@@ -106,7 +110,7 @@ struct File {
 }
 
 #[derive(Copy, PartialEq, Clone, Debug)]
-enum FileType {
+pub enum FileType {
     File,
     Directory,
     Syslink,
@@ -236,6 +240,7 @@ impl File {
         }
     }
 
+    // Only works on the root directory
     fn _find(&mut self, filename: &str, mut cluster_address: u32) -> Result<File, &str> {
         if filename.len() > 8 {
             return Err("File is too big");
@@ -252,6 +257,8 @@ impl File {
                 0xE5 => panic!("Unused entry"),
                 _ => {}
             }
+
+            print_serial!("{:?}\n", directory_entry);
 
             let dos_filename = core::str::from_utf8(&directory_entry.filename)
                 .unwrap()
@@ -296,6 +303,7 @@ impl Fat16 {
             fat_address: 0,
             first_data_sector_address: 0,
             root_directory_size: 0,
+            initrd: None,
         }
     }
 }
@@ -338,8 +346,10 @@ fn get_next_unallocated_cluster() -> Option<u16> {
     return None;
 }
 
-// Clusters represent linear addresses, sectors use segment addresses
-// LBA represents an indexed location on the disk
+/*
+    Clusters represent linear addresses, sectors use segment addresses
+    LBA represents an indexed location on the disk
+*/
 fn get_lba(cluster_num: u32) -> u32 {
     return (cluster_num - 2) * (FS.lock().bpb.unwrap().sectors_per_cluster) as u32;
 }
@@ -358,21 +368,6 @@ fn convert_sector_to_bytes(sector: u32) -> u32 {
 }
 
 static FS: Mutex<Fat16> = Mutex::new(Fat16::new());
-
-// Print filenames in required format
-fn print_filename(filename: &[u8], ext: &[u8]) {
-    for i in 0..filename.len() {
-        if filename[i] != 0x20 {
-            // print!("{}", filename[i] as char);
-        }
-    }
-
-    for i in 0..ext.len() {
-        // print!("{}", ext[i] as char);
-    }
-
-    // print!("\n");
-}
 
 pub fn init(start_address: u32) {
     let bpb = unsafe { &*(start_address as *const BiosParameterBlock) };
@@ -395,13 +390,14 @@ pub fn init(start_address: u32) {
     let first_data_sector: u32 =
         convert_sector_to_bytes(root_directory_size) + root_directory_address;
 
+    let mut initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
+
     FS.lock().bpb = Some(*bpb);
     FS.lock().start_address = start_address;
     FS.lock().fat_address = first_fat;
     FS.lock().first_data_sector_address = first_data_sector;
     FS.lock().root_directory_size = convert_sector_to_bytes(root_directory_size);
-
-    let initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
+    FS.lock().initrd = Some(initrd);
 }
 
 // Copies number of bytes into destination
@@ -410,4 +406,24 @@ pub unsafe fn memcpy_cluster(dest: *mut u8, src: *mut u8, index: u32) {
         let offset = ((index * 2048) + i) as isize;
         *(dest.offset(offset)) = *(src.offset(offset));
     }
+}
+
+/*
+    Parses an absolute file path and returns a file
+    Example '/home/a.txt' returns a.txt
+*/
+pub fn get_file_beta(absolute_filepath: &str) -> File {
+    let mut current_fd = FS.lock().initrd.unwrap();
+
+    // Split path against /
+    let mut filepath_components = absolute_filepath.split("/");
+    let test = filepath_components.next().unwrap();
+    current_fd = current_fd.find_root(test).unwrap();
+
+    // Loop through each portion and return the file
+    for component in filepath_components {
+        current_fd = current_fd.find(component).unwrap();
+    }
+
+    return current_fd;
 }

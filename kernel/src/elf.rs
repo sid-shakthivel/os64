@@ -23,9 +23,10 @@
 
 use crate::allocator::kmalloc;
 use crate::multitask::USER_PROCESS_START_ADDRESS;
-use crate::paging;
+use crate::{paging, print_serial};
 use core::mem;
-use crate::page_frame_allocator;
+use crate::page_frame_allocator::{self, PAGE_FRAME_ALLOCATOR, FrameAllocator};
+use crate::CONSOLE;
 
 type Elf64Half = u16;
 type Elf64Off = u64;
@@ -166,10 +167,7 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
 }
 
 fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader) {
-    // Loop through sections
-
-    // if elf_header.e_shnum > 0 { panic!("MUST IMPLEMENT BSS"); }
-
+    // Loop through segments
     for i in 0..(elf_header.e_shnum) {
         let address = file_start
             + elf_header.e_shoff
@@ -185,7 +183,12 @@ fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader) {
 
 fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {
     // Allocate memory for the segment
-    let dest = kmalloc(page_frame_allocator::round_to_nearest_page(size));
+    let rounded_size = page_frame_allocator::round_to_nearest_page(size);
+    let number_of_pages = page_frame_allocator::get_page_number(rounded_size);
+
+    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages);
+    PAGE_FRAME_ALLOCATOR.free();
+
     let source = source_raw as *mut u64;
 
     // Copy segment data into the memory space
@@ -196,6 +199,8 @@ fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {
     }
 
     // Map the physical pages to 0x800000
-    let v_address = USER_PROCESS_START_ADDRESS + (index * 0x1000) as u64;
+    // Gonna currently manaually map both pages
+    let v_address = USER_PROCESS_START_ADDRESS;
     paging::map_page(dest as u64, v_address, true);
+    paging::map_page(dest as u64 + 4096, v_address + 4096, true);
 }

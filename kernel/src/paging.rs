@@ -197,7 +197,7 @@ pub fn unmap_page(virtual_address: u64) {
 
 /*
     Identity maps a specified amount of megabytes from address 0
-    Usage identity_map(16) would identity map the first 16 MB of memory
+    Usage - identity_map(16) would identity map the first 16 MB of memory
 */
 pub fn identity_map(megabytes: u64) {
     for address in 0..(megabytes * 256) {

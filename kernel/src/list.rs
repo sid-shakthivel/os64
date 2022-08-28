@@ -7,7 +7,7 @@ use crate::{
 };
 
 // Each node stores a reference to the next/previous node within the list along with a payload
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Node<T: 'static> {
     pub payload: T,
     pub next: Option<*mut Node<T>>,
@@ -15,7 +15,7 @@ pub struct Node<T: 'static> {
 }
 
 // LIFO (Last in, First out)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Stack<T: 'static> {
     pub head: Option<*mut Node<T>>,
     pub tail: Option<*mut Node<T>>,

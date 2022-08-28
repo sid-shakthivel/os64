@@ -8,6 +8,7 @@ mod framebuffer;
 mod fs;
 mod gdt;
 mod grub;
+mod hashmap;
 mod interrupts;
 mod keyboard;
 mod list;
@@ -30,15 +31,14 @@ extern crate multiboot2;
 extern crate bitflags;
 extern crate x86_64;
 
-use crate::framebuffer::{DESKTOP, Rectangle};
-use crate::list::Stack;
 use crate::framebuffer::Window;
+use crate::framebuffer::{Rectangle, DESKTOP};
+use crate::hashmap::HashMap;
+use crate::list::Stack;
 use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
-use crate::vga_text::TERMINAL;
-use crate::writer::Writer;
 use core::panic::PanicInfo;
 use multiboot2::load;
 
@@ -50,8 +50,6 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     PAGE_FRAME_ALLOCATOR.lock().init(&boot_info);
     PAGE_FRAME_ALLOCATOR.free();
 
-    allocator::extend_memory_region(1);
-
     uart::init();
 
     gdt::init();
@@ -60,14 +58,30 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     interrupts::init();
     PICS.lock().init();
 
-    TERMINAL.lock().clear();
-
     grub::bga_set_video_mode();
 
-    framebuffer::init(boot_info.framebuffer_tag().unwrap());
+    // framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
     grub::initialise_userland(&boot_info);
 
+    // let test = fs::get_file_beta("A.TXT");
+
+    // setup_wm();
+
+    let mut map = HashMap::<usize>::new();
+    map.set(1, 1510);
+    print_serial!("{}\n", map.get(1).unwrap());
+    map.set(1, 65);
+    print_serial!("{}\n", map.get(1).unwrap());
+
+    print_serial!("Execution Finished\n");
+
+    interrupts::enable();
+
+    loop {}
+}
+
+fn setup_wm() {
     let window1 = Window::new(
         10,
         10,
@@ -96,22 +110,11 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
     DESKTOP.free();
-
-    // fs::init(multiboot_information_address);
-
-    interrupts::enable();
-
-    // grub::initialise_userland(&boot_info);
-
-    print_vga!("Execution finished\n");
-
-    loop {}
 }
 
 #[panic_handler] // This function is called on panic.
 #[no_mangle]
 fn panic(info: &PanicInfo) -> ! {
     print_serial!("Error: {}", info);
-    print_vga!("Error: {}", info);
     loop {}
 }

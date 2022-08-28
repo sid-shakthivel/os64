@@ -19,21 +19,23 @@ Smaller Tasks:
 - Double buffering with REP MOVSB (Bochs is broken, so can't do)
 - Bitflags
 - Images (https://wiki.osdev.org/Loading_Icons)
+- Load userspace programs from fs instead of modules
+- Text with windows (titles, etc)
 
 Think:
 - Switch to usize
-- Make things like page frame allocator generic of types - large array would be of certain types
 - Make an idle user space process with low priority which always runs
-- Syscall management - which ones to write, design of basic syscall functions within syscalls.c
 
-Potential problems:
+Problems:
 - New framebuffer stuff may not work with fs
 - Double buffering significantly reduces performance
-- General protection fault from syscall
+- Switching address space is broken with cr3
+- Keyboard and mouse are broken in bochs
+- Collisions may fail
 
 Now:
-- Use free more
-- Text with windows (titles, etc)
+- Test the hashmap for effectiveness
+- Test the syscalls more 
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
@@ -41,4 +43,4 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
-Hashmap to map id's to file descriptors
+REMEMBER ABOUT UPPER/LOWER CASES FOR FILESYEM

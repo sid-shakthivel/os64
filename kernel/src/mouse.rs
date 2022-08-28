@@ -166,11 +166,11 @@ impl Mouse {
         self.set_mouse_rate(200);
         self.set_mouse_rate(200);
         self.set_mouse_rate(80);
-        if self.get_type() != ps2::PS2Device::PS2MouseFiveButtons {
-            panic!("5 button mode failed");
-        } else {
-            self.variety = self.get_type()
-        }
+        // if self.get_type() != ps2::PS2Device::PS2MouseFiveButtons {
+        //     panic!("5 button mode failed");
+        // } else {
+        //     self.variety = self.get_type()
+        // }
     }
 
     fn get_type(&self) -> ps2::PS2Device {
