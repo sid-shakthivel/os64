@@ -30,4 +30,8 @@ SECTIONS
         *(COMMON)
         *(.bss) *(.bss.*)
     }
+
+    /* Beginning of heap */
+    . = ALIGN(4k);
+    __kernel_end = .;
 }

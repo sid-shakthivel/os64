@@ -21,16 +21,12 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::allocator::{kfree, kmalloc};
+use crate::allocator::kmalloc;
+use crate::list::Stack;
 use crate::spinlock::Lock;
 use crate::writer::Writer;
-use crate::CONSOLE;
-use crate::{list::Stack, print_serial};
 use crate::{page_frame_allocator, paging};
 use multiboot2::FramebufferTag;
-use x86_64::structures::paging::page;
-
-use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 
 pub const SCREEN_WIDTH: u64 = 1024;
 pub const SCREEN_HEIGHT: u64 = 768;
@@ -229,8 +225,7 @@ impl Window {
 
             // Get windows above
             if let Some(parent) = self.parent {
-                let mut windows_above =
-                    unsafe { (*parent).children.get_higher_nodes(self.clone()) };
+                let windows_above = unsafe { (*parent).children.get_higher_nodes(self.clone()) };
 
                 // Apply clipping against windows above
                 // Conditional statement exists because windows above includes the background
@@ -284,7 +279,7 @@ impl Window {
                     (*parent).paint(dirty_rectangles.clone(), false);
 
                     // Repaint windows below the moving window
-                    let mut windows_below = (*parent).children.get_lower_nodes(self.clone());
+                    let windows_below = (*parent).children.get_lower_nodes(self.clone());
                     for (_i, window) in windows_below.into_iter().enumerate() {
                         window
                             .unwrap()

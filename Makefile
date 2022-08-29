@@ -5,8 +5,11 @@ run-bochs: all
 	bochs -f bochs/bochsrc.txt -q
 
 all:
+	# Replace filesystem
+	rm -f isodir/modules/fs.img
+	cp fs.img isodir/modules
+
 	# Userspace modules
-	# docker run --rm -v /Users/siddharth/Code/rust/os64/:/code os64/toolchain bash -c "cd code/userland/program && make all"
 	cd /Users/siddharth/Code/rust/os64/userland/hello-c && make 
 
 	# Kernel

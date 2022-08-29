@@ -1,10 +1,6 @@
 // src/list.rs
 
-use crate::{
-    allocator::{kfree, kmalloc},
-    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
-    print_serial, CONSOLE,
-};
+use crate::allocator::kmalloc;
 
 // Each node stores a reference to the next/previous node within the list along with a payload
 #[derive(Debug, Copy, Clone)]
@@ -253,7 +249,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
     // Removes every element from a list
     pub fn empty(&mut self) {
         while self.head.is_some() {
-            let address = self.pop() as *mut u64;
+            let _address = self.pop() as *mut u64;
             // kfree(address);
         }
     }

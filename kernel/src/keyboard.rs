@@ -6,8 +6,6 @@
     Scancode is simply a byte and scan code set is map between ascii characters and bytes sent
 */
 
-use core::panic;
-
 use crate::print_serial;
 use crate::ps2;
 use crate::CONSOLE;

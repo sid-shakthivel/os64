@@ -14,6 +14,10 @@ use crate::elf;
 use crate::framebuffer;
 use crate::fs;
 use crate::multitask;
+use crate::multitask::USER_PROCESS_START_ADDRESS;
+use crate::page_frame_allocator::FrameAllocator;
+use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
+use crate::paging;
 use crate::ports::inpw;
 use crate::ports::outpw;
 use multiboot2::BootInformation;
@@ -36,15 +40,23 @@ const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 pub fn initialise_userland(boot_info: &BootInformation) {
     let mut i = 0;
 
-    let mut process_index = 0; // This index determines the PID for each process 
+    let mut process_index = 0; // This index determines the PID for each process
     for module in boot_info.module_tags() {
+        // print_serial!("MODULE ADDRESS = {:x}\n", module.start_address());
         // First module will be filesystem if given and constant is true
         if FILESYSTEM_ON && i == 0 {
             fs::init(module.start_address());
-        } else if !FILESYSTEM_ON {
+        } else {
             // Else, modules are userspace programs
             elf::parse(module.start_address() as u64);
-            let user_process = multitask::Process::init(multitask::ProcessPriority::High, process_index);
+
+            // Alloc some pages and map them accordingly
+            let heap = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+            PAGE_FRAME_ALLOCATOR.free();
+            paging::map_page(heap as u64, USER_PROCESS_START_ADDRESS + 8192, true);
+
+            let user_process =
+                multitask::Process::init(multitask::ProcessPriority::High, process_index, heap as i64);
 
             // Add process to list of processes
             multitask::PROCESS_SCHEDULAR

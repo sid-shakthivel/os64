@@ -20,7 +20,7 @@
 #![allow(unused_variables)]
 
 use crate::CONSOLE;
-use core::mem;
+use core::{mem, panic};
 use spin::Mutex;
 
 use crate::print_serial;
@@ -30,7 +30,7 @@ pub struct Fat16 {
     start_address: u32,
     fat_address: u32,
     first_data_sector_address: u32,
-    root_directory_address: u32,
+    root_directory_size: u32,
     initrd: Option<File>,
 }
 
@@ -128,31 +128,17 @@ impl File {
         };
     }
 
-    pub fn read(&mut self, buffer: *mut u8, length: usize) -> Result<u64, &str> {
+    pub fn read(&mut self, buffer: *mut u8) -> Result<u64, &str> {
         if self.file_type != FileType::File {
             return Err("Tried to read on a directory");
         }
 
-        let cluster_address =
-            convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
-
-        let file_contents = cluster_address as *mut u8;
-
-        if length > 2048 {
-            panic!("CLUSTER TOO BIG");
-        }
-
-        for i in 0..length {
-            unsafe {
-                *buffer.offset(i as isize) = *file_contents.offset(i as isize);
-            }
-        }
-
+        self._modify(buffer, false);
+        self.index = 0;
         return Ok(0);
     }
 
     pub fn write(&mut self, buffer: *mut u8, length: usize) -> Result<u64, &str> {
-        // TODO: Improve and implement further
         if self.file_type != FileType::File {
             return Err("Tried to write on a directory");
         }
@@ -182,7 +168,10 @@ impl File {
     }
 
     pub fn find_root(&mut self, filename: &str) -> Result<File, &str> {
-        let root_directory_address = FS.lock().root_directory_address;
+        let first_data_sector_address: u32 = FS.lock().first_data_sector_address;
+        let root_directory_size: u32 = FS.lock().root_directory_size;
+        let root_directory_address = first_data_sector_address - root_directory_size;
+
         return self._find(filename, root_directory_address);
     }
 
@@ -264,7 +253,6 @@ impl File {
         }
     }
 
-    // Only works on the root directory
     fn _find(&mut self, filename: &str, mut cluster_address: u32) -> Result<File, &str> {
         if filename.len() > 8 {
             return Err("File is too big");
@@ -275,6 +263,8 @@ impl File {
 
         for _i in 0..64 {
             let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
+
+            print_serial!("{} {:?}\n", filename, directory_entry);
 
             match directory_entry.filename[0] {
                 0x00 => return Err("File cannot be found in this directory"), // No more files/directories
@@ -324,7 +314,7 @@ impl Fat16 {
             start_address: 0,
             fat_address: 0,
             first_data_sector_address: 0,
-            root_directory_address: 0,
+            root_directory_size: 0,
             initrd: None,
         }
     }
@@ -404,7 +394,6 @@ pub fn init(start_address: u32) {
 
     let root_directory_sector: u32 =
         (bpb.reserved_sector_count as u32) + ((bpb.table_count as u32) * fat_size);
-
     let root_directory_address: u32 =
         start_address + convert_sector_to_bytes(root_directory_sector);
 
@@ -419,7 +408,7 @@ pub fn init(start_address: u32) {
     FS.lock().start_address = start_address;
     FS.lock().fat_address = first_fat;
     FS.lock().first_data_sector_address = first_data_sector;
-    FS.lock().root_directory_address = root_directory_address;
+    FS.lock().root_directory_size = convert_sector_to_bytes(root_directory_size);
     FS.lock().initrd = Some(initrd);
 }
 
@@ -433,9 +422,9 @@ pub unsafe fn memcpy_cluster(dest: *mut u8, src: *mut u8, index: u32) {
 
 /*
     Parses an absolute filepath and returns a file descriptor
-    File descriptor is a unqiue unsigned integer which is used to identify an open file
+    File descriptor is unsigned integer which is used to identify an open file
 */
-pub fn parse_absolute_filepath(filepath: &str) -> Result<File, &str> {
+pub fn parse_absolute_filepath(filepath: &str) -> File {
     let cleaned_filepath: &str = &filepath[1..filepath.len()]; // Remove the initial / for ease
 
     let mut current_fd = FS.lock().initrd.unwrap();
@@ -443,25 +432,22 @@ pub fn parse_absolute_filepath(filepath: &str) -> Result<File, &str> {
     // Split path against /
     let mut filepath_components = cleaned_filepath.split("/");
 
-    match filepath_components.next() {
-        Some(first_component) => {
-            current_fd = current_fd.find_root(first_component).unwrap();
+    let first_component = filepath_components.next().unwrap();
+    current_fd = current_fd.find_root(first_component).unwrap();
 
-            // Loop through each other portion and return the file/directory needed
-            for component in filepath_components {
-                let result = current_fd.find(component);
-
-                if result.is_ok() {
-                    current_fd = result.unwrap();
-                } else {
-                    return Err("File not found");
-                }
-            }
-        }
-        None => {
-            return Err("Filepath is in incorrect format");
-        }
+    // // Loop through each portion and return the file
+    for component in filepath_components {
+        current_fd = current_fd.find(component).unwrap();
     }
 
-    return Ok(current_fd);
+    return current_fd;
+}
+
+fn is_string_empty(string: &str) -> bool {
+    let bytes = string.as_bytes();
+    if bytes[0] == 0 {
+        return true;
+    }
+
+    return false;
 }

@@ -21,12 +21,11 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::allocator::kmalloc;
 use crate::multitask::USER_PROCESS_START_ADDRESS;
+use crate::page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR};
+use crate::CONSOLE;
 use crate::{paging, print_serial};
 use core::mem;
-use crate::page_frame_allocator::{self, PAGE_FRAME_ALLOCATOR, FrameAllocator};
-use crate::CONSOLE;
 
 type Elf64Half = u16;
 type Elf64Off = u64;
@@ -80,6 +79,7 @@ enum ElfType {
 }
 
 #[repr(C, packed)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct ElfSectionHeader {
     sh_name: Elf64Word,
     sh_type: Elf64Word,
@@ -173,6 +173,8 @@ fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader) {
             + elf_header.e_shoff
             + (mem::size_of::<ElfSectionHeader>() as u64) * (i as u64);
         let section_header = unsafe { &*(address as *const ElfSectionHeader) };
+
+        // print_serial!("{:?}\n", section_header);
 
         // TODO: Add support for .bss by checking flags etc
         if section_header.sh_type == 8 {

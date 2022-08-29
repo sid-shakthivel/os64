@@ -4,20 +4,30 @@
 int main()
 {
     // In at&t - source, destionation
-    char *message = "Hello World";
-    int address = (int)message;
+    const char *filename = "/A.TXT";
+    int file_address = (int)filename;
 
-    // asm("xchg %bx, %bx");
+    // Open syscall
+    asm volatile("mov $0, %%rcx \n\t\
+        mov %0, %%rbx \n\t\
+        mov $8, %%rax \n\t\
+        int $0x80 \n\t\
+        "
+                 :
+                 : "m"(file_address));
 
-    // Message to write
-    asm volatile("mov $11, %%rdx \n\t\
+    const char *message = "hAllo";
+    int message_address = (int)message;
+
+    // Write syscall
+    asm volatile("mov $5, %%rdx \n\t\
         mov %0, %%rcx \n\t\
-        mov $1, %%rbx \n\t\
+        mov $0, %%rbx \n\t\
         mov $10, %%rax \n\t\
         int $0x80 \n\t\
         "
                  :
-                 : "m"(address));
+                 : "m"(message_address));
 
     for (;;)
     {

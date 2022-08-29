@@ -34,7 +34,7 @@ impl<T> HashItem<T> {
     }
 }
 
-impl<T: Copy + Debug + PartialEq + core::fmt::Display> HashMap<T> {
+impl<T: Copy + Debug + PartialEq> HashMap<T> {
     pub const fn new() -> HashMap<T> {
         HashMap {
             items: [None; CAPACITY],
@@ -57,7 +57,7 @@ impl<T: Copy + Debug + PartialEq + core::fmt::Display> HashMap<T> {
                         let mut index_to_be_removed = 0;
 
                         // If list exists, attempt to find the item and update it accordingly
-                        for (i, item) in list.into_iter().enumerate() {
+                        for (_i, item) in list.into_iter().enumerate() {
                             if item.unwrap().payload.key == key {
                                 index_to_be_removed = key;
                             }
@@ -105,7 +105,7 @@ impl<T: Copy + Debug + PartialEq + core::fmt::Display> HashMap<T> {
                 }
 
                 if let Some(list) = item.list {
-                    for (i, item) in list.into_iter().enumerate() {
+                    for (_i, item) in list.into_iter().enumerate() {
                         let unwrapped = item.unwrap().payload.clone();
                         if unwrapped.key == key {
                             return Some(unwrapped.value);

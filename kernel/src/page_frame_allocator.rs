@@ -7,7 +7,7 @@ It returns the physical start address of a page frame
 A stack of free pages along with a pointer to the first page will be used in order to keep track of pages
 */
 
-use crate::{list::Stack, spinlock::Lock};
+use crate::{list::Stack, print_serial, spinlock::Lock, CONSOLE};
 use multiboot2::BootInformation;
 pub struct PageFrameAllocator {
     pub free_frames: Stack<u64>,
@@ -36,7 +36,6 @@ impl FrameAllocator for PageFrameAllocator {
             }
 
             self.current_page += 4096;
-
             return address as *mut u64;
         } else {
             // Pop from free frames and return that address
@@ -85,7 +84,7 @@ impl PageFrameAllocator {
     pub fn init(&mut self, boot_info: &BootInformation) {
         let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
 
-        let memory_start: u64 = round_to_nearest_page(boot_info.end_address() as u64);
+        let mut memory_start: u64 = round_to_nearest_page(boot_info.end_address() as u64);
 
         let memory_end: u64 = round_to_nearest_page(
             memory_map_tag
@@ -94,6 +93,9 @@ impl PageFrameAllocator {
                 .expect("Unknown Length")
                 .end_address(),
         );
+
+        // TODO: Fix this fix - very large modules seem to confuse the multiboot2 package
+        memory_start = 0xdf4000;
 
         self.current_page = memory_start;
         self.memory_end = memory_end;

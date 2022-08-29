@@ -33,7 +33,6 @@ extern crate x86_64;
 
 use crate::framebuffer::Window;
 use crate::framebuffer::{Rectangle, DESKTOP};
-use crate::hashmap::HashMap;
 use crate::list::Stack;
 use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
@@ -64,15 +63,7 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     grub::initialise_userland(&boot_info);
 
-    // let test = fs::get_file_beta("A.TXT");
-
     // setup_wm();
-
-    let mut map = HashMap::<usize>::new();
-    map.set(1, 1510);
-    print_serial!("{}\n", map.get(1).unwrap());
-    map.set(1, 65);
-    print_serial!("{}\n", map.get(1).unwrap());
 
     print_serial!("Execution Finished\n");
 
@@ -106,9 +97,6 @@ fn setup_wm() {
     DESKTOP.free();
 
     DESKTOP.lock().add_sub_window(window1);
-    DESKTOP.free();
-
-    DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
     DESKTOP.free();
 }
 

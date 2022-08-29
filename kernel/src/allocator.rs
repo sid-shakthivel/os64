@@ -8,9 +8,7 @@
 use crate::{
     list::{Node, Stack},
     page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR},
-    print_serial,
     spinlock::Lock,
-    CONSOLE,
 };
 
 // Divide by 8 as u64 is 8 bytes and a *mut u64 points to 8 bytes

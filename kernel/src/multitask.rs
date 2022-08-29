@@ -18,15 +18,16 @@ use core::prelude::v1::Some;
     There are kernel processes (run in kernel mode) and user processes (run in user mode)
     Processes will be selected based on what priority they are
 */
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Process {
-    pid: u64,
+    pub pid: u64,
     pub rsp: *const u64,
-    process_priority: ProcessPriority,
+    pub process_priority: ProcessPriority,
     pub cr3: *mut Table,
+    pub heap: i64,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 #[allow(dead_code)]
 pub enum ProcessPriority {
     High,
@@ -41,7 +42,7 @@ pub struct ProcessSchedular {
     pub tasks: [Option<Process>; MAX_PROCESS_NUM],
     is_from_kernel: bool,
     process_count: usize,
-    current_process_index: usize,
+    pub current_process_index: usize,
 }
 
 pub static mut KERNEL_STACK: u64 = 0;
@@ -100,11 +101,36 @@ impl ProcessSchedular {
         self.tasks[self.process_count] = Some(process);
         self.process_count += 1;
     }
+
+    pub fn remove_process(&mut self, mut index: usize) {
+        // Remove index
+        self.tasks[index] = None;
+
+        // TODO: Verify this works correctly
+
+        // Shift all further processes back
+        if index + 1 < MAX_PROCESS_NUM {
+            index += 1;
+
+            let mut current_task = self.tasks[index];
+            while current_task != None {
+                index += 1;
+                current_task = self.tasks[index];
+                self.tasks[index - 1] = current_task.clone();
+            }
+
+            self.tasks[index] = None;
+        }
+    }
+
+    pub fn get_current_process(&self) -> Option<Process> {
+        self.tasks[self.current_process_index]
+    }
 }
 
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
-    pub fn init(process_priority: ProcessPriority, pid: u64) -> Process {
+    pub fn init(process_priority: ProcessPriority, pid: u64, heap_address: i64) -> Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4
@@ -141,6 +167,7 @@ impl Process {
             rsp: rsp,
             process_priority: process_priority,
             cr3: new_p4,
+            heap: heap_address,
         }
     }
 }

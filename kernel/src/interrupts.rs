@@ -17,7 +17,6 @@ use crate::pic::PicFunctions;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::print_serial;
-use crate::print_vga;
 use crate::uart::CONSOLE;
 use core::arch::asm;
 use core::mem::size_of;

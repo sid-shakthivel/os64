@@ -24,11 +24,8 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use crate::allocator::{kfree, kmalloc};
 use crate::page_frame_allocator::PAGE_SIZE;
-use crate::{
-    allocator::{kfree, kmalloc},
-    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
-};
 use core::prelude::v1::Some;
 
 #[allow(dead_code)]
