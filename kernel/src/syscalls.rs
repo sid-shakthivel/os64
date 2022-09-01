@@ -8,7 +8,7 @@
 */
 
 use crate::framebuffer::{self, Rectangle, Window, DESKTOP};
-use crate::fs::File;
+use crate::fs::{File, FS};
 use crate::hashmap::HashMap;
 use crate::interrupts::Registers;
 use crate::list::Stack;
@@ -19,14 +19,13 @@ use crate::spinlock::Lock;
 use crate::CONSOLE;
 use bitflags::bitflags;
 use core::panic;
-use core::str::from_utf8;
 
 /*
     File descriptor table is hashmap of file descriptors which point to actual files
     File table entries are created when a process requests to open a file and this maintains its validity and is used
 */
 pub static FILE_TABLE: Lock<HashMap<File>> = Lock::new(HashMap::<File>::new());
-pub static mut COUNTER: usize = 0;
+pub static mut COUNTER: i64 = 0;
 
 bitflags! {
     struct Flags: u32 {
@@ -126,42 +125,45 @@ fn kill(pid: u64, sig: u64) -> i64 {
 // Used to open a file for reading/writing and returns the file number
 fn open(name: *const u8, flags: u64) -> i64 {
     // Get name of file
-    let len = strlen(name);
-
-    let filepath_array = unsafe { core::slice::from_raw_parts(name, len) };
-
-    let filepath = from_utf8(filepath_array).unwrap().trim();
+    let filepath = crate::string::get_string_from_ptr(name);
 
     // Parse filename
-    match filepath_array[0] {
+    match filepath.as_bytes()[0] {
         0x2F => {
             // Absolute path starting from the root of the entire fs
-            let file = crate::fs::parse_absolute_filepath(filepath).unwrap();
+            match crate::fs::parse_absolute_filepath(filepath) {
+                Ok(file) => unsafe {
+                    COUNTER += 1;
 
-            unsafe {
-                FILE_TABLE.lock().set(COUNTER, file);
-                FILE_TABLE.free();
-                COUNTER += 1;
+                    FILE_TABLE.lock().set(COUNTER as usize, file);
+                    FILE_TABLE.free();
 
-                return COUNTER as i64;
+                    return COUNTER;
+                },
+                Err(error) => {
+                    let file_flags = Flags::from_bits_truncate(flags as u32);
+
+                    if file_flags.contains(Flags::O_CREAT) {
+                        let file = crate::fs::create_new_root_file(filepath);
+                        unsafe {
+                            COUNTER += 1;
+                            FILE_TABLE.lock().set(COUNTER as usize, file);
+                            FILE_TABLE.free();
+
+                            return COUNTER as i64;
+                        }
+                    }
+
+                    1
+                }
             }
         }
         _ => {
             // Relative path within directory
             // Relative paths are used when files are within same directory
-            panic!("RELATIVE FILE PATH of {}\n", filepath_array[0]);
+            panic!("RELATIVE FILE PATH of {}\n", filepath.as_bytes()[0]);
         }
     }
-
-    // let file_flags = Flags::from_bits_truncate(flags as u32);
-
-    // if file_flags.contains(Flags::O_CREAT) {
-    //     // Create new file
-    // }
-
-    // if file_flags.contains(Flags::O_RDWR) {
-    //     // Read and write
-    // }
 }
 
 /*
@@ -202,6 +204,8 @@ fn sbrk(increment: i64) -> i64 {
     Length must be above 0 and under max value
 */
 fn write(file: u64, buffer: *mut u8, length: u64) -> i64 {
+    panic!("GOOD {} {:p} {}\n", file, buffer, length);
+
     if length == 0 {
         return 0;
     }
@@ -292,17 +296,4 @@ fn desktop_paint() -> i64 {
     DESKTOP.free();
 
     0
-}
-
-fn strlen(mut string: *const u8) -> usize {
-    let mut count = 0;
-    loop {
-        count += 1;
-        unsafe {
-            if *string == 0 {
-                return count as usize;
-            }
-            string = string.offset(1);
-        }
-    }
 }

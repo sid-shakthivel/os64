@@ -7,7 +7,7 @@
 
 
     +-----------+----------------------------------+
-    |   name    |             purpose              |
+    |   Name    |             Purpose              |
     +-----------+----------------------------------+
     | .text     | code                             |
     | .data     | initialised data with read/write |
@@ -26,6 +26,7 @@ use crate::page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::CONSOLE;
 use crate::{paging, print_serial};
 use core::mem;
+use core::str::from_utf8;
 
 type Elf64Half = u16;
 type Elf64Off = u64;
@@ -81,16 +82,16 @@ enum ElfType {
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct ElfSectionHeader {
-    sh_name: Elf64Word,
-    sh_type: Elf64Word,
-    sh_flags: Elf64Xword,
-    sh_addr: Elf64Addr,
-    sh_offset: Elf64Off,
-    sh_size: Elf64Xword,
-    sh_link: Elf64Word,
-    sh_info: Elf64Word,
-    sh_addralgin: Elf64Xword,
-    sh_entsize: Elf64Xword,
+    sh_name: Elf64Word, // Section name, index in string table (index is defined in e_shstrndx)
+    sh_type: Elf64Word, // Type
+    sh_flags: Elf64Xword, // Miscellaneous section atttributes
+    sh_addr: Elf64Addr, // Sectoin virtual address
+    sh_offset: Elf64Off, // Section file offset
+    sh_size: Elf64Xword, // Size of section (in bytes)
+    sh_link: Elf64Word, // Index of another section
+    sh_info: Elf64Word, // Additional section info
+    sh_addralgin: Elf64Xword, // Section alignment
+    sh_entsize: Elf64Xword, // Entry size if section holds table
 }
 
 #[repr(C, packed)]
@@ -108,15 +109,24 @@ struct ElfProgramHeader {
 #[derive(PartialEq, Copy, Clone)]
 #[repr(u32)]
 enum ProgramHeaderType {
-    PtNull = 0, // unused
-    PtLoad = 1, // loadable segment
+    PtNull = 0, // Unused
+    PtLoad = 1, // Loadable segment
+}
+
+struct ElfSymbol {
+    st_name: Elf64Word,  // Symbol name (index in string table)
+    st_info: u8,         // Type and binding attributes
+    st_other: u8,        // No meaning
+    st_shndx: Elf64Half, // Section index
+    st_value: Elf64Addr, // Value of symbol
+    st_size: Elf64Xword, // Symbol size
 }
 
 pub fn parse(file_start: u64) {
     let elf_header = unsafe { &*(file_start as *const ElfHeader) };
     validate_file(elf_header);
     parse_program_headers(file_start, elf_header);
-    parse_segment_headers(file_start, elf_header);
+    // parse_section_headers(file_start, elf_header);
 }
 
 // Verify file starts with ELF Magic number and is built for the correct system
@@ -155,9 +165,9 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
         match program_header.p_type {
             1 => {
                 let source = file_start + program_header.p_offset as u64;
-                if program_header.p_memsz != program_header.p_filesz {
-                    panic!("Segment is padded with 0's\n");
-                }
+                // if program_header.p_memsz != program_header.p_filesz {
+                //     panic!("Segment is padded with 0's\n");
+                // }
                 load_segment_into_memory(source, program_header.p_memsz, i as u64);
             }
             0 => {}
@@ -166,21 +176,77 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
     }
 }
 
-fn parse_segment_headers(file_start: u64, elf_header: &ElfHeader) {
-    // Loop through segments
+fn parse_section_headers(file_start: u64, elf_header: &ElfHeader) {
+    // Loop through sections
     for i in 0..(elf_header.e_shnum) {
         let address = file_start
             + elf_header.e_shoff
             + (mem::size_of::<ElfSectionHeader>() as u64) * (i as u64);
         let section_header = unsafe { &*(address as *const ElfSectionHeader) };
 
-        // print_serial!("{:?}\n", section_header);
+        // print_serial!(
+        //     "{}\n",
+        //     get_section_name(file_start, elf_header, section_header.sh_name as u64)
+        // );
 
-        // TODO: Add support for .bss by checking flags etc
-        if section_header.sh_type == 8 {
-            panic!("BSS!?");
+        let section_type = section_header.sh_type;
+
+        match section_type {
+            0 => {} // SHT_NULL
+            1 => {} // SHT_PROGBITS
+            2 => {
+                /*
+                SHT_SYMTAB
+                    Defines location, type, visibility, and traits of symbols created during compilation/linking
+                    Multiple may exist
+                */
+            }
+            3 => {} // SHT_STRTAB
+            4 => {} // SHT_RELA
+            8 => {} // SHT_NOBITS (BSS)
+            9 => {} // SHT_REL
+            _ => panic!("Unknown section type {}\n", section_type),
         }
     }
+}
+
+fn get_symbol(file_start: u64, section_header: &ElfSectionHeader, index: u64) {
+    // Check if index is within range
+    let max_entries = section_header.sh_size / section_header.sh_entsize;
+    if index > max_entries {
+        panic!("Index greater then max number of entries");
+    }
+
+    let symbol_address =
+        file_start + section_header.sh_offset + (section_header.sh_entsize * index);
+
+    let symbol = unsafe { &*(symbol_address as *const ElfSymbol) };
+
+    match symbol.st_shndx {
+        0x00 => {
+            // SHN_UNDEF
+            panic!("oh no");
+        }
+        _ => {
+            panic!("Unknown {}\n", symbol.st_shndx);
+        }
+    }
+}
+
+fn get_string_table(file_start: u64, elf_header: &ElfHeader) -> ElfSectionHeader {
+    let string_table_section_address = file_start
+        + elf_header.e_shoff
+        + (mem::size_of::<ElfSectionHeader>() as u64) * (elf_header.e_shstrndx as u64);
+    let string_table_header =
+        unsafe { &*(string_table_section_address as *const ElfSectionHeader) };
+
+    string_table_header.clone()
+}
+
+fn get_section_name(file_start: u64, elf_header: &ElfHeader, offset: u64) -> &str {
+    let string_table = get_string_table(file_start, elf_header);
+    let ptr = (file_start + string_table.sh_offset + offset) as *const u8;
+    crate::string::get_string_from_ptr(ptr)
 }
 
 fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {

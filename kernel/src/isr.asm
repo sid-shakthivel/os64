@@ -95,7 +95,13 @@ handle_syscall:
     cld
     pushaq
     call syscall_handler
-    popaq
+    xchg bx, bx
+    pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    add rsp, 0x08 ;; Manoeuvre to preserve the return value as it's stored within rax
     iretq
 
 handle_no_err_exception 0

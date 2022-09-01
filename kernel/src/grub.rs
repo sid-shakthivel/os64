@@ -20,6 +20,7 @@ use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::paging;
 use crate::ports::inpw;
 use crate::ports::outpw;
+use crate::{print_serial, CONSOLE};
 use multiboot2::BootInformation;
 
 const FILESYSTEM_ON: bool = true;
@@ -42,7 +43,7 @@ pub fn initialise_userland(boot_info: &BootInformation) {
 
     let mut process_index = 0; // This index determines the PID for each process
     for module in boot_info.module_tags() {
-        // print_serial!("MODULE ADDRESS = {:x}\n", module.start_address());
+        print_serial!("MODULE ADDRESS = {:x}\n", module.start_address());
         // First module will be filesystem if given and constant is true
         if FILESYSTEM_ON && i == 0 {
             fs::init(module.start_address());
@@ -55,8 +56,11 @@ pub fn initialise_userland(boot_info: &BootInformation) {
             PAGE_FRAME_ALLOCATOR.free();
             paging::map_page(heap as u64, USER_PROCESS_START_ADDRESS + 8192, true);
 
-            let user_process =
-                multitask::Process::init(multitask::ProcessPriority::High, process_index, heap as i64);
+            let user_process = multitask::Process::init(
+                multitask::ProcessPriority::High,
+                process_index,
+                heap as i64,
+            );
 
             // Add process to list of processes
             multitask::PROCESS_SCHEDULAR

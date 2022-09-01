@@ -11,7 +11,7 @@ LIBG = $(shell pwd)/../libc/build/x86_64-sidos/lib/libg.a
 LIB_HEADERS =$(shell pwd)/../libc/build/x86_64-sidos/include
 
 all: main.o
-	x86_64-elf-ld -T ${LINKER_FILE} -o program main.o -O2 -nostdlib -z max-page-size=4096 ${LIBC} ${LIBM} ${LIBG} && \
+	x86_64-elf-ld -T ${LINKER_FILE} -o program main.o -O2 -nostdlib -z max-page-size=4096 ${LIBM} ${LIBC} ${LIBG} && \
 	rm -f ../../isodir/modules/program && \
  	mv program ../../isodir/modules 
  

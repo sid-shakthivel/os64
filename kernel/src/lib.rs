@@ -21,6 +21,7 @@ mod pit;
 mod ports;
 mod ps2;
 mod spinlock;
+mod string;
 mod syscalls;
 mod uart;
 mod vga_text;

@@ -33,10 +33,6 @@ Problems:
 - Keyboard and mouse are broken in bochs
 - Collisions may fail
 
-Now:
-- Implement more syscalls / get inspired more ;)
-- See if we can return a value from a syscall (inline assembly kinda thing)
-
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
@@ -44,16 +40,3 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
 REMEMBER ABOUT UPPER/LOWER CASES FOR FILESYSTEM
-
-interprocess communication syscall stuff
-fix multicluster length files (write syscall)
-rename files
-create new files/directories (open syscall)
-
-can't implement rn:
-kill (need IPC)
-fstat (specific struct required
-
-download the elf header file thing
-get some ipc links open
-get newer syscall stuff open

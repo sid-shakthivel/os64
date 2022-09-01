@@ -128,12 +128,6 @@ case "${host_cpu}" in
   arc*)
 	machine_dir=arc
 	;;
-  i[3-7]86-*-sidos*)
-  sys_dir=sidos
-  ;;
-  x86_64-*-sidos*)
-  sys_dir=sidos
-  ;;
   arm*)
 	machine_dir=arm
 	libm_machine_dir=arm
@@ -465,6 +459,9 @@ case "${host}" in
 	sys_dir=tirtos
 	have_crt0="no"
 	;;
+  x86_64-*-sidos*)
+  sys_dir=sidos
+  ;;
   a29k-*-*)
 	sys_dir=a29khif
 	signal_dir=

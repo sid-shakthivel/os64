@@ -20,7 +20,7 @@
 #![allow(unused_variables)]
 
 use crate::CONSOLE;
-use core::mem;
+use core::{mem, result};
 use spin::Mutex;
 
 use crate::print_serial;
@@ -133,20 +133,7 @@ impl File {
             return Err("Tried to read on a directory");
         }
 
-        let cluster_address =
-            convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
-
-        let file_contents = cluster_address as *mut u8;
-
-        if length > 2048 {
-            panic!("CLUSTER TOO BIG");
-        }
-
-        for i in 0..length {
-            unsafe {
-                *buffer.offset(i as isize) = *file_contents.offset(i as isize);
-            }
-        }
+        self._modify(buffer, false, length);
 
         return Ok(0);
     }
@@ -157,20 +144,7 @@ impl File {
             return Err("Tried to write on a directory");
         }
 
-        let cluster_address =
-            convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
-
-        let file_contents = cluster_address as *mut u8;
-
-        if length > 2048 {
-            panic!("CLUSTER TOO BIG");
-        }
-
-        for i in 0..length {
-            unsafe {
-                *file_contents.offset(i as isize) = *buffer.offset(i as isize);
-            }
-        }
+        self._modify(buffer, true, length);
 
         return Ok(0);
     }
@@ -195,16 +169,14 @@ impl File {
         return Ok(unsafe { &*(cluster_address as *const [File; 64]) });
     }
 
-    pub fn mkdir(&mut self, filename: &str) -> Result<File, &str> {
-        if self.file_type != FileType::Directory {
-            return Err("Tried to mkdir on a file");
-        }
-
-        let mut cluster_address =
-            convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
-
-        // Search for an empty space
-        for _i in 0..64 {
+    fn _mk(
+        &mut self,
+        mut cluster_address: u32,
+        filename: &str,
+        filetype: FileType,
+    ) -> Result<File, &str> {
+        // Search the directory for an empty space
+        for i in 0..64 {
             let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
 
             // Free entry
@@ -220,7 +192,12 @@ impl File {
                         }
                     }
 
-                    directory_entry_mut.attributes = 0x10;
+                    directory_entry_mut.attributes = match filetype {
+                        FileType::Directory => 0x10,
+                        FileType::File => 0x20,
+                        _ => panic!("Unknown file type"),
+                    };
+
                     directory_entry_mut.cluster_low = get_next_unallocated_cluster().unwrap();
 
                     let mut node = File::new(
@@ -239,32 +216,79 @@ impl File {
         return Err("Directory is full");
     }
 
-    fn _modify(&mut self, buffer: *mut u8, write: bool) {
+    pub fn mkdir_root(&mut self, filename: &str) -> Result<File, &str> {
+        if self.file_type != FileType::Directory {
+            return Err("Tried to mkdir on a file");
+        }
+
+        let root_directory_address = FS.lock().root_directory_address;
+
+        self._mk(root_directory_address, filename, FileType::Directory)
+    }
+
+    pub fn mkdir(&mut self, filename: &str) -> Result<File, &str> {
+        if self.file_type != FileType::Directory {
+            return Err("Tried to mkdir on a file");
+        }
+
         let cluster_address =
             convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
 
-        unsafe {
-            let file_contents = cluster_address as *mut u8;
-            if write {
-                memcpy_cluster(file_contents, buffer, self.index);
-            } else {
-                memcpy_cluster(buffer, file_contents, self.index);
-            }
+        self._mk(cluster_address, filename, FileType::Directory)
+    }
+
+    pub fn mkf(&mut self, filename: &str) -> Result<File, &str> {
+        if self.file_type != FileType::Directory {
+            return Err("Tried to mkf on a file");
         }
 
-        let saved_cluster_num = self.cluster;
+        let cluster_address =
+            convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
 
-        match get_next_cluster(self.cluster) {
-            None => return, // End of file
-            Some(cluster_num) => {
-                self.index += 1;
-                self.cluster = cluster_num;
-                return self._modify(buffer, write);
+        self._mk(cluster_address, filename, FileType::File)
+    }
+
+    pub fn mkf_root(&mut self, filename: &str) -> Result<File, &str> {
+        if self.file_type != FileType::Directory {
+            return Err("Tried to mkf on a file");
+        }
+
+        let root_directory_address = FS.lock().root_directory_address;
+        self._mk(root_directory_address, filename, FileType::File)
+    }
+
+    fn _modify(&mut self, buffer: *mut u8, write: bool, length: usize) {
+        let mut cluster_address =
+            convert_sector_to_bytes(get_lba(0)) + FS.lock().first_data_sector_address;
+
+        let mut file_contents = cluster_address as *mut u8;
+
+        let mut total_count = 0;
+        let mut i = 0;
+
+        while total_count < length {
+            unsafe {
+                if write {
+                    *file_contents.offset(i as isize) = *buffer.offset(i as isize);
+                } else {
+                    *buffer.offset(i as isize) = *file_contents.offset(i as isize);
+                }
+                i += 1;
+
+                if i >= 2048 {
+                    match get_next_cluster(self.cluster) {
+                        None => return, // End of file
+                        Some(cluster_num) => {
+                            cluster_address = convert_sector_to_bytes(get_lba(cluster_num))
+                                + FS.lock().first_data_sector_address;
+                            file_contents = cluster_address as *mut u8;
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Only works on the root directory
     fn _find(&mut self, filename: &str, mut cluster_address: u32) -> Result<File, &str> {
         if filename.len() > 8 {
             return Err("File is too big");
@@ -413,9 +437,9 @@ pub fn init(start_address: u32) {
     let first_data_sector: u32 =
         convert_sector_to_bytes(root_directory_size) + root_directory_address;
 
-    let initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
+    let mut initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
 
-    FS.lock().bpb = Some(*bpb);
+    FS.lock().bpb = Some(bpb.clone());
     FS.lock().start_address = start_address;
     FS.lock().fat_address = first_fat;
     FS.lock().first_data_sector_address = first_data_sector;
@@ -464,4 +488,15 @@ pub fn parse_absolute_filepath(filepath: &str) -> Result<File, &str> {
     }
 
     return Ok(current_fd);
+}
+
+// Replace this by parsing the file and creating it if it doesn't exist in a specific path
+pub fn create_new_root_file(filename: &str) -> File {
+    let mut current_fd = FS.lock().initrd.unwrap();
+    let fd = current_fd.mkf_root(filename).unwrap();
+    fd
+}
+
+pub fn round_to_nearest_cluster(size: u64) -> u64 {
+    ((size as i64 + 2047) & (-2048)) as u64
 }
