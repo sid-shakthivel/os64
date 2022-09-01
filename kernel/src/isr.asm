@@ -95,7 +95,6 @@ handle_syscall:
     cld
     pushaq
     call syscall_handler
-    xchg bx, bx
     pop rdi
     pop rsi
     pop rdx

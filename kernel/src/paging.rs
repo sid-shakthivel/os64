@@ -210,6 +210,14 @@ pub fn identity_map_from(physical_address: u64, virtual_address: u64, megabytes:
     }
 }
 
+pub fn map_pages(number_of_pages: u64, physical_address: u64, virtual_address: u64) {
+    for i in 0..number_of_pages {
+        let p_address = physical_address + (i * 4096);
+        let v_address = virtual_address + (i * 4096);
+        map_page(p_address, v_address, true);
+    }
+}
+
 // Creates a deep clone of the paging system
 pub fn deep_clone() -> *mut Table {
     unsafe {

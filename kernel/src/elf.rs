@@ -25,8 +25,7 @@ use crate::multitask::USER_PROCESS_START_ADDRESS;
 use crate::page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::CONSOLE;
 use crate::{paging, print_serial};
-use core::mem;
-use core::str::from_utf8;
+use core::{mem, num};
 
 type Elf64Half = u16;
 type Elf64Off = u64;
@@ -95,14 +94,15 @@ struct ElfSectionHeader {
 }
 
 #[repr(C, packed)]
+#[derive(Debug, Copy, Clone)]
 struct ElfProgramHeader {
     p_type: Elf64Word,    // Entry type
     p_flags: Elf64Word,   // Access permission flags
     p_offset: Elf64Off,   // File offset of contents
     p_vaddr: Elf64Addr,   // Virtual address in memory
     p_paddr: Elf64Addr,   // Physical address in memory
-    p_filesz: Elf64Xword, // Size of contents in file
-    p_memsz: Elf64Xword,  // Size of contents in memory
+    p_filesz: Elf64Xword, // Size of contents in file in bytes
+    p_memsz: Elf64Xword,  // Size of contents in memory in bytes
     p_align: Elf64Xword,  // Alignment in memory and file
 }
 
@@ -154,6 +154,11 @@ fn validate_file(elf_header: &ElfHeader) -> bool {
 }
 
 // Elf program headers specify where segments are located
+
+/*
+    Program headers point to segments which contain multiple sections
+    These are utilised whilst executing
+*/
 fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
     // Loop through the headers and load each loadable segment into memory
     for i in 0..elf_header.e_phnum {
@@ -164,11 +169,14 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
 
         match program_header.p_type {
             1 => {
+                // LOAD
                 let source = file_start + program_header.p_offset as u64;
-                // if program_header.p_memsz != program_header.p_filesz {
-                //     panic!("Segment is padded with 0's\n");
-                // }
-                load_segment_into_memory(source, program_header.p_memsz, i as u64);
+                load_segment_into_memory(
+                    source,
+                    program_header.p_filesz,
+                    program_header.p_memsz,
+                    program_header.p_vaddr,
+                );
             }
             0 => {}
             _ => panic!("Unknown\n"),
@@ -176,6 +184,10 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
     }
 }
 
+/*
+    Section headers point to sections
+    These are utilised whilst linking
+*/
 fn parse_section_headers(file_start: u64, elf_header: &ElfHeader) {
     // Loop through sections
     for i in 0..(elf_header.e_shnum) {
@@ -183,11 +195,6 @@ fn parse_section_headers(file_start: u64, elf_header: &ElfHeader) {
             + elf_header.e_shoff
             + (mem::size_of::<ElfSectionHeader>() as u64) * (i as u64);
         let section_header = unsafe { &*(address as *const ElfSectionHeader) };
-
-        // print_serial!(
-        //     "{}\n",
-        //     get_section_name(file_start, elf_header, section_header.sh_name as u64)
-        // );
 
         let section_type = section_header.sh_type;
 
@@ -249,26 +256,30 @@ fn get_section_name(file_start: u64, elf_header: &ElfHeader, offset: u64) -> &st
     crate::string::get_string_from_ptr(ptr)
 }
 
-fn load_segment_into_memory(source_raw: u64, size: u64, index: u64) {
-    // Allocate memory for the segment
-    let rounded_size = page_frame_allocator::round_to_nearest_page(size);
+fn load_segment_into_memory(source_raw: u64, filesz: u64, memsz: u64, v_address: u64) {
+    // Allocate appropriate amount of memory
+    let rounded_size = page_frame_allocator::round_to_nearest_page(memsz);
     let number_of_pages = page_frame_allocator::get_page_number(rounded_size);
 
-    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages);
+    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as *mut u8;
     PAGE_FRAME_ALLOCATOR.free();
 
-    let source = source_raw as *mut u64;
+    let source = source_raw as *mut u8;
 
-    // Copy segment data into the memory space
-    for i in 0..size {
+    // If the memsz is greater then filesz, extra bytes should store 0
+    for i in filesz..memsz {
         unsafe {
             *dest.offset(i as isize) = *source.offset(i as isize);
         }
     }
 
-    // Map the physical pages to 0x800000
-    // Gonna currently manaually map both pages
-    let v_address = USER_PROCESS_START_ADDRESS;
-    paging::map_page(dest as u64, v_address, true);
-    paging::map_page(dest as u64 + 4096, v_address + 4096, true);
+    // Copy actual segment data
+    for i in 0..filesz {
+        unsafe {
+            *dest.offset(i as isize) = *source.offset(i as isize);
+        }
+    }
+
+    // Map the physical pages to the virtual address provided
+    paging::map_pages(number_of_pages, dest as u64, v_address);
 }

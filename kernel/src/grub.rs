@@ -54,7 +54,7 @@ pub fn initialise_userland(boot_info: &BootInformation) {
             // Alloc some pages and map them accordingly
             let heap = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
             PAGE_FRAME_ALLOCATOR.free();
-            paging::map_page(heap as u64, USER_PROCESS_START_ADDRESS + 8192, true);
+            // paging::map_page(heap as u64, USER_PROCESS_START_ADDRESS + 8192, true);
 
             let user_process = multitask::Process::init(
                 multitask::ProcessPriority::High,

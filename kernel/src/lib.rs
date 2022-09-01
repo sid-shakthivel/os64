@@ -33,8 +33,7 @@ extern crate bitflags;
 extern crate x86_64;
 
 use crate::framebuffer::Window;
-use crate::framebuffer::{Rectangle, DESKTOP};
-use crate::list::Stack;
+use crate::framebuffer::DESKTOP;
 use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
 use crate::pit::PIT;

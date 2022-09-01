@@ -40,6 +40,8 @@ bitflags! {
 pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
     let syscall_id = registers.rax;
 
+    print_serial!("SYS = {}\n", syscall_id);
+
     return match syscall_id {
         0 => _exit(registers.rbx),
         1 => close(registers.rbx),
@@ -125,6 +127,7 @@ fn kill(pid: u64, sig: u64) -> i64 {
 // Used to open a file for reading/writing and returns the file number
 fn open(name: *const u8, flags: u64) -> i64 {
     // Get name of file
+
     let filepath = crate::string::get_string_from_ptr(name);
 
     // Parse filename
@@ -273,10 +276,10 @@ fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
 */
 fn create_window(x: u64, y: u64, width: u64, height: u64) -> i64 {
     let new_window = Window::new(
-        10,
-        10,
-        300,
-        300,
+        x,
+        y,
+        width,
+        height,
         Some(DESKTOP.lock()),
         framebuffer::WINDOW_BACKGROUND_COLOUR,
     );
@@ -289,7 +292,7 @@ fn create_window(x: u64, y: u64, width: u64, height: u64) -> i64 {
 }
 
 /*
-    Custom syscall which paints the scene
+    Custom syscall which paints the desktop
 */
 fn desktop_paint() -> i64 {
     DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);

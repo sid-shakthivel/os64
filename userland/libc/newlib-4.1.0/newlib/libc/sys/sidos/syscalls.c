@@ -10,12 +10,17 @@
 
 void _exit()
 {
-    asm volatile("mov $0, %rax \n\t\
+    asm volatile("xchg %bx, %bx");
+
+    asm volatile("mov $44, %rax \n\t\
         int $0x80 \n\t\
         ");
 }
 int close(int file)
 {
+    asm volatile("mov $55, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     return 0;
 }
 char **environ; /* pointer to array of char * strings that define the current environment variables */
@@ -66,6 +71,7 @@ int read(int file, char *ptr, int len)
 }
 caddr_t sbrk(int incr)
 {
+    return (caddr_t)0;
 }
 int stat(const char *file, struct stat *st)
 {
@@ -88,14 +94,30 @@ int wait(int *status)
 }
 int write(int file, char *ptr, int len)
 {
-    int address = (int)ptr;
-    asm volatile("mov %2, %%edx \n\t\
-        mov %0, %%rcx \n\t\
-        mov %1, %%ebx \n\t\
-        mov $10, %%rax \n\t\
+    // int address = (int)ptr;
+    // asm volatile("mov %2, %%edx \n\t\
+    //     mov %0, %%rcx \n\t\
+    //     mov %1, %%ebx \n\t\
+    //     mov $10, %%rax \n\t\
+    //     int $0x80 \n\t\
+    //     "
+    //              :
+    //              : "m"(address), "r"(file), "r"(len));
+
+    asm volatile("xchg %bx, %bx");
+
+    asm volatile("mov $69, %rax \n\t\
         int $0x80 \n\t\
-        "
-                 :
-                 : "m"(address), "r"(file), "r"(len));
+        ");
+
+    return 1;
 }
 int gettimeofday(struct timeval *p, void *restrict);
+
+int yet_another_sussy_syscall()
+{
+    asm volatile("mov $90, %rax \n\t\
+        int $0x80 \n\t\
+        ");
+    return -5;
+}

@@ -1,4 +1,4 @@
-ENTRY(start)
+ENTRY(_start)
 OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS
@@ -33,5 +33,5 @@ SECTIONS
 
     /* Beginning of heap */
     . = ALIGN(4k);
-    __kernel_end = .;
+    __program_end = .;
 }

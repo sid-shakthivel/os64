@@ -20,7 +20,7 @@
 #![allow(unused_variables)]
 
 use crate::CONSOLE;
-use core::{mem, result};
+use core::{mem};
 use spin::Mutex;
 
 use crate::print_serial;

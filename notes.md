@@ -31,7 +31,7 @@ Problems:
 - Double buffering significantly reduces performance
 - Switching address space is broken with cr3
 - Keyboard and mouse are broken in bochs
-- Collisions may fail
+- Collisions may fail with hashmap
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as

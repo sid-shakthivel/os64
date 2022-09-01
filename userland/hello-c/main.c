@@ -1,14 +1,18 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <fcntl.h>
+// #include <unistd.h>
 
 int main()
 {
-    // In at&t - source, destionation
-    const char *filename = "/A.TXT";
-    int file_address = (int)filename;
+    asm volatile("xchg %bx, %bx");
 
-    printf("Hello World");
+    write(1, "Hello World", 11);
+
+    // In at&t - source, destionation
+    // const char *filename = "/A.TXT";
+    // int file_address = (int)filename;
 
     // Open syscall
     // u_int64_t a;
