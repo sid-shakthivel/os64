@@ -13,6 +13,8 @@ ASSEMBLY_SOURCES := $(wildcard */*.asm) $(wildcard *.asm)
 ASSEMBLY_OBJECTS := $(patsubst %.asm, $(OBJ)/%.o, $(ASSEMBLY_SOURCES))
 FONT := font.o
 
+all: os64.iso
+
 os64.iso: kernel.bin
 	cd /code; rm -f isodir/boot/kernel.bin; \
 	cp /code/kernel/kernel.bin isodir/boot; \

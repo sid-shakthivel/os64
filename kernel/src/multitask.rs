@@ -24,7 +24,7 @@ pub struct Process {
     pub rsp: *const u64,
     pub process_priority: ProcessPriority,
     pub cr3: *mut Table,
-    pub heap: i64,
+    pub heap: i32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -130,7 +130,7 @@ impl ProcessSchedular {
 
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
-    pub fn init(process_priority: ProcessPriority, pid: u64, heap_address: i64) -> Process {
+    pub fn init(process_priority: ProcessPriority, pid: u64, heap_address: i32) -> Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4

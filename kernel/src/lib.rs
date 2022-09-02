@@ -1,6 +1,7 @@
 // src/lib.rs
 
 #![no_std] // Don't link with Rust standard library
+#![feature(core_ffi_c)]
 
 mod allocator;
 mod elf;

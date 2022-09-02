@@ -19,8 +19,8 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::CONSOLE;
-use core::{mem};
+use crate::{allocator::kmalloc, CONSOLE};
+use core::mem;
 use spin::Mutex;
 
 use crate::print_serial;
@@ -33,7 +33,6 @@ pub struct Fat16 {
     root_directory_address: u32,
     initrd: Option<File>,
 }
-
 // Boot record occupies one sector and is at the start
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
@@ -203,7 +202,7 @@ impl File {
                     let mut node = File::new(
                         directory_entry_mut.cluster_low as u32,
                         directory_entry_mut.file_size,
-                        FileType::Directory,
+                        FileType::File,
                     );
                     node.name = directory_entry.filename;
                     return Ok(node);
@@ -259,7 +258,7 @@ impl File {
 
     fn _modify(&mut self, buffer: *mut u8, write: bool, length: usize) {
         let mut cluster_address =
-            convert_sector_to_bytes(get_lba(0)) + FS.lock().first_data_sector_address;
+            convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
 
         let mut file_contents = cluster_address as *mut u8;
 
@@ -269,13 +268,15 @@ impl File {
         while total_count < length {
             unsafe {
                 if write {
-                    *file_contents.offset(i as isize) = *buffer.offset(i as isize);
+                    *file_contents.offset(i as isize) = *buffer.offset(total_count as isize);
                 } else {
-                    *buffer.offset(i as isize) = *file_contents.offset(i as isize);
+                    *buffer.offset(total_count as isize) = *file_contents.offset(i as isize);
                 }
                 i += 1;
+                total_count += 1;
 
                 if i >= 2048 {
+                    i = 0;
                     match get_next_cluster(self.cluster) {
                         None => return, // End of file
                         Some(cluster_num) => {
@@ -437,7 +438,7 @@ pub fn init(start_address: u32) {
     let first_data_sector: u32 =
         convert_sector_to_bytes(root_directory_size) + root_directory_address;
 
-    let mut initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
+    let initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
 
     FS.lock().bpb = Some(bpb.clone());
     FS.lock().start_address = start_address;

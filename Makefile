@@ -1,3 +1,7 @@
+KERNEL = $(shell pwd)/kernel
+USERLAND_MODULE_1 = $(shell pwd)/userland/hello-c
+SYSCALLS = $(shell pwd)/userland/syscalls
+
 run-qemu: all
 	qemu-system-x86_64 -serial stdio -cdrom os64.iso
 
@@ -9,11 +13,14 @@ all:
 	rm -f isodir/modules/fs.img
 	cp fs.img isodir/modules
 
+	# Compile syscalls
+	cd $(SYSCALLS) && make
+
 	# Userspace modules
-	cd /Users/siddharth/Code/rust/os64/userland/hello-c && make 
+	cd $(USERLAND_MODULE_1) && make 
 
 	# Kernel
-	cd /Users/siddharth/Code/rust/os64/kernel && make run
+	cd $(KERNEL) && make run
 
 clean:
 	rm -f os64.iso

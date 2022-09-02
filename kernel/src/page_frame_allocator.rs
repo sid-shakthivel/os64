@@ -95,7 +95,7 @@ impl PageFrameAllocator {
         );
 
         // TODO: Fix this fix - very large modules seem to confuse the multiboot2 package
-        memory_start = 0xdf4000;
+        memory_start = 0xef9000;
 
         self.current_page = memory_start;
         self.memory_end = memory_end;

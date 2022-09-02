@@ -33,6 +33,10 @@ Problems:
 - Keyboard and mouse are broken in bochs
 - Collisions may fail with hashmap
 
+Now:
+- Long file names for FAT16
+- Test printf.... (GPF)
+
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
@@ -40,3 +44,5 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
 REMEMBER ABOUT UPPER/LOWER CASES FOR FILESYSTEM
+
+paging issue? elf issue?

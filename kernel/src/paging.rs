@@ -26,6 +26,7 @@ Page table entries have a certain 64 bit format which looks like this:
 
 use crate::allocator::{kfree, kmalloc};
 use crate::page_frame_allocator::PAGE_SIZE;
+use crate::{print_serial, CONSOLE};
 use core::prelude::v1::Some;
 
 #[allow(dead_code)]
@@ -214,6 +215,7 @@ pub fn map_pages(number_of_pages: u64, physical_address: u64, virtual_address: u
     for i in 0..number_of_pages {
         let p_address = physical_address + (i * 4096);
         let v_address = virtual_address + (i * 4096);
+        // print_serial!("{} {} {}\n", i, p_address, v_address);
         map_page(p_address, v_address, true);
     }
 }

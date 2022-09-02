@@ -462,7 +462,6 @@ case "${host}" in
   x86_64-*-sidos*)
   sys_dir=sidos
   have_crt0="yes"
-  newlib_cflags="${newlib_cflags} -DMISSING_SYSCALL_NAMES"
   ;;
   a29k-*-*)
 	sys_dir=a29khif

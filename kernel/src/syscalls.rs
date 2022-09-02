@@ -8,7 +8,7 @@
 */
 
 use crate::framebuffer::{self, Rectangle, Window, DESKTOP};
-use crate::fs::{File, FS};
+use crate::fs::File;
 use crate::hashmap::HashMap;
 use crate::interrupts::Registers;
 use crate::list::Stack;
@@ -40,34 +40,34 @@ bitflags! {
 pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
     let syscall_id = registers.rax;
 
-    print_serial!("SYS = {}\n", syscall_id);
+    print_serial!("SYSCALL = {}\n", syscall_id);
 
     return match syscall_id {
-        0 => _exit(registers.rbx),
+        0 => _exit(),
         1 => close(registers.rbx),
         2 => {
             // fstat
             return -1;
         }
         3 => getpid(),
-        5 => isatty(registers.rbx),
-        6 => kill(registers.rbx, registers.rcx),
-        7 => {
+        4 => isatty(registers.rbx),
+        5 => kill(registers.rbx, registers.rcx),
+        6 => {
             // link
             return -1;
         }
-        8 => open(registers.rbx as *const u8, registers.rcx),
-        9 => sbrk(registers.rbx as i64),
-        10 => write(registers.rbx, registers.rcx as *mut u8, registers.rdx),
-        11 => read(registers.rbx, registers.rcx as *mut u8, registers.rdx),
-        12 => create_window(registers.rbx, registers.rcx, registers.rdx, registers.rsi),
-        13 => desktop_paint(),
+        7 => open(registers.rbx as *const u8, registers.rcx),
+        8 => sbrk(registers.rbx as i32),
+        9 => write(registers.rbx, registers.rcx as *mut u8, registers.rdx),
+        10 => read(registers.rbx, registers.rcx as *mut u8, registers.rdx),
+        11 => create_window(registers.rbx, registers.rcx, registers.rdx, registers.rsi),
+        12 => desktop_paint(),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
 
 // Terminates process without cleaning files
-fn _exit(status: u64) -> i64 {
+fn _exit() -> i64 {
     // Get current pid
     let pid = PROCESS_SCHEDULAR.lock().current_process_index;
     PROCESS_SCHEDULAR.free();
@@ -76,7 +76,7 @@ fn _exit(status: u64) -> i64 {
     PROCESS_SCHEDULAR.lock().remove_process(pid);
     PROCESS_SCHEDULAR.free();
 
-    print_serial!("TASK {} EXITED WITH STATUS CODE {}\n", pid, status);
+    print_serial!("TASK {} EXITED\n", pid);
 
     return 0;
 }
@@ -175,7 +175,9 @@ fn open(name: *const u8, flags: u64) -> i64 {
     Break value is the first byte of unallocated memory
     If successful, returns the prior break value or else returns -1
 */
-fn sbrk(increment: i64) -> i64 {
+fn sbrk(increment: i32) -> i64 {
+    print_serial!("INCREMENT = {}\n", increment);
+
     // Get the current process
     let index = PROCESS_SCHEDULAR.lock().current_process_index;
     PROCESS_SCHEDULAR.free();
@@ -185,8 +187,6 @@ fn sbrk(increment: i64) -> i64 {
 
     // Save the old address
     let break_value = current_process.heap;
-
-    // TODO: Check boundries to avoid overwritting
 
     // Increment the break value and save
     let updated_process = Process {
@@ -198,6 +198,12 @@ fn sbrk(increment: i64) -> i64 {
     PROCESS_SCHEDULAR.lock().tasks[index] = Some(updated_process);
     PROCESS_SCHEDULAR.free();
 
+    print_serial!(
+        "NEW BREAK VALUE = {} {}\n",
+        break_value,
+        break_value + increment
+    );
+
     // Return old break
     return break_value as i64;
 }
@@ -207,8 +213,6 @@ fn sbrk(increment: i64) -> i64 {
     Length must be above 0 and under max value
 */
 fn write(file: u64, buffer: *mut u8, length: u64) -> i64 {
-    panic!("GOOD {} {:p} {}\n", file, buffer, length);
-
     if length == 0 {
         return 0;
     }
@@ -219,11 +223,10 @@ fn write(file: u64, buffer: *mut u8, length: u64) -> i64 {
     match file {
         1 => {
             // 1 refers to stdout and writes to the console
-            for i in 0..(length + 3) {
+            for i in 0..(length) {
                 let character = unsafe { *buffer.offset(i as isize) };
-                print_serial!("{}\n", character as char);
+                print_serial!("{}", character as char);
             }
-            print_serial!("\n");
         }
         _ => {
             // Other files can be written to through the fs
