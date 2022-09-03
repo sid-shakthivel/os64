@@ -21,7 +21,7 @@ fn strlen(mut string: *const u8) -> usize {
 }
 
 // Converts a *const u8 pointer into a string which can be displayed
-pub fn get_string_from_ptr(mut string_ptr: *const u8) -> &'static str {
+pub fn get_string_from_ptr(string_ptr: *const u8) -> &'static str {
     let len = strlen(string_ptr);
     let string_array = unsafe { core::slice::from_raw_parts(string_ptr, len) };
     from_utf8(string_array).unwrap().trim()

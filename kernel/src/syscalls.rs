@@ -14,6 +14,7 @@ use crate::interrupts::Registers;
 use crate::list::Stack;
 use crate::multitask::Process;
 use crate::multitask::PROCESS_SCHEDULAR;
+use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::print_serial;
 use crate::spinlock::Lock;
 use crate::CONSOLE;
@@ -40,8 +41,6 @@ bitflags! {
 pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
     let syscall_id = registers.rax;
 
-    print_serial!("SYSCALL = {}\n", syscall_id);
-
     return match syscall_id {
         0 => _exit(),
         1 => close(registers.rbx),
@@ -57,7 +56,7 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
             return -1;
         }
         7 => open(registers.rbx as *const u8, registers.rcx),
-        8 => sbrk(registers.rbx as i32),
+        8 => allocate_pages(registers.rbx),
         9 => write(registers.rbx, registers.rcx as *mut u8, registers.rdx),
         10 => read(registers.rbx, registers.rcx as *mut u8, registers.rdx),
         11 => create_window(registers.rbx, registers.rcx, registers.rdx, registers.rsi),
@@ -169,14 +168,28 @@ fn open(name: *const u8, flags: u64) -> i64 {
     }
 }
 
+fn allocate_pages(pages_required: u64) -> i64 {
+    let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(pages_required);
+    PAGE_FRAME_ALLOCATOR.free();
+
+    address as i64
+}
+
 /*
     Dynamically change the amount of space allocated for a process
     Resets the break value and allocates space which is set to zero
     Break value is the first byte of unallocated memory
     If successful, returns the prior break value or else returns -1
 */
-fn sbrk(increment: i32) -> i64 {
-    print_serial!("INCREMENT = {}\n", increment);
+fn sbrk(increment: u64) -> i64 {
+    print_serial!(
+        "INCREMENT = {} {} {}\n",
+        increment as i32,
+        increment as i16,
+        increment as i8
+    );
+
+    let correct_increment = increment as i16;
 
     // Get the current process
     let index = PROCESS_SCHEDULAR.lock().current_process_index;
@@ -190,7 +203,7 @@ fn sbrk(increment: i32) -> i64 {
 
     // Increment the break value and save
     let updated_process = Process {
-        heap: break_value + increment,
+        heap: (break_value + correct_increment as i32),
         ..PROCESS_SCHEDULAR.lock().tasks[index].unwrap()
     };
     PROCESS_SCHEDULAR.free();
@@ -199,9 +212,9 @@ fn sbrk(increment: i32) -> i64 {
     PROCESS_SCHEDULAR.free();
 
     print_serial!(
-        "NEW BREAK VALUE = {} {}\n",
+        "{} {}\n",
         break_value,
-        break_value + increment
+        break_value + correct_increment as i32
     );
 
     // Return old break

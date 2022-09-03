@@ -1,18 +1,23 @@
-ASSEMBLER = nasm
-ASSEMBLER_FLAGS =  -f elf64
+CC = x86_64-elf-gcc
+LINKER = x86_64-elf-ld
 
-ASSEMBLY_SOURCES := $(wildcard */*.asm) $(wildcard *.asm)
-ASSEMBLY_OBJECTS := $(patsubst %.asm, %.o, $(ASSEMBLY_SOURCES))
+CFLAGS = -ffreestanding -O2 -Wall -Wextra
+LINKER_FLAGS = -ffreestanding -O2 -nostdlib -z max-page-size=4096
 
 LINKER_FILE = ../linker.ld
+LIBC = $(shell pwd)/../libc/build/x86_64-sidos/lib/libc.a
+LIBM = $(shell pwd)/../libc/build/x86_64-sidos/lib/libm.a
+LIBG = $(shell pwd)/../libc/build/x86_64-sidos/lib/libg.a
+LIB_HEADERS = $(shell pwd)/../libc/build/x86_64-sidos/include
+SYSCALLS = $(shell pwd)/../syscalls/syscalls.o
 
-all: $(ASSEMBLY_OBJECTS)
-	ld -m elf_x86_64 -o program -T ${LINKER_FILE} ${ASSEMBLY_OBJECTS} -z max-page-size=4096
-	# rm -f ../../isodir/modules/program
-	# mv program ../../isodir/modules
+all: main.o
+	$(LINKER) -T ${LINKER_FILE} -o program main.o -O0 -nostdlib -z max-page-size=4096 ${LIBM} ${LIBC} ${LIBG} $(SYSCALLS) && \
+	rm -f ../../isodir/modules/program && \
+ 	mv program ../../isodir/modules 
+ 
+main.o: main.c
+	$(CC) -c main.c -o main.o -ffreestanding -nostdlib -O0 -Wall -Wextra -I ${LIB_HEADERS}
 
-$(ASSEMBLY_OBJECTS): $(ASSEMBLY_SOURCES)
-	$(ASSEMBLER) $(ASSEMBLER_FLAGS) $(patsubst %.o, %.asm, $@) -o $@
-
-clean:
-	rm -f ${OUTPUT}
+clean: 
+	rm -f main.o

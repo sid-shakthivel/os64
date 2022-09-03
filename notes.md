@@ -14,13 +14,16 @@ Smaller Tasks:
 - Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
 - Fix binutils and get ld to work properly (doesn't build on MacOS https://github.com/spack/spack/issues/3213)
 - Add syslinks to newlib makefile 
-- Mutable into_iter_mut method
 - Handle keyboard events
 - Double buffering with REP MOVSB (Bochs is broken, so can't do)
 - Bitflags
 - Images (https://wiki.osdev.org/Loading_Icons)
 - Load userspace programs from fs instead of modules
 - Text with windows (titles, etc)
+- Priority based round robin
+- Memory start in pfa
+- Make verify functions in fs and fb
+- Custom error handling with enums
 
 Think:
 - Switch to usize
@@ -35,7 +38,6 @@ Problems:
 
 Now:
 - Long file names for FAT16
-- Test printf.... (GPF)
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
@@ -44,5 +46,3 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
 REMEMBER ABOUT UPPER/LOWER CASES FOR FILESYSTEM
-
-paging issue? elf issue?

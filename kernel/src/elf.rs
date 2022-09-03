@@ -161,6 +161,8 @@ fn validate_file(elf_header: &ElfHeader) -> bool {
 */
 fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
     // Loop through the headers and load each loadable segment into memory
+    let mut begin_address = USER_PROCESS_START_ADDRESS;
+
     for i in 0..elf_header.e_phnum {
         let address = file_start
             + elf_header.e_phoff
@@ -171,11 +173,11 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
             1 => {
                 // LOAD
                 let source = file_start + program_header.p_offset as u64;
-                load_segment_into_memory(
+                begin_address = load_segment_into_memory(
                     source,
                     program_header.p_filesz,
                     program_header.p_memsz,
-                    program_header.p_vaddr,
+                    begin_address,
                 );
             }
             0 => {}
@@ -256,10 +258,12 @@ fn get_section_name(file_start: u64, elf_header: &ElfHeader, offset: u64) -> &st
     crate::string::get_string_from_ptr(ptr)
 }
 
-fn load_segment_into_memory(source_raw: u64, filesz: u64, memsz: u64, v_address: u64) {
+fn load_segment_into_memory(source_raw: u64, filesz: u64, memsz: u64, v_address: u64) -> u64 {
     // Allocate appropriate amount of memory
     let rounded_size = page_frame_allocator::round_to_nearest_page(memsz);
     let number_of_pages = page_frame_allocator::get_page_number(rounded_size);
+
+    print_serial!("PAGE NUM = {}\n", number_of_pages);
 
     let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as *mut u8;
     PAGE_FRAME_ALLOCATOR.free();
@@ -282,4 +286,6 @@ fn load_segment_into_memory(source_raw: u64, filesz: u64, memsz: u64, v_address:
 
     // Map the physical pages to the virtual address provided
     paging::map_pages(number_of_pages, dest as u64, v_address);
+
+    v_address + (rounded_size)
 }

@@ -70,7 +70,7 @@ impl Mouse {
         let mut is_left_clicked = false;
         // Check overflows, if set, discard packet
         if self.mouse_packets[0] & (1 << 7) >= 0x80 || self.mouse_packets[0] & (1 << 6) >= 0x40 {
-            return; // TODO: Add an error
+            return;
         }
 
         // Bit 3 verifies packet alignment (if wrong, should return error)

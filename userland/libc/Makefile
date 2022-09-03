@@ -11,4 +11,4 @@ all:
 
 clean:
 	rm -rf newlib_build
-	rm -rd build
+	rm -rf build

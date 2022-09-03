@@ -23,7 +23,7 @@ use crate::ports::outpw;
 use crate::{print_serial, CONSOLE};
 use multiboot2::BootInformation;
 
-const FILESYSTEM_ON: bool = true;
+const FILESYSTEM_ON: bool = false;
 const VBE_DISPI_IOPORT_INDEX: u16 = 0x01CE;
 const VBE_DISPI_IOPORT_DATA: u16 = 0x01CF;
 const VBE_DISPI_INDEX_ID: u16 = 0;
@@ -54,13 +54,11 @@ pub fn initialise_userland(boot_info: &BootInformation) {
             // Alloc some pages and map them accordingly
             let heap = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
             PAGE_FRAME_ALLOCATOR.free();
-            let test_address = USER_PROCESS_START_ADDRESS + (4096 * 17);
-            paging::map_page(heap as u64, test_address, true);
 
             let user_process = multitask::Process::init(
                 multitask::ProcessPriority::High,
                 process_index,
-                test_address as i32,
+                heap as i32,
             );
 
             // Add process to list of processes

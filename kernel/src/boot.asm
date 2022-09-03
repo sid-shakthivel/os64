@@ -37,7 +37,7 @@ start:
     ; Recursive paging in which the last entry points to the first
 
     mov eax, p4_table
-    or eax, 0b11 ; Present, Writeable
+    or eax, 0b111 ; Present, Writeable, User
     mov [p4_table + 511 * 8], eax
 
     call enable_paging
@@ -52,11 +52,11 @@ setup_paging:
     ; Fill P2 with 512 entries 
 
     mov eax, p3_table
-    or eax, 0b111 ; Present, Writeable
+    or eax, 0b111 ; Present, Writeable, User
     mov [p4_table], eax
 
     mov eax, p2_table
-    or eax, 0b111 ; Present, Writeable
+    or eax, 0b111 ; Present, Writeable, User
     mov [p3_table], eax
 
     mov eax, p1_tables
