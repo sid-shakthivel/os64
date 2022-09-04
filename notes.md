@@ -24,6 +24,7 @@ Smaller Tasks:
 - Memory start in pfa
 - Make verify functions in fs and fb
 - Custom error handling with enums
+- Long file names for FAT16
 
 Think:
 - Switch to usize
@@ -37,7 +38,8 @@ Problems:
 - Collisions may fail with hashmap
 
 Now:
-- Long file names for FAT16
+- Check lua
+- argx, etc
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
@@ -46,3 +48,17 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
 REMEMBER ABOUT UPPER/LOWER CASES FOR FILESYSTEM
+
+static const luaL_Reg loadedlibs[] = {
+  {LUA_GNAME, luaopen_base},
+  {LUA_LOADLIBNAME, luaopen_package},
+  {LUA_COLIBNAME, luaopen_coroutine},
+  {LUA_TABLIBNAME, luaopen_table},
+  {LUA_IOLIBNAME, luaopen_io},
+  {LUA_OSLIBNAME, luaopen_os},
+  {LUA_STRLIBNAME, luaopen_string},
+  {LUA_MATHLIBNAME, luaopen_math},
+  {LUA_UTF8LIBNAME, luaopen_utf8},
+  {LUA_DBLIBNAME, luaopen_debug},
+  {NULL, NULL}
+};

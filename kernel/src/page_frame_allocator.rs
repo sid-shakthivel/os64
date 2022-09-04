@@ -9,6 +9,7 @@ A stack of free pages along with a pointer to the first page will be used in ord
 
 use crate::{list::Stack, print_serial, spinlock::Lock, CONSOLE};
 use multiboot2::BootInformation;
+use x86_64::structures::paging::page;
 pub struct PageFrameAllocator {
     pub free_frames: Stack<u64>,
     pub current_page: u64,
@@ -49,6 +50,11 @@ impl FrameAllocator for PageFrameAllocator {
         for _i in 0..pages_required {
             self.current_page += 4096;
         }
+
+        if pages_required == 8 {
+            print_serial!("0x{:x}\n", self.current_page);
+        }
+
         return address as *mut u64;
     }
 
@@ -95,7 +101,7 @@ impl PageFrameAllocator {
         );
 
         // TODO: Fix this fix - very large modules seem to confuse the multiboot2 package
-        memory_start = 0xef9000;
+        memory_start = 0xcf9000;
 
         self.current_page = memory_start;
         self.memory_end = memory_end;

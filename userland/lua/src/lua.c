@@ -685,9 +685,13 @@ static int pmain(lua_State *L)
 int main()
 {
   int status, result;
-  puts("This atleast works?");
+
+  // puts("In main");
 
   lua_State *L = luaL_newstate(); /* create state */
+
+  // puts("State created");
+
   // if (L == NULL) {
   //   l_message(argv[0], "cannot create state: not enough memory");
   //   return EXIT_FAILURE;
@@ -701,15 +705,15 @@ int main()
   // lua_close(L);
   // return (result && status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
 
-  while (1)
-  {
-  }
-
   // Load libraries
   luaL_openlibs(L);
 
+  // puts("Libraries loaded");
+
   // Run lua
-  luaL_dostring(L, "print \"Hello World\"");
+  luaL_dostring(L, "print \"Hello Lua\"");
+
+  puts("Code ra?");
 
   // Close lua
   lua_close(L);

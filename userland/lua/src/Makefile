@@ -14,12 +14,12 @@ SYSCALLS = $(shell pwd)/../../syscalls/syscalls.o
 
 CC= x86_64-elf-gcc -std=gnu99
 CFLAGS= -ffreestanding -nostdlib -O2 -Wall -Wextra -I ${LIB_HEADERS}
-LDFLAGS=  -ffreestanding -O2 -nostdlib -z max-page-size=4096 $(SYSLDFLAGS) $(MYLDFLAGS)
+LDFLAGS=  -ffreestanding -O2 -nostdlib -z max-page-size=4096 -lgcc $(SYSLDFLAGS) $(MYLDFLAGS)
 LIBS= $(LIBM) $(LIBC) $(LIBG) $(SYSCALLS)
 LINKER_FILE = $(shell pwd)/../../linker.ld
 
-AR= ar rcu
-RANLIB= ranlib
+AR= x86_64-elf-ar rcu
+RANLIB= x86_64-elf-ranlib
 RM= rm -f
 UNAME= uname
 
@@ -57,9 +57,9 @@ ALL_A= $(LUA_A)
 # Targets start here.
 default: $(PLAT)
 
-all:	$(ALL_T)
-	rm ../../../isodir/modules/lua
-	cp lua ../../../isodir/modules/
+all:$(ALL_T)
+	rm -f ../../../isodir/modules/lua
+	# cp lua ../../../isodir/modules/
 
 o:	$(ALL_O)
 
@@ -70,10 +70,10 @@ $(LUA_A): $(BASE_O)
 	$(RANLIB) $@
 
 $(LUA_T): $(LUA_O) $(LUA_A)
-	$(CC) -T $(LINKER_FILE) -o $@ $(LDFLAGS) $(LUA_O) $(LUA_A) $(LIBS)
+	$(CC) -o $@ $(LDFLAGS) $(LUA_O) $(LUA_A) $(LIBS)
 
 $(LUAC_T): $(LUAC_O) $(LUA_A)
-	$(CC) -T $(LINKER_FILE) -o $@ $(LDFLAGS) $(LUAC_O) $(LUA_A) $(LIBS)
+	$(CC) -o $@ $(LDFLAGS) $(LUAC_O) $(LUA_A) $(LIBS)
 
 test:
 	./$(LUA_T) -v

@@ -3,21 +3,27 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "../lua/src/lua.h";
+#include "../lua/src/lualib.h";
+#include "../lua/src/lauxlib.h";
+
 int main()
 {
-    // asm volatile("xchg %bx, %bx");m
+    lua_State *L = luaL_newstate();
 
-    malloc(4);
+    // write(1, "state\n", 6);
 
-    // In at&t - source, destionation
-    // const char *filename = "/A.TXT";
-    // int file_address = (int)filename;
+    // asm volatile("xchg %bx, %bx");
 
-    // int length = 78;
-    // int file = 1;
+    luaL_openlibs(L);
 
-    // const char *message = "hAllo";
-    // int message_address = (int)message;
+    asm volatile("mov $100, %rax \n\t\
+        int $0x80 \n\t\
+        ");
+
+    luaL_dostring(L, "print \"Hello Lua\"");
+
+    lua_close(L);
 
     for (;;)
     {

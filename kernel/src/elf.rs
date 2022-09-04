@@ -25,7 +25,7 @@ use crate::multitask::USER_PROCESS_START_ADDRESS;
 use crate::page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::CONSOLE;
 use crate::{paging, print_serial};
-use core::{mem, num};
+use core::mem;
 
 type Elf64Half = u16;
 type Elf64Off = u64;
@@ -177,7 +177,7 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
                     source,
                     program_header.p_filesz,
                     program_header.p_memsz,
-                    begin_address,
+                    program_header.p_vaddr,
                 );
             }
             0 => {}
@@ -271,9 +271,9 @@ fn load_segment_into_memory(source_raw: u64, filesz: u64, memsz: u64, v_address:
     let source = source_raw as *mut u8;
 
     // If the memsz is greater then filesz, extra bytes should store 0
-    for i in filesz..memsz {
+    for i in 0..memsz {
         unsafe {
-            *dest.offset(i as isize) = *source.offset(i as isize);
+            *dest.offset(i as isize) = 0;
         }
     }
 

@@ -5,7 +5,7 @@
 */
 
 use crate::allocator::kmalloc;
-use crate::page_frame_allocator::PAGE_SIZE;
+use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR, PAGE_SIZE};
 use crate::paging::Table;
 use crate::spinlock::Lock;
 use crate::CONSOLE;
@@ -134,21 +134,25 @@ impl Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4
-        let new_p4: *mut Table = paging::deep_clone();
+        // let new_p4: *mut Table = paging::deep_clone();
+        let new_p4 = 0 as *mut Table;
 
         // Create and setup a stack as though an interrupt has been fired
-        let mut rsp = kmalloc(PAGE_SIZE as u64);
+        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(8);
+        PAGE_FRAME_ALLOCATOR.free();
 
         unsafe {
-            let stack_top = rsp.offset(511) as u64;
-            rsp = rsp.offset(511); // Stack grows downwards towards decreasing memory addresses
+            print_serial!("RSP = {:p} 0x{:x}\n", rsp, rsp.offset(4095) as u64);
+
+            rsp = rsp.offset(4095);
+            let stack_top = rsp as u64;
 
             // These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
             // When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
 
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x202; // RFLAGS which enable interrupts
+            *rsp.offset(-3) = 0; // RFLAGS which enable interrupts
             *rsp.offset(-4) = 0x18 | 0x3; // CS
             *rsp.offset(-5) = v_address; // RIP
             *rsp.offset(-6) = 0x00; // RAX
@@ -173,3 +177,16 @@ impl Process {
 }
 
 pub static PROCESS_SCHEDULAR: Lock<ProcessSchedular> = Lock::new(ProcessSchedular::new());
+
+/*
+    0xd5a000
+    0xd59fa0
+    0xd59fc8
+    0xd59ff8
+
+    SET 2:
+    d5a000
+    d59fa0
+    d59f98
+    d59f90
+*/

@@ -15,6 +15,7 @@ Features:
 - Window Manager
 
 Ports:
-- Newlib 4.1.0
-
+- newlib 4.1.0 https://sourceware.org/newlib/
+- hello-1.3 https://www.gnu.org/software/hello/
+ 
 Font used is https://www.inp.nsk.su/~bolkhov/files/fonts/univga/index.html

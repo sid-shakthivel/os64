@@ -19,11 +19,11 @@ all:
 	cd $(SYSCALLS) && make
 
 	# Userspace modules
+	cd $(USERLAND_MODULE_3) && make generic
+	
 	cd $(USERLAND_MODULE_1) && make 
 
 	# cd $(USERLAND_MODULE_2) && make all
-
-	# cd $(USERLAND_MODULE_3) && make generic
 
 	# Kernel
 	cd $(KERNEL) && make run

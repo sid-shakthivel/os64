@@ -15,17 +15,25 @@
 char **environ; /* pointer to array of char * strings that define the current environment variables */
 int execve(char *name, char **argv, char **env)
 {
+    asm volatile("mov $100, %rax \n\t\
+    int $0x80 \n\t\
+        ");
     errno = ENOMEM;
     return -1;
 }
 int fork()
 {
+    asm volatile("mov $101, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     errno = EAGAIN;
     return -1;
 }
 int fstat(int file, struct stat *st)
 {
-    asm volatile("xchg %bx, %bx");
+    asm volatile("mov $102, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     if (st == NULL)
         return -1;
     st->st_mode = S_IFCHR;
@@ -33,40 +41,64 @@ int fstat(int file, struct stat *st)
 }
 int kill(int pid, int sig)
 {
+    asm volatile("mov $103, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     errno = EINVAL;
     return -1;
 }
 int link(char *old, char *new)
 {
+    asm volatile("mov $104, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     errno = EMLINK;
     return -1;
 }
 int lseek(int file, int ptr, int dir)
 {
+    asm volatile("mov $105, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     return 0;
 }
 int stat(const char *file, struct stat *st)
 {
-    asm volatile("xchg %bx, %bx");
+    asm volatile("mov $106, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     st->st_mode = S_IFCHR;
     return 0;
 }
 clock_t times(struct tms *buf)
 {
-    asm volatile("xchg %bx, %bx");
+    asm volatile("mov $107, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     return -1;
 }
 int unlink(char *name)
 {
-    asm volatile("xchg %bx, %bx");
+    asm volatile("mov $108, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     errno = ENOENT;
     return -1;
 }
 int wait(int *status)
 {
-    asm volatile("xchg %bx, %bx");
+    asm volatile("mov $108, %rax \n\t\
+        int $0x80 \n\t\
+        ");
     errno = ECHILD;
     return -1;
+}
+
+int gettimeofday(struct timeval *__p, void *__tz)
+{
+    __p->tv_sec = 0;
+    __p->tv_usec = 0;
+    return 0;
 }
 
 // liballoc
@@ -90,7 +122,7 @@ int liballoc_unlock()
 void *liballoc_alloc(int pages)
 {
     int64_t result;
-    asm volatile("mov %0, %%rbx \n\t\
+    asm volatile("mov %1, %%ebx \n\t\
                  mov $8, %%rax \n\t\
                  int $0x80 \n\t\
                  "
@@ -105,13 +137,7 @@ void *liballoc_alloc(int pages)
 */
 int liballoc_free(void *memory, int pages)
 {
-    asm volatile("xchg %bx, %bx");
-    return 0;
-}
-
-int gettimeofday(struct timeval *__p, void *__tz)
-{
-    asm volatile("xchg %bx, %bx");
+    write(1, "free\n", 5);
     return 0;
 }
 

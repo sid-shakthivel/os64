@@ -19,7 +19,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::{allocator::kmalloc, CONSOLE};
+use crate::CONSOLE;
 use core::mem;
 use spin::Mutex;
 

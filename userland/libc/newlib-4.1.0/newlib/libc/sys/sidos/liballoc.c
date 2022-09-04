@@ -24,9 +24,9 @@ unsigned int l_allocated = 0; //< The real amount of memory allocated.
 unsigned int l_inuse = 0;	  //< The amount of memory in use (malloc'ed).
 #endif
 
-static int l_initialized = 10; //< Flag to indicate initialization.
-static int l_pageSize = 4096;  //< Individual page size
-static int l_pageCount = 16;   //< Minimum number of pages to allocate.
+static int l_initialized = 0; //< Flag to indicate initialization.
+static int l_pageSize = 4096; //< Individual page size
+static int l_pageCount = 16;  //< Minimum number of pages to allocate.
 
 // ***********   HELPER FUNCTIONS  *******************************
 
@@ -276,9 +276,9 @@ void *malloc(size_t size)
 
 	liballoc_lock();
 
-	if (l_initialized == 10)
+	if (l_initialized == 0)
 	{
-		asm volatile("xchg %bx, %bx");
+		write(1, "init", 4);
 		for (index = 0; index < MAXEXP; index++)
 		{
 			l_freePages[index] = NULL;
@@ -295,7 +295,6 @@ void *malloc(size_t size)
 	tag = l_freePages[index]; // Start at the front of the list.
 	if (tag != NULL)
 	{
-		asm volatile("xchg %bx, %bx");
 		while (tag != NULL)
 		{
 			unsigned int tag_size = tag->real_size;
