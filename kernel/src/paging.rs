@@ -161,7 +161,6 @@ pub fn map_page(physical_address: u64, virtual_address: u64, is_user: bool) {
     let p2 = p3.create_next_table(p3_index);
     let p1 = p2.create_next_table(p2_index);
 
-
     if p1.entries[p1_index].entry == 0 {
         p1.entries[p1_index] = Page::new(physical_address);
     } else {

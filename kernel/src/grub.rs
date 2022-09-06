@@ -21,7 +21,7 @@ use crate::ports::outpw;
 use crate::{print_serial, CONSOLE};
 use multiboot2::BootInformation;
 
-const FILESYSTEM_ON: bool = false;
+const FILESYSTEM_ON: bool = true;
 const VBE_DISPI_IOPORT_INDEX: u16 = 0x01CE;
 const VBE_DISPI_IOPORT_DATA: u16 = 0x01CF;
 const VBE_DISPI_INDEX_ID: u16 = 0;

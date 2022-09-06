@@ -17,5 +17,6 @@ Features:
 Ports:
 - newlib 4.1.0 https://sourceware.org/newlib/
 - hello-1.3 https://www.gnu.org/software/hello/
+- libforth https://github.com/howerj/libforth
  
 Font used is https://www.inp.nsk.su/~bolkhov/files/fonts/univga/index.html

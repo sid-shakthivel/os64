@@ -7,13 +7,11 @@ static int count = 0;
 
 int main()
 {
-    count += 1;
-
-    printf("COUNT = %d\n", count);
+    printf("Hello World\n");
 
     for (;;)
-    {
-        // body of the for loop
-    }
-    return 0;
+{
+    // body of the for loop
+}
+return 0;
 }

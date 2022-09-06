@@ -72,25 +72,27 @@ struct ExtendedBootRecord {
 struct StandardDirectoryEntry {
     filename: [u8; 8],
     ext: [u8; 3],
-    attributes: u8,
-    unused: [u8; 8],
-    cluster_high: u16,
+    attributes: u8,    // Could be LFN, Directory, Archive
+    unused: [u8; 8],   // Reserved for windows NT
+    cluster_high: u16, // Always 0
     time: u16,
     date: u16,
     cluster_low: u16,
     file_size: u32,
 }
 
-// These always have a regular entry as well, and these are placed before the standard entry
-struct LongDirectoryEntry {
-    order: u8,
-    name_start: [char; 5],
-    attribute: u8,
-    long_entry_type: u8,
-    checksum: u8,
-    name_middle: [char; 6],
-    zero: u16,
-    name_end: [char; 2],
+// These always have a regular entry as well, and these are placed before the standard entry and hold extra data
+#[derive(Debug, Copy, Clone)]
+#[repr(C, packed)]
+struct LongFileEntry {
+    order: u8,             // Since there could be number of LFE's, order is important
+    name_start: [u16; 5],  // First 5 characters
+    attribute: u8,         // 0x0F
+    long_entry_type: u8,   // 0x00
+    checksum: u8,          // Checksum generated fo the short file name
+    name_middle: [u16; 6], // Next 6 characters
+    zero: u16,             // Always 0
+    name_end: [u16; 2],    // Final 2 characters
 }
 
 // Inspired by the ubiquitous FILE* data type in C
@@ -138,7 +140,6 @@ impl File {
     }
 
     pub fn write(&mut self, buffer: *mut u8, length: usize) -> Result<u64, &str> {
-        // TODO: Improve and implement further
         if self.file_type != FileType::File {
             return Err("Tried to write on a directory");
         }
@@ -148,13 +149,13 @@ impl File {
         return Ok(0);
     }
 
-    pub fn find(&mut self, filename: &str) -> Result<File, &str> {
+    pub fn find(&self, filename: &str) -> Result<File, &str> {
         let cluster_address =
             convert_sector_to_bytes(get_lba(self.cluster)) + FS.lock().first_data_sector_address;
         return self._find(filename, cluster_address);
     }
 
-    pub fn find_root(&mut self, filename: &str) -> Result<File, &str> {
+    pub fn find_root(&self, filename: &str) -> Result<File, &str> {
         let root_directory_address = FS.lock().root_directory_address;
         return self._find(filename, root_directory_address);
     }
@@ -290,48 +291,117 @@ impl File {
         }
     }
 
-    fn _find(&mut self, filename: &str, mut cluster_address: u32) -> Result<File, &str> {
-        if filename.len() > 8 {
-            return Err("File is too big");
-        }
+    fn _find(&self, filename: &str, mut cluster_address: u32) -> Result<File, &str> {
         if self.file_type != FileType::Directory {
             return Err("Tried to find on a directory");
         }
 
+        let mut filename_buffer: [u8; 12] = [0; 12];
+
+        // Loop through each directory entry within the directory cluster
         for _i in 0..64 {
             let directory_entry = unsafe { &*(cluster_address as *const StandardDirectoryEntry) };
 
             match directory_entry.filename[0] {
-                0x00 => return Err("File cannot be found in this directory"), // No more files/directories
+                0x00 => return Err("File cannot be found in this directory"), // Marks the end (no more files/directories)
                 0xE5 => panic!("Unused entry"),
                 _ => {}
             }
 
-            let dos_filename = core::str::from_utf8(&directory_entry.filename)
-                .unwrap()
-                .trim();
-            let dos_extension = core::str::from_utf8(&directory_entry.ext).unwrap().trim();
-            let mut split_filename = filename.split(".");
+            // Check against attributes of a directory entry
+            match directory_entry.attributes {
+                0x0F => {
+                    // Handle long file name entry
+                    let long_file_entry = unsafe { &*(cluster_address as *const LongFileEntry) };
+                    let mut index = 0;
 
-            // Check if entry matches
-            if split_filename.next().unwrap() == dos_filename {
-                if directory_entry.attributes & 0x10 > 0 {
-                    let mut node = File::new(
-                        directory_entry.cluster_low as u32,
-                        directory_entry.file_size,
-                        FileType::Directory,
-                    );
-                    node.name = directory_entry.filename;
-                    return Ok(node);
-                } else {
-                    let mut node = File::new(
-                        directory_entry.cluster_low as u32,
-                        directory_entry.file_size,
-                        FileType::File,
-                    );
-                    node.name = directory_entry.filename;
-                    return Ok(node);
+                    // Convert the lowercase into uppercase
+
+                    for i in 0..5 {
+                        filename_buffer[index] =
+                            (long_file_entry.name_start[i] as u8).wrapping_sub(32);
+                        index += 1;
+                    }
+
+                    for i in 0..6 {
+                        filename_buffer[index] =
+                            (long_file_entry.name_middle[i] as u8).wrapping_sub(32);
+                        index += 1
+                    }
+
+                    for i in 0..1 {
+                        filename_buffer[index] =
+                            (long_file_entry.name_end[i] as u8).wrapping_sub(32);
+                        index += 1;
+                    }
                 }
+                0x10 => {
+                    // Directory
+                    let dos_filename: &str;
+                    let filename_clone = filename_buffer.clone();
+
+                    if filename_buffer[0] != 0 {
+                        // There is a corresponding long file name for this entry
+                        dos_filename = core::str::from_utf8(&filename_clone).unwrap().trim();
+
+                        // Clean up
+                        for i in 0..12 {
+                            filename_buffer[i] = 0;
+                        }
+                    } else {
+                        // Use the standard filename
+                        dos_filename = core::str::from_utf8(&directory_entry.filename)
+                            .unwrap()
+                            .trim();
+                    }
+
+                    let mut split_filename = filename.split(".");
+
+                    if split_filename.next().unwrap() == dos_filename {
+                        let mut node = File::new(
+                            directory_entry.cluster_low as u32,
+                            directory_entry.file_size,
+                            FileType::Directory,
+                        );
+                        node.name = directory_entry.filename;
+                        return Ok(node);
+                    }
+                }
+                0x20 => {
+                    // Archive
+
+                    let dos_filename: &str;
+                    let filename_clone = filename_buffer.clone();
+
+                    if filename_buffer[0] != 0 {
+                        // There is a corresponding long file name for this entry
+                        dos_filename = core::str::from_utf8(&filename_clone).unwrap().trim_end();
+
+                        // Clean up
+                        for i in 0..12 {
+                            filename_buffer[i] = 0;
+                        }
+                    } else {
+                        // Use the standard filename
+                        dos_filename = core::str::from_utf8(&directory_entry.filename)
+                            .unwrap()
+                            .trim();
+                    }
+
+                    let mut split_filename = filename.split(".");
+
+                    if split_filename.next().unwrap().trim() == dos_filename.trim() {
+                        print_serial!("ALL DONE");
+                        let mut node = File::new(
+                            directory_entry.cluster_low as u32,
+                            directory_entry.file_size,
+                            FileType::Directory,
+                        );
+                        node.name = directory_entry.filename;
+                        return Ok(node);
+                    }
+                }
+                _ => panic!("Unknown attribute"),
             }
 
             cluster_address += 0x20;
