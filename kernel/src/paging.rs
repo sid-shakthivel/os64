@@ -25,7 +25,7 @@ Page table entries have a certain 64 bit format which looks like this:
 #![allow(unused_variables)]
 
 use crate::allocator::{kfree, kmalloc};
-use crate::page_frame_allocator::PAGE_SIZE;
+use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR, PAGE_SIZE};
 use crate::{print_serial, CONSOLE};
 use core::prelude::v1::Some;
 
@@ -108,7 +108,8 @@ impl Table {
     */
     fn create_next_table(&mut self, index: usize) -> &mut Table {
         if self.get_table(index).is_none() {
-            let page_frame = kmalloc(PAGE_SIZE as u64);
+            let page_frame = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+            PAGE_FRAME_ALLOCATOR.free();
 
             self.entries[index] = Page::new(page_frame as u64);
         }
@@ -160,7 +161,13 @@ pub fn map_page(physical_address: u64, virtual_address: u64, is_user: bool) {
     let p2 = p3.create_next_table(p3_index);
     let p1 = p2.create_next_table(p2_index);
 
-    p1.entries[p1_index] = Page::new(physical_address);
+
+    if p1.entries[p1_index].entry == 0 {
+        p1.entries[p1_index] = Page::new(physical_address);
+    } else {
+        p1.entries[p1_index] = Page::new(physical_address);
+        print_serial!("OVERWRITE? 0x{:x}\n", virtual_address);
+    }
 
     // Translation lookaside buffer - cashes the translation of virtual to physical addresses and needs to be updated manually
     unsafe {

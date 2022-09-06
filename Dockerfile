@@ -28,6 +28,12 @@ RUN apt-get install fdisk -y
 # Install mkfs.vfat
 RUN apt-get install dosfstools -y
 
+# Install gcc
+RUN apt install build-essential -y
+
+# Install ldd
+RUN apt-get install libc-bin -y
+
 WORKDIR /
 
 # Compile and create ISO

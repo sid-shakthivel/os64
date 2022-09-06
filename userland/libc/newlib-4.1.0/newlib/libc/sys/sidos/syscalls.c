@@ -31,9 +31,6 @@ int fork()
 }
 int fstat(int file, struct stat *st)
 {
-    asm volatile("mov $102, %rax \n\t\
-        int $0x80 \n\t\
-        ");
     if (st == NULL)
         return -1;
     st->st_mode = S_IFCHR;
@@ -72,10 +69,11 @@ int stat(const char *file, struct stat *st)
 }
 clock_t times(struct tms *buf)
 {
-    asm volatile("mov $107, %rax \n\t\
-        int $0x80 \n\t\
-        ");
-    return -1;
+    // asm volatile("mov $107, %rax \n\t\
+    //     int $0x80 \n\t\
+    //     ");
+    asm volatile("xchg %bx, %bx");
+    return 0;
 }
 int unlink(char *name)
 {

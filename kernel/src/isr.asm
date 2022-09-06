@@ -87,6 +87,8 @@ handle_pit_interrupt:
     ; mov cr3, rax
     popaq
 
+    xchg bx, bx
+
     iretq 
 
 

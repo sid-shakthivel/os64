@@ -40,7 +40,7 @@ bitflags! {
 pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
     let syscall_id = registers.rax;
 
-    print_serial!("SYSCALL {}\n", syscall_id);
+    // print_serial!("SYSCALL {}\n", syscall_id);
 
     return match syscall_id {
         0 => _exit(),
@@ -205,18 +205,25 @@ fn write(file: u64, buffer: *mut u8, length: u64) -> i64 {
                 print_serial!("{}", character as char);
             }
         }
+        2 => {
+            // 2 refers to stderr and writes to the console
+            for i in 0..(length) {
+                let character = unsafe { *buffer.offset(i as isize) };
+                print_serial!("{}", character as char);
+            }
+        }
         _ => {
             // Other files can be written to through the fs
-            let wrapped_fd = FILE_TABLE.lock().get(file as usize);
-            FILE_TABLE.free();
-            match wrapped_fd {
-                Some(mut fd) => {
-                    fd.write(buffer, length as usize).unwrap();
-                }
-                None => {
-                    return -1;
-                }
-            }
+            // let wrapped_fd = FILE_TABLE.lock().get(file as usize);
+            // FILE_TABLE.free();
+            // match wrapped_fd {
+            //     Some(mut fd) => {
+            //         fd.write(buffer, length as usize).unwrap();
+            //     }
+            //     None => {
+            //         return -1;
+            //     }
+            // }
         }
     }
 

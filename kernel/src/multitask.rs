@@ -177,16 +177,3 @@ impl Process {
 }
 
 pub static PROCESS_SCHEDULAR: Lock<ProcessSchedular> = Lock::new(ProcessSchedular::new());
-
-/*
-    0xd5a000
-    0xd59fa0
-    0xd59fc8
-    0xd59ff8
-
-    SET 2:
-    d5a000
-    d59fa0
-    d59f98
-    d59f90
-*/

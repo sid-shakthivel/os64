@@ -1,6 +1,9 @@
 // src/list.rs
 
-use crate::allocator::kmalloc;
+use crate::{
+    allocator::kmalloc,
+    page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
+};
 
 // Each node stores a reference to the next/previous node within the list along with a payload
 #[derive(Debug, Copy, Clone)]
@@ -67,9 +70,10 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
 
     // Appends a new node to the start of the stack and allocates memory for it
     pub fn push(&mut self, value: T) {
-        use core::mem::size_of;
-        let size = size_of::<Node<T>>();
-        let address = kmalloc(size as u64);
+        // let size = size_of::<Node<T>>();
+        // let address = kmalloc(size as u64);
+        let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+        PAGE_FRAME_ALLOCATOR.free();
 
         let new_node = Node::new(address as u64, value);
 

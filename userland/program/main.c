@@ -3,27 +3,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../lua/src/lua.h";
-#include "../lua/src/lualib.h";
-#include "../lua/src/lauxlib.h";
+static int count = 0;
 
 int main()
 {
-    lua_State *L = luaL_newstate();
+    count += 1;
 
-    // write(1, "state\n", 6);
-
-    // asm volatile("xchg %bx, %bx");
-
-    luaL_openlibs(L);
-
-    asm volatile("mov $100, %rax \n\t\
-        int $0x80 \n\t\
-        ");
-
-    luaL_dostring(L, "print \"Hello Lua\"");
-
-    lua_close(L);
+    printf("COUNT = %d\n", count);
 
     for (;;)
     {

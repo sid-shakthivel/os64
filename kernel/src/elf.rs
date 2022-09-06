@@ -181,7 +181,7 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
                 );
             }
             0 => {}
-            _ => panic!("Unknown\n"),
+            _ => {}
         }
     }
 }
@@ -265,23 +265,37 @@ fn load_segment_into_memory(source_raw: u64, filesz: u64, memsz: u64, v_address:
 
     print_serial!("PAGE NUM = {}\n", number_of_pages);
 
-    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as *mut u8;
+    let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as *mut u64;
     PAGE_FRAME_ALLOCATOR.free();
 
-    let source = source_raw as *mut u8;
+    let source = source_raw as *mut u64;
 
     // If the memsz is greater then filesz, extra bytes should store 0
-    for i in 0..memsz {
-        unsafe {
-            *dest.offset(i as isize) = 0;
-        }
-    }
+    // for i in 0..(memsz / 8) {
+    //     unsafe {
+    //         *dest.offset(i as isize) = 0;
+    //     }
+    // }
 
-    // Copy actual segment data
-    for i in 0..filesz {
-        unsafe {
-            *dest.offset(i as isize) = *source.offset(i as isize);
-        }
+    // unsafe {
+    //     print_serial!(
+    //         "SIZE {:x} POINTER = {:p} {:p}\n",
+    //         filesz,
+    //         dest,
+    //         dest.offset(filesz as isize)
+    //     );
+    // }
+
+    // // Copy actual segment data
+    // for i in 0..(filesz / 8) {
+    //     unsafe {
+    //         *dest.offset(i as isize) = *source.offset(i as isize);
+    //     }
+    // }
+
+    unsafe {
+        core::ptr::write_bytes(dest as *mut u8, 0, memsz as usize);
+        core::ptr::copy_nonoverlapping(source as *mut u8, dest as *mut u8, filesz as usize);
     }
 
     // Map the physical pages to the virtual address provided
