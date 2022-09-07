@@ -95,9 +95,7 @@ impl ProcessSchedular {
     }
 
     pub fn add_process(&mut self, process: Process) {
-        if self.process_count > MAX_PROCESS_NUM {
-            panic!("Memory maxed")
-        }
+        assert!(self.process_count < MAX_PROCESS_NUM, "Memory maxed");
         self.tasks[self.process_count] = Some(process);
         self.process_count += 1;
     }
@@ -177,3 +175,7 @@ impl Process {
 }
 
 pub static PROCESS_SCHEDULAR: Lock<ProcessSchedular> = Lock::new(ProcessSchedular::new());
+
+/*
+    Call functions on code from different files with specific data that needs to be stored
+*/

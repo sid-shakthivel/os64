@@ -165,7 +165,7 @@ pub fn map_page(physical_address: u64, virtual_address: u64, is_user: bool) {
         p1.entries[p1_index] = Page::new(physical_address);
     } else {
         p1.entries[p1_index] = Page::new(physical_address);
-        print_serial!("OVERWRITE? 0x{:x}\n", virtual_address);
+        // print_serial!("OVERWRITE? 0x{:x}\n", virtual_address);
     }
 
     // Translation lookaside buffer - cashes the translation of virtual to physical addresses and needs to be updated manually
@@ -221,7 +221,6 @@ pub fn map_pages(number_of_pages: u64, physical_address: u64, virtual_address: u
     for i in 0..number_of_pages {
         let p_address = physical_address + (i * 4096);
         let v_address = virtual_address + (i * 4096);
-        // print_serial!("{} {} {}\n", i, p_address, v_address);
         map_page(p_address, v_address, true);
     }
 }

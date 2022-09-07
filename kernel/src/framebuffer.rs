@@ -23,10 +23,14 @@
 
 use crate::allocator::kmalloc;
 use crate::list::Stack;
+use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
+use crate::print_serial;
 use crate::spinlock::Lock;
 use crate::writer::Writer;
+use crate::CONSOLE;
 use crate::{page_frame_allocator, paging};
 use multiboot2::FramebufferTag;
+use x86_64::structures::paging::page;
 
 pub const SCREEN_WIDTH: u64 = 1024;
 pub const SCREEN_HEIGHT: u64 = 768;
@@ -158,7 +162,6 @@ impl Window {
         FRAMEBUFFER
             .lock()
             .fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00FF);
-        FRAMEBUFFER.free();
 
         self.mouse_x = mouse_x;
         self.mouse_y = mouse_y;
@@ -342,7 +345,6 @@ impl Window {
                 self.height - WINDOW_TITLE_HEIGHT - 6,
                 self.colour,
             );
-            FRAMEBUFFER.free();
 
             // Paint the top title bar
             FRAMEBUFFER.lock().fill_rect(
@@ -353,7 +355,6 @@ impl Window {
                 WINDOW_TITLE_HEIGHT,
                 WINDOW_TITLE_COLOUR,
             );
-            FRAMEBUFFER.free();
 
             // Paint the outline of the window
             FRAMEBUFFER.lock().draw_rect_outline(
@@ -364,7 +365,14 @@ impl Window {
                 self.height,
                 WINDOW_BORDER_COLOUR,
             );
-            FRAMEBUFFER.free();
+
+            // Paint the title text and centre it
+            FRAMEBUFFER.lock().draw_string(
+                Some(&self.clipped_rectangles),
+                "Terminal",
+                self.x + (self.width / 2 - ("Terminal".as_bytes().len() * 8) as u64 / 2),
+                self.y + (WINDOW_TITLE_HEIGHT - 10) / 2,
+            );
         } else {
             // Most likely the background
 
@@ -376,7 +384,6 @@ impl Window {
                 self.height,
                 self.colour,
             );
-            FRAMEBUFFER.free();
         }
     }
 }
@@ -463,6 +470,8 @@ pub struct Framebuffer {
     bpp: u64,
     backbuffer: u64,
     frontbuffer: u64,
+    font_start: u32,
+    font: Option<PsfFont>,
 }
 
 #[derive(Copy, Clone)]
@@ -477,7 +486,7 @@ struct PsfFont {
     width: u32,           // In pixels
 }
 
-pub static FRAMEBUFFER: Lock<Framebuffer> = Lock::new(Framebuffer::new());
+pub static FRAMEBUFFER: spin::Mutex<Framebuffer> = spin::Mutex::new(Framebuffer::new());
 
 impl Framebuffer {
     pub const fn new() -> Framebuffer {
@@ -486,6 +495,9 @@ impl Framebuffer {
             bpp: 0,
             backbuffer: 0,
             frontbuffer: 0,
+
+            font_start: 0,
+            font: None,
         }
     }
 
@@ -603,23 +615,61 @@ impl Framebuffer {
         self.fill_rect(clipped_rectangles, x, y, 3, length, colour);
     }
 
-    fn draw_character(&mut self, _character: char) {
-        // let font = self.font.unwrap();
-        // let glyph_address = (self.font_start + font.header_size + (font.bytes_per_glyph * (character as u32))) as *mut u8;
+    pub fn draw_string(
+        &mut self,
+        clipped_rectangles: Option<&Stack<Rectangle>>,
+        string: &str,
+        mut x: u64,
+        y: u64,
+    ) {
+        for byte in string.as_bytes() {
+            self.draw_clipped_character(clipped_rectangles, *byte as char, x, y);
+            x += 8;
+        }
+    }
 
-        // for cy in 0..16 {
-        //     let mut index = 8;
-        //     for cx in (0..8) {
-        //         // Load correct bitmap for glyph
-        //         let glyph_offset: u16 = unsafe { (*glyph_address.offset(cy) as u16) & (1 << index) };
-        //         if glyph_offset > 0 {
-        //             self.draw_pixel(cx + self.terminal_col, cy as usize + self.terminal_row, 0xFFFFFFFF);
-        //         } else {
-        //             self.draw_pixel(cx + self.terminal_col, cy as usize + self.terminal_row, 0x00);
-        //         }
-        //         index -= 1;
-        //     }
-        // }
+    fn draw_clipped_character(
+        &mut self,
+        clipped_rectangles: Option<&Stack<Rectangle>>,
+        character: char,
+        x: u64,
+        y: u64,
+    ) {
+        if let Some(rectangles) = clipped_rectangles {
+            for (i, clipped_rect) in rectangles.into_iter().enumerate() {
+                let clip = clipped_rect.unwrap().payload;
+
+                // Ensure we can't go over the limit
+
+                if let Some(font) = self.font {
+                    let glyph_address = (self.font_start
+                        + font.header_size
+                        + (font.bytes_per_glyph * (character as u32)))
+                        as *mut u8;
+
+                    for cy in 0..16 {
+                        let mut index = 8;
+                        for cx in 0..8 {
+                            // Clamp down the values
+                            let x_base = core::cmp::max(x, clip.left);
+                            let y_base = core::cmp::max(y, clip.top);
+
+                            let clamped_x = core::cmp::min(x_base + cx, clip.right);
+                            let clamped_y = core::cmp::min(y_base + cy, clip.bottom);
+
+                            // Load correct bitmap for glyph
+                            let glyph_offset: u16 = unsafe {
+                                (*glyph_address.offset(cy as isize) as u16) & (1 << index)
+                            };
+                            if glyph_offset > 0 {
+                                self.draw_pixel(clamped_x, clamped_y, 0x00);
+                            }
+                            index -= 1;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -628,11 +678,11 @@ impl Writer for Framebuffer {
         self.fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x00);
     }
 
-    fn put_char(&mut self, character: char) {
-        match character {
-            _ => self.draw_character(character),
-        }
-    }
+    // fn put_char(&mut self, character: char) {
+    //     match character {
+    //         _ => self.draw_character(character),
+    //     }
+    // }
 }
 
 /*
@@ -648,12 +698,12 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     let font_end = unsafe { &_binary_font_psf_end as *const _ as u32 };
     let font_size = unsafe { &_binary_font_psf_size as *const _ as u32 };
     let font_start = font_end - font_size;
-    let _font = unsafe { &*(font_start as *const PsfFont) };
+    let font = unsafe { &*(font_start as *const PsfFont) };
 
     FRAMEBUFFER.lock().pitch = framebuffer_tag.pitch as u64;
-    FRAMEBUFFER.free();
     FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;
-    FRAMEBUFFER.free();
+    FRAMEBUFFER.lock().font = Some(font.clone());
+    FRAMEBUFFER.lock().font_start = font_start;
 
     // Calulate sizes of the framebuffer
     let size_in_bytes = ((framebuffer_tag.bpp as u64)
@@ -663,20 +713,23 @@ pub fn init(framebuffer_tag: FramebufferTag) {
 
     let size_in_mb = page_frame_allocator::convert_bytes_to_mb(size_in_bytes);
 
+    let pages_required = page_frame_allocator::get_page_number(
+        page_frame_allocator::round_to_nearest_page(size_in_bytes),
+    );
+
     // Setup the front buffer
-    let frontbuffer_address = kmalloc(size_in_bytes) as u64;
+    let frontbuffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(pages_required) as u64;
+    PAGE_FRAME_ALLOCATOR.free();
 
     // // Identity map this buffer so it maps to video memory
     paging::identity_map_from(framebuffer_tag.address, frontbuffer_address, size_in_mb);
 
     FRAMEBUFFER.lock().frontbuffer = frontbuffer_address;
-    FRAMEBUFFER.free();
 
     // Setup the back buffer
     // let backbuffer_address = malloc(size_in_bytes) as u64;
 
     FRAMEBUFFER.lock().backbuffer = 0;
-    FRAMEBUFFER.free();
 }
 
 extern "C" {

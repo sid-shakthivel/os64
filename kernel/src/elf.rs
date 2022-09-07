@@ -131,25 +131,48 @@ pub fn parse(file_start: u64) {
 
 // Verify file starts with ELF Magic number and is built for the correct system
 fn validate_file(elf_header: &ElfHeader) -> bool {
-    if elf_header.e_ident[ElfIdent::EiMag0 as usize] != ELF_FLAG_MAG0 {
-        panic!("ELF Header EI_MAG0 incorrect\n");
-    } else if elf_header.e_ident[ElfIdent::EiMag1 as usize] != ('E' as u8) {
-        panic!("ELF header EI_MAG1 incorrect\n");
-    } else if elf_header.e_ident[ElfIdent::EiMag2 as usize] != ('L' as u8) {
-        panic!("ELF header EI_MAG2 incorrect\n");
-    } else if elf_header.e_ident[ElfIdent::EiMag3 as usize] != ('F' as u8) {
-        panic!("ELF header EI_MAG3 incorrect\n");
-    } else if elf_header.e_ident[ElfIdent::EiClass as usize] != ELF_CLASS {
-        panic!("Unsupported ELF File class\n");
-    } else if elf_header.e_ident[ElfIdent::EiData as usize] != ELF_DATA {
-        panic!("Unsupported ELF File byte order\n");
-    } else if elf_header.e_ident[ElfIdent::EiVersion as usize] != ELF_VERSION {
-        panic!("Unsupported ELF version\n");
-    } else if elf_header.e_machine != ELF_MACHINE {
-        panic!("Unsupported ELF file target\n");
-    } else if elf_header.e_type == 1 {
-        panic!("Unsupported ELF file type");
-    }
+    assert!(
+        elf_header.e_ident[ElfIdent::EiMag0 as usize] == ELF_FLAG_MAG0,
+        "ELF Header EI_MAG0 incorrect\n"
+    );
+
+    assert!(
+        elf_header.e_ident[ElfIdent::EiMag1 as usize] == ('E' as u8),
+        "ELF header EI_MAG1 incorrect\n"
+    );
+
+    assert!(
+        elf_header.e_ident[ElfIdent::EiMag2 as usize] == ('L' as u8),
+        "ELF header EI_MAG2 incorrect\n"
+    );
+
+    assert!(
+        elf_header.e_ident[ElfIdent::EiMag3 as usize] == ('F' as u8),
+        "ELF header EI_MAG3 incorrect\n"
+    );
+
+    assert!(
+        elf_header.e_ident[ElfIdent::EiClass as usize] == ELF_CLASS,
+        "Unsupported ELF File class\n"
+    );
+
+    assert!(
+        elf_header.e_ident[ElfIdent::EiData as usize] == ELF_DATA,
+        "Unsupported ELF File byte order\n"
+    );
+
+    assert!(
+        elf_header.e_ident[ElfIdent::EiVersion as usize] == ELF_VERSION,
+        "Unsupported ELF version\n"
+    );
+
+    assert!(
+        elf_header.e_machine == ELF_MACHINE,
+        "Unsupported ELF file target\n"
+    );
+
+    assert!(elf_header.e_type == 1, "Unsupported ELF file type");
+
     return true;
 }
 

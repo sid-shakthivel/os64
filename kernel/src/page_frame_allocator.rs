@@ -31,10 +31,7 @@ impl FrameAllocator for PageFrameAllocator {
         if self.free_frames.is_empty() {
             // If the free frames list is empty, bump the address and return that
             let address = self.current_page;
-
-            if address > self.memory_end {
-                panic!("KERNEL RAN OUT OF MEMORY");
-            }
+            assert!(address < self.memory_end, "KERNEL RAN OUT OF MEMORY");
 
             self.current_page += 4096;
             return address as *mut u64;
@@ -90,7 +87,7 @@ impl PageFrameAllocator {
     pub fn init(&mut self, boot_info: &BootInformation) {
         let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
 
-        let mut memory_start: u64 = round_to_nearest_page(boot_info.end_address() as u64);
+        let memory_start: u64 = round_to_nearest_page((boot_info.end_address() as u64) + 0x1000);
 
         let memory_end: u64 = round_to_nearest_page(
             memory_map_tag
@@ -100,8 +97,9 @@ impl PageFrameAllocator {
                 .end_address(),
         );
 
+        print_serial!("MEMORY START = 0x{:x}\n", memory_start);
+
         // TODO: Fix this fix - very large modules seem to confuse the multiboot2 package
-        memory_start = 0xcf9000;
 
         self.current_page = memory_start;
         self.memory_end = memory_end;

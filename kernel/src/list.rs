@@ -143,9 +143,7 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
 
     // Removes a node from linked list given position within list
     pub fn remove_at(&mut self, index: usize) -> *mut Node<T> {
-        if index > self.length {
-            panic!("Index out of bounds at {}\n", index);
-        };
+        assert!(index < self.length, "Index out of bounds at {}\n", index);
 
         if index == (self.length - 1) {
             return self.pop_tail();

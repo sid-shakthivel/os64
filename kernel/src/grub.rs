@@ -41,7 +41,11 @@ pub fn initialise_userland(boot_info: &BootInformation) {
 
     let mut process_index = 0; // This index determines the PID for each process
     for module in boot_info.module_tags() {
-        print_serial!("MODULE ADDRESS = {:x}\n", module.start_address());
+        print_serial!(
+            "MODULE ADDRESS = 0x{:x} 0x{:x}\n",
+            module.start_address(),
+            module.module_size()
+        );
         // First module will be filesystem if given and constant is true
         if FILESYSTEM_ON && i == 0 {
             fs::init(module.start_address());
@@ -72,9 +76,8 @@ pub fn initialise_userland(boot_info: &BootInformation) {
 }
 
 pub fn bga_set_video_mode() {
-    if !is_bga_available() {
-        panic!("BGA is not available");
-    }
+    assert!(is_bga_available(), "BGA is not available");
+
     write_bga_register(VBE_DISPI_INDEX_ENABLE, 0x00); // To modify contents of other registers, VBE extensions must be disabled
     write_bga_register(VBE_DISPI_INDEX_XRES, framebuffer::SCREEN_WIDTH as u16);
     write_bga_register(VBE_DISPI_INDEX_YRES, framebuffer::SCREEN_HEIGHT as u16);

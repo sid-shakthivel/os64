@@ -18,28 +18,26 @@ Other Tasks:
 - Priority based round robin
 - Memory start in pfa
 - Custom error handling with enums (custom emails for each file, asserts used instead of panic, use of ?)
+- Clean code (Remove all the static mut)
 
 Usermode:
 - argx, argrx
 
 GUI:
-- Double buffering with REP MOVSB (Bochs is broken, so can't do)
+- Double buffering with REP MOVSB 
 - Handle keyboard events
 - Images (https://wiki.osdev.org/Loading_Icons)
 - Text with windows (titles, etc)
 
 FS:
 - Load userspace programs from fs instead of modules
-- Long file names for FAT16
 - Make verify functions in fs and fb
 
 Problems:
-- New framebuffer stuff may not work with fs
-- Double buffering significantly reduces performance
 - Switching address space is broken with cr3
 - Keyboard and mouse are broken in bochs
 - Collisions may fail with hashmap
-- Creating new files with fs fails slightly
+- Creating new files with fs fails maybe
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
@@ -47,3 +45,18 @@ ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
 
+<!-- pub struct Locked<A> {
+    inner: spin::Mutex<A>,
+}
+
+impl<A> Locked<A> {
+    pub const fn new(inner: A) -> Self {
+        Locked {
+            inner: spin::Mutex::new(inner),
+        }
+    }
+
+    pub fn lock(&self) -> spin::MutexGuard<A> {
+        self.inner.lock()
+    }
+} -->

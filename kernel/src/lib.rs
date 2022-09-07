@@ -33,13 +33,17 @@ extern crate multiboot2;
 extern crate bitflags;
 extern crate x86_64;
 
+use crate::framebuffer::Rectangle;
 use crate::framebuffer::Window;
 use crate::framebuffer::DESKTOP;
 use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
+use core::f32::consts::FRAC_1_PI;
 use core::panic::PanicInfo;
+use framebuffer::FRAMEBUFFER;
+use list::Stack;
 use multiboot2::load;
 
 #[no_mangle]
@@ -58,17 +62,17 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     interrupts::init();
     PICS.lock().init();
 
-    grub::bga_set_video_mode();
-
-    // framebuffer::init(boot_info.framebuffer_tag().unwrap());
+    // grub::bga_set_video_mode();
 
     grub::initialise_userland(&boot_info);
 
-    // setup_wm();
+    framebuffer::init(boot_info.framebuffer_tag().unwrap());
+
+    setup_wm();
 
     print_serial!("Execution Finished\n");
 
-    interrupts::enable();
+    // interrupts::enable();
 
     loop {}
 }
@@ -97,7 +101,10 @@ fn setup_wm() {
     DESKTOP.lock().add_sub_window(window2);
     DESKTOP.free();
 
-    DESKTOP.lock().add_sub_window(window1);
+    // DESKTOP.lock().add_sub_window(window1);
+    // DESKTOP.free();
+
+    DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
     DESKTOP.free();
 }
 
