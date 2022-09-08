@@ -41,6 +41,7 @@ const WINDOW_TITLE_COLOUR: u32 = 0x7092be;
 const WINDOW_TITLE_HEIGHT: u64 = 20;
 
 pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
+    "Desktop",
     0,
     0,
     SCREEN_WIDTH,
@@ -51,6 +52,7 @@ pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Window {
+    title: &'static str,
     x: u64,
     y: u64,
     width: u64,
@@ -68,6 +70,7 @@ pub struct Window {
 
 impl Window {
     pub const fn new(
+        title: &'static str,
         x: u64,
         y: u64,
         width: u64,
@@ -89,6 +92,7 @@ impl Window {
             drag_y_offset: 0,
             mouse_x: 0,
             mouse_y: 0,
+            title,
         }
     }
 
@@ -369,7 +373,7 @@ impl Window {
             // Paint the title text and centre it
             FRAMEBUFFER.lock().draw_string(
                 Some(&self.clipped_rectangles),
-                "Terminal",
+                self.title,
                 self.x + (self.width / 2 - ("Terminal".as_bytes().len() * 8) as u64 / 2),
                 self.y + (WINDOW_TITLE_HEIGHT - 10) / 2,
             );
@@ -474,16 +478,37 @@ pub struct Framebuffer {
     font: Option<PsfFont>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct PsfFont {
-    magic: u32,       // TODO: Work out magic and make a verify func
-    version: u32,     // Usually 0
-    header_size: u32, // Offset of bitmaps
-    flags: u32,
-    glymph_num: u32,
-    bytes_per_glyph: u32, // Size
+    magic: u32,           // TODO: Work out magic and make a verify func
+    version: u32,         // Usually 0
+    header_size: u32,     // Offset of bitmaps
+    flags: u32,           // 0 If there isn't a unicode table
+    glymph_num: u32,      // Number of glyghs
+    bytes_per_glyph: u32, // Size of each glygh
     height: u32,          // In pixels
     width: u32,           // In pixels
+}
+
+impl PsfFont {
+    pub fn verify(&self) {
+        assert!(
+            self.magic == 0x864ab572,
+            "PsfFont magic is not {}",
+            0x864ab572 as u32
+        );
+
+        assert!(self.version == 0, "PsfFont version is not 0");
+
+        assert!(
+            self.bytes_per_glyph == 16,
+            "PsfFont bytes per glyph is not 16"
+        );
+
+        assert!(self.height == 16, "PsfFont is not 16");
+
+        assert!(self.width == 8, "PsfFont is not 8");
+    }
 }
 
 pub static FRAMEBUFFER: spin::Mutex<Framebuffer> = spin::Mutex::new(Framebuffer::new());
@@ -678,11 +703,11 @@ impl Writer for Framebuffer {
         self.fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x00);
     }
 
-    // fn put_char(&mut self, character: char) {
-    //     match character {
-    //         _ => self.draw_character(character),
-    //     }
-    // }
+    fn put_char(&mut self, character: char) {
+        match character {
+            _ => self.draw_clipped_character(None, character, 0, 0),
+        }
+    }
 }
 
 /*
@@ -692,13 +717,14 @@ impl Writer for Framebuffer {
     Swapping the buffers refers to when memory is copied from backbuffer to frontbuffer
     Main advantage is that users do not see pixel modification, writing to vm is expensive
 */
-
 pub fn init(framebuffer_tag: FramebufferTag) {
     // Setup font information
     let font_end = unsafe { &_binary_font_psf_end as *const _ as u32 };
     let font_size = unsafe { &_binary_font_psf_size as *const _ as u32 };
     let font_start = font_end - font_size;
     let font = unsafe { &*(font_start as *const PsfFont) };
+
+    font.verify();
 
     FRAMEBUFFER.lock().pitch = framebuffer_tag.pitch as u64;
     FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;

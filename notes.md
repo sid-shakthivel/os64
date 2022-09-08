@@ -22,22 +22,20 @@ Other Tasks:
 
 Usermode:
 - argx, argrx
+- Switching address space is broken with cr3
 
 GUI:
 - Double buffering with REP MOVSB 
 - Handle keyboard events
-- Images (https://wiki.osdev.org/Loading_Icons)
-- Text with windows (titles, etc)
+- Mouse are broken in bochs
 
 FS:
 - Load userspace programs from fs instead of modules
-- Make verify functions in fs and fb
+- Make verify functions in fs
+- Creating new files with fs fails
 
 Problems:
-- Switching address space is broken with cr3
-- Keyboard and mouse are broken in bochs
 - Collisions may fail with hashmap
-- Creating new files with fs fails maybe
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as

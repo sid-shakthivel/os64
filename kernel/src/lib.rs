@@ -62,23 +62,24 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     interrupts::init();
     PICS.lock().init();
 
-    // grub::bga_set_video_mode();
+    grub::bga_set_video_mode();
 
     grub::initialise_userland(&boot_info);
 
-    framebuffer::init(boot_info.framebuffer_tag().unwrap());
+    // framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
-    setup_wm();
+    // setup_wm();
 
     print_serial!("Execution Finished\n");
 
-    // interrupts::enable();
+    interrupts::enable();
 
     loop {}
 }
 
 fn setup_wm() {
     let window1 = Window::new(
+        "Notepad",
         10,
         10,
         300,
@@ -89,6 +90,7 @@ fn setup_wm() {
     DESKTOP.free();
 
     let window2 = Window::new(
+        "Terminal",
         150,
         150,
         300,

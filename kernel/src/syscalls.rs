@@ -263,6 +263,7 @@ fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
 */
 fn create_window(x: u64, y: u64, width: u64, height: u64) -> i64 {
     let new_window = Window::new(
+        "Window",
         x,
         y,
         width,

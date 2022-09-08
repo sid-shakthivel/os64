@@ -1,7 +1,6 @@
 KERNEL = $(shell pwd)/kernel
 USERLAND_MODULE_1 = $(shell pwd)/userland/program
 USERLAND_MODULE_2 = $(shell pwd)/userland/hello-1.3
-USERLAND_MODULE_3 = $(shell pwd)/userland/lua
 SYSCALLS = $(shell pwd)/userland/syscalls
 
 run-qemu: all
@@ -19,9 +18,7 @@ all:
 	cd $(SYSCALLS) && make
 
 	# Userspace modules
-	# cd $(USERLAND_MODULE_3) && make generic
-	
-	# cd $(USERLAND_MODULE_1) && make 
+	cd $(USERLAND_MODULE_1) && make 
 
 	# cd $(USERLAND_MODULE_2) && make all
 

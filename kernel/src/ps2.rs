@@ -226,8 +226,7 @@ pub fn ps2_identify_device_type(device_num: u16) -> Result<PS2Device, &'static s
         0xAB => {
             response = ps2_read(PS2_DATA)?;
             return match response {
-                0x41 => Ok(PS2Device::MF2KeyboardTranslation),
-                0xC1 => Ok(PS2Device::MF2KeyboardTranslation),
+                0x41 | 0xC1 => Ok(PS2Device::MF2KeyboardTranslation),
                 0x83 => Ok(PS2Device::MF2Keyboard),
                 _ => Err("Unknown device"),
             };

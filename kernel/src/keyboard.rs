@@ -28,7 +28,7 @@ pub static KEYBOARD: Mutex<Keyboard> = Mutex::new(Keyboard {
     scancode_set: ScancodeSet::ScancodeSet1,
 });
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum ScancodeSet {
     ScancodeSet1,
     ScancodeSet2,
@@ -97,11 +97,10 @@ impl Keyboard {
         let value = ps2::ps2_read(0x60).unwrap();
 
         return match value {
-            0x43 => ScancodeSet::ScancodeSet1,
-            0x41 => ScancodeSet::ScancodeSet2,
-            0x3f => ScancodeSet::ScancodeSet3,
-            // _ => panic!("Unkown scancode set {}", value),
-            _ => ScancodeSet::ScancodeSet1,
+            0x43 | 0x01 => ScancodeSet::ScancodeSet1,
+            0x41 | 0x02 => ScancodeSet::ScancodeSet2,
+            0x3f | 0x03 => ScancodeSet::ScancodeSet3,
+            _ => panic!("Unkown scancode set {}", value),
         };
     }
 }

@@ -278,7 +278,6 @@ void *malloc(size_t size)
 
 	if (l_initialized == 0)
 	{
-		write(1, "init", 4);
 		for (index = 0; index < MAXEXP; index++)
 		{
 			l_freePages[index] = NULL;

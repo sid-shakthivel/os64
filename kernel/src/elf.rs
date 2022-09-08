@@ -171,7 +171,9 @@ fn validate_file(elf_header: &ElfHeader) -> bool {
         "Unsupported ELF file target\n"
     );
 
-    assert!(elf_header.e_type == 1, "Unsupported ELF file type");
+    let test = elf_header.e_type;
+
+    // assert!(test == 1, "Unsupported ELF file type {}", test);
 
     return true;
 }

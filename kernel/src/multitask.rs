@@ -139,6 +139,31 @@ impl Process {
         let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(8);
         PAGE_FRAME_ALLOCATOR.free();
 
+        // Test argc and argv
+        let argv = ["hey\0", "there\0"];
+        let test = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut u8;
+        PAGE_FRAME_ALLOCATOR.free();
+        unsafe {
+            let mut index = 0;
+
+            for string in argv {
+                for character in string.as_bytes() {
+                    *test.offset(index) = character.clone() as u8;
+                    index += 1;
+                }
+            }
+        }
+
+        let best = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+        PAGE_FRAME_ALLOCATOR.free();
+
+        unsafe {
+            *best = test as u64;
+            *best.offset(1) = test.offset(4) as u64;
+        }
+
+        print_serial!("{:p} {:p}\n", best, test);
+
         unsafe {
             print_serial!("RSP = {:p} 0x{:x}\n", rsp, rsp.offset(4095) as u64);
 
@@ -157,8 +182,8 @@ impl Process {
             *rsp.offset(-7) = 0x00; // RBX
             *rsp.offset(-8) = 0x00; // RBC
             *rsp.offset(-9) = 0x00; // RDX
-            *rsp.offset(-10) = 0x00; // RSI
-            *rsp.offset(-11) = 0x00; // RDI
+            *rsp.offset(-10) = test as u64; // RSI (argv)
+            *rsp.offset(-11) = 2; // RDI (argc)
             *rsp.offset(-12) = new_p4 as u64; // CR3
 
             rsp = rsp.offset(-12);

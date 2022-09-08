@@ -9,8 +9,19 @@ extern void __libc_fini_array();
 
 void _start()
 {
+    asm volatile("xchg %bx, %bx");
+    int argc;
+    asm volatile("mov %%rdi, %0"
+                 : "=m"(argc) /* output */
+                 :);
+
+    char **argv;
+    asm volatile("mov %%rsi, 0"
+                 : "=m"(argv) /* output */
+                 :);
+
     __libc_init_array();
-    int ex = main();
+    int ex = main(argc, argv);
     __libc_fini_array();
     exit(ex);
 }

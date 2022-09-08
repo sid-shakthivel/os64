@@ -5,13 +5,22 @@
 
 static int count = 0;
 
-int main()
+int main(int argc, char *argv[])
 {
-    printf("Hello World\n");
+    printf("%d \n", argc);
+
+    char **test = (char **)0xe5e000;
+
+    printf("arg %d = %s\n", 0, test[1]);
+
+    // for (int i = 0; i < argc; i++)
+    // {
+    //     printf("arg %d = %s\n", i, argv[i]);
+    // }
 
     for (;;)
-{
-    // body of the for loop
-}
-return 0;
+    {
+        // body of the for loop
+    }
+    return 0;
 }

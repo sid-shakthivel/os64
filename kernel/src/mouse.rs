@@ -16,6 +16,8 @@
 */
 
 use crate::framebuffer;
+use crate::ports::io_wait;
+use crate::print_serial;
 use crate::ps2;
 use crate::spinlock::Lock;
 use crate::DESKTOP;
@@ -151,6 +153,7 @@ impl Mouse {
         ps2::ps2_wait_ack().unwrap();
     }
 
+    // Uses a magic sequence
     fn enable_z_axis(&mut self) {
         self.set_mouse_rate(200);
         self.set_mouse_rate(100);
@@ -158,19 +161,15 @@ impl Mouse {
         if self.get_type() != ps2::PS2Device::PS2MouseScrollWheel {
             panic!("Scroll wheel failed");
         } else {
-            self.variety = self.get_type()
+            self.variety = self.get_type();
         }
     }
 
+    // Uses a magic sequence
     fn enable_5_buttons(&mut self) {
         self.set_mouse_rate(200);
         self.set_mouse_rate(200);
         self.set_mouse_rate(80);
-        // if self.get_type() != ps2::PS2Device::PS2MouseFiveButtons {
-        //     panic!("5 button mode failed");
-        // } else {
-        //     self.variety = self.get_type()
-        // }
     }
 
     fn get_type(&self) -> ps2::PS2Device {
