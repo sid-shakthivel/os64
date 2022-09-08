@@ -4,7 +4,6 @@
     Preemptive multitasking is when the CPU splits up its time between various processes to give the illusion they are happening simultaneously
 */
 
-use crate::allocator::kmalloc;
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR, PAGE_SIZE};
 use crate::paging::Table;
 use crate::spinlock::Lock;
@@ -140,29 +139,27 @@ impl Process {
         PAGE_FRAME_ALLOCATOR.free();
 
         // Test argc and argv
-        let argv = ["hey\0", "there\0"];
-        let test = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut u8;
+        let arguments = ["hey\0", "there\0"];
+        let string_locations = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut u8;
         PAGE_FRAME_ALLOCATOR.free();
         unsafe {
             let mut index = 0;
 
-            for string in argv {
+            for string in arguments {
                 for character in string.as_bytes() {
-                    *test.offset(index) = character.clone() as u8;
+                    *string_locations.offset(index) = character.clone() as u8;
                     index += 1;
                 }
             }
         }
 
-        let best = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+        let argv = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
         PAGE_FRAME_ALLOCATOR.free();
 
         unsafe {
-            *best = test as u64;
-            *best.offset(1) = test.offset(4) as u64;
+            *argv = string_locations as u64;
+            *argv.offset(1) = string_locations.offset(4) as u64;
         }
-
-        print_serial!("{:p} {:p}\n", best, test);
 
         unsafe {
             print_serial!("RSP = {:p} 0x{:x}\n", rsp, rsp.offset(4095) as u64);
@@ -170,20 +167,22 @@ impl Process {
             rsp = rsp.offset(4095);
             let stack_top = rsp as u64;
 
-            // These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
-            // When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
+            /*
+               When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
+               These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
+            */
 
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0; // RFLAGS which enable interrupts
+            *rsp.offset(-3) = 0x202; // RFLAGS which enable interrupts
             *rsp.offset(-4) = 0x18 | 0x3; // CS
             *rsp.offset(-5) = v_address; // RIP
             *rsp.offset(-6) = 0x00; // RAX
             *rsp.offset(-7) = 0x00; // RBX
             *rsp.offset(-8) = 0x00; // RBC
             *rsp.offset(-9) = 0x00; // RDX
-            *rsp.offset(-10) = test as u64; // RSI (argv)
-            *rsp.offset(-11) = 2; // RDI (argc)
+            *rsp.offset(-10) = argv as u64; // RSI (argv)
+            *rsp.offset(-11) = arguments.len() as u64; // RDI (argc)
             *rsp.offset(-12) = new_p4 as u64; // CR3
 
             rsp = rsp.offset(-12);

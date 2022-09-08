@@ -121,22 +121,6 @@ impl Mouse {
             self.mouse_y = self.mouse_y.wrapping_add(adjusted_y as u64);
         }
 
-        // if self.mouse_x > 1019 {
-        //     self.mouse_x = 1019;
-        // }
-
-        // if self.mouse_y > 763 {
-        //     self.mouse_y = 763;
-        // }
-
-        // if self.mouse_x <= 5{
-        //     self.mouse_x = 10;
-        // }
-
-        // if self.mouse_y <= 5 {
-        //     self.mouse_y = 10;
-        // }
-
         DESKTOP
             .lock()
             .handle_mouse(self.mouse_x, self.mouse_y, is_left_clicked);

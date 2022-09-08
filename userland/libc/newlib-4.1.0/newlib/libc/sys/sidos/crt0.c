@@ -16,7 +16,7 @@ void _start()
                  :);
 
     char **argv;
-    asm volatile("mov %%rsi, 0"
+    asm volatile("mov %%rsi, %0"
                  : "=m"(argv) /* output */
                  :);
 

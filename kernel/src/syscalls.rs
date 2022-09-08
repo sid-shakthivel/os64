@@ -60,8 +60,9 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
         8 => allocate_pages(registers.rbx),
         9 => write(registers.rbx, registers.rcx as *mut u8, registers.rdx),
         10 => read(registers.rbx, registers.rcx as *mut u8, registers.rdx),
-        11 => create_window(registers.rbx, registers.rcx, registers.rdx, registers.rsi),
+        11 => create_window(registers.rbx, registers.rcx, registers.rdi, registers.rsi),
         12 => desktop_paint(),
+        13 => get_event(),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -287,4 +288,13 @@ fn desktop_paint() -> i64 {
     DESKTOP.free();
 
     0
+}
+
+/*
+    Returns the key that a user pressed
+*/
+fn get_event() -> i64 {
+    let event = DESKTOP.lock().handle_event().unwrap();
+    DESKTOP.free();
+    event as i64
 }

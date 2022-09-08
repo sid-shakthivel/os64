@@ -6,6 +6,7 @@
     Scancode is simply a byte and scan code set is map between ascii characters and bytes sent
 */
 
+use crate::framebuffer::DESKTOP;
 use crate::print_serial;
 use crate::ps2;
 use crate::CONSOLE;
@@ -71,6 +72,8 @@ impl Keyboard {
 
                     if letter != '0' {
                         print_serial!("{}", letter);
+                        DESKTOP.lock().handle_keyboard(letter);
+                        DESKTOP.free();
                     }
                 }
             }

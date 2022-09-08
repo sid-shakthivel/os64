@@ -3,15 +3,13 @@
 #include <string.h>
 #include <stdlib.h>
 
-static int count = 0;
+#include "../syscalls/syscalls.h"
 
-int main(int argc, char *argv[])
+int main(int argc, char **argv)
 {
-    printf("%d \n", argc);
+    create_window(10, 10, 300, 300);
 
-    char **test = (char **)0xe5e000;
-
-    printf("arg %d = %s\n", 0, test[1]);
+    paint_all();
 
     // for (int i = 0; i < argc; i++)
     // {
@@ -21,6 +19,12 @@ int main(int argc, char *argv[])
     for (;;)
     {
         // body of the for loop
+        char key_pressed = get_event();
+        int test = (int)key_pressed;
+        if (test != 49 && test != 48 && test != 0)
+        {
+            printf("KEY PRESSED = %c %d\n", key_pressed, test);
+        }
     }
     return 0;
 }

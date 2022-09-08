@@ -21,20 +21,17 @@ Other Tasks:
 - Clean code (Remove all the static mut)
 
 Usermode:
-- argx, argrx
 - Switching address space is broken with cr3
 
 GUI:
 - Double buffering with REP MOVSB 
-- Handle keyboard events
-- Mouse are broken in bochs
 
 FS:
 - Load userspace programs from fs instead of modules
 - Make verify functions in fs
-- Creating new files with fs fails
+- Creating new files with fs fails (maybe)
 
-Problems:
+Potential Problems:
 - Collisions may fail with hashmap
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
@@ -58,3 +55,6 @@ impl<A> Locked<A> {
         self.inner.lock()
     }
 } -->
+
+
+

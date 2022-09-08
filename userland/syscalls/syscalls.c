@@ -82,3 +82,40 @@ int read(int file, char *ptr, int len)
                  : "r"(len), "m"(ptr), "r"(file));
     return (int)result;
 }
+
+int create_window(int x, int y, int width, int height)
+{
+    int64_t result;
+    asm volatile("mov %3, %%edi \n\t\
+        mov %1, %%ebx \n\t\
+        mov %2, %%ecx \n\t\
+        mov %4, %%esi \n\t\
+        mov $11, %%eax \n\t\
+        int $0x80 \n\t\
+        "
+                 : "=r"(result)
+                 : "r"(x), "r"(y), "r"(width), "r"(height));
+    return (int)result;
+}
+
+int paint_all()
+{
+    int64_t result;
+    asm volatile("mov $12, %%rax \n\t\
+                 int $0x80 \n\t\
+                 "
+                 : "=r"(result));
+    return (int)result;
+}
+
+char get_event()
+{
+    int64_t result;
+    asm volatile("mov $13, %%rax \n\t\
+                 int $0x80 \n\t\
+                 "
+                 : "=r"(result));
+
+    asm volatile("xchg %bx, %bx");
+    return (char)result;
+}

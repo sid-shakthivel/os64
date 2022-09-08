@@ -2,6 +2,7 @@
 
 #![no_std] // Don't link with Rust standard library
 #![feature(core_ffi_c)]
+#![feature(const_option)]
 
 mod allocator;
 mod elf;
@@ -66,9 +67,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     grub::initialise_userland(&boot_info);
 
-    // framebuffer::init(boot_info.framebuffer_tag().unwrap());
+    framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
-    // setup_wm();
+    setup_wm();
 
     print_serial!("Execution Finished\n");
 
@@ -78,36 +79,36 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 }
 
 fn setup_wm() {
-    let window1 = Window::new(
-        "Notepad",
-        10,
-        10,
-        300,
-        300,
-        Some(DESKTOP.lock()),
-        framebuffer::WINDOW_BACKGROUND_COLOUR,
-    );
-    DESKTOP.free();
+    // let window1 = Window::new(
+    //     "Notepad",
+    //     10,
+    //     10,
+    //     300,
+    //     300,
+    //     Some(DESKTOP.lock()),
+    //     framebuffer::WINDOW_BACKGROUND_COLOUR,
+    // );
+    // DESKTOP.free();
 
-    let window2 = Window::new(
-        "Terminal",
-        150,
-        150,
-        300,
-        300,
-        Some(DESKTOP.lock()),
-        framebuffer::WINDOW_BACKGROUND_COLOUR,
-    );
-    DESKTOP.free();
+    // let window2 = Window::new(
+    //     "Terminal",
+    //     150,
+    //     150,
+    //     300,
+    //     300,
+    //     Some(DESKTOP.lock()),
+    //     framebuffer::WINDOW_BACKGROUND_COLOUR,
+    // );
+    // DESKTOP.free();
 
-    DESKTOP.lock().add_sub_window(window2);
-    DESKTOP.free();
+    // DESKTOP.lock().add_sub_window(window2);
+    // DESKTOP.free();
 
     // DESKTOP.lock().add_sub_window(window1);
     // DESKTOP.free();
 
-    DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
-    DESKTOP.free();
+    // DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
+    // DESKTOP.free();
 }
 
 #[panic_handler] // This function is called on panic.

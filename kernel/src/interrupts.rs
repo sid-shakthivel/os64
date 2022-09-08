@@ -226,6 +226,8 @@ pub extern "C" fn pit_handler(iret_stack: IretStack) -> *const u64 {
         new_process_rsp = new_stack.unwrap() as u64;
     }
 
+    // PICS.lock().clean_mask(0x20);
+
     return new_stack.unwrap();
 }
 

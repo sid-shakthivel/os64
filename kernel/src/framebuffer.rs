@@ -29,8 +29,8 @@ use crate::spinlock::Lock;
 use crate::writer::Writer;
 use crate::CONSOLE;
 use crate::{page_frame_allocator, paging};
+use bitflags::bitflags;
 use multiboot2::FramebufferTag;
-use x86_64::structures::paging::page;
 
 pub const SCREEN_WIDTH: u64 = 1024;
 pub const SCREEN_HEIGHT: u64 = 768;
@@ -39,6 +39,43 @@ pub const BACKGROUND_COLOUR: u32 = 0x3499fe;
 const WINDOW_BORDER_COLOUR: u32 = 0xFF000000;
 const WINDOW_TITLE_COLOUR: u32 = 0x7092be;
 const WINDOW_TITLE_HEIGHT: u64 = 20;
+
+bitflags! {
+    pub struct EventFlags: i32 {
+        const KEY_PRESSED = 0b00000001;
+        const MOUSE_UPDATED = 0b00000010;
+        const MOUSE_CLICKED = 0b00000100;
+    }
+}
+
+/*
+    This struct is used by processes to encapsulate information that a user program may require
+    Allows usermode process to access mouse, keyboard, (potentially more) data
+*/
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(C)]
+pub struct Event {
+    mask: EventFlags,
+    key_pressed: u8,
+    mouse_x: i32,
+    mouse_y: i32,
+}
+
+impl Event {
+    pub const fn new(
+        mask: Option<EventFlags>,
+        key_pressed: u8,
+        mouse_x: u64,
+        mouse_y: u64,
+    ) -> Event {
+        Event {
+            mask: mask.unwrap(),
+            key_pressed,
+            mouse_x: mouse_x as i32,
+            mouse_y: mouse_y as i32,
+        }
+    }
+}
 
 pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
     "Desktop",
@@ -66,6 +103,7 @@ pub struct Window {
     drag_y_offset: u64,
     mouse_x: u64,
     mouse_y: u64,
+    event: Event,
 }
 
 impl Window {
@@ -93,6 +131,7 @@ impl Window {
             mouse_x: 0,
             mouse_y: 0,
             title,
+            event: Event::new(EventFlags::from_bits(0), 0, 0, 0),
         }
     }
 
@@ -112,7 +151,7 @@ impl Window {
         // Clear clipping rects
         self.clipped_rectangles.empty();
 
-        // Optionally paint children (Might be temporary)
+        // Optionally repaint children
         if paint_children {
             for (_i, child) in self.children.into_iter().enumerate() {
                 child
@@ -120,6 +159,50 @@ impl Window {
                     .payload
                     .clone()
                     .paint(dirty_rectangles.clone(), false);
+            }
+        }
+    }
+
+    pub fn handle_event(&mut self) -> Option<*mut Event> {
+        // Return an event struct with important details in the future but for now return a char
+        if let Some(selected_window_wrapped) = self.children.head {
+            let selected_window = unsafe { (*selected_window_wrapped).payload.clone() };
+            let cloned_event = selected_window.event.clone();
+            let event = kmalloc(core::mem::size_of::<Event>() as u64) as *mut Event;
+            unsafe {
+                *event = cloned_event;
+            }
+
+            // Remove flags for event after clone has been made
+            unsafe {
+                (*selected_window_wrapped)
+                    .payload
+                    .event
+                    .mask
+                    .remove(EventFlags::KEY_PRESSED);
+                (*selected_window_wrapped)
+                    .payload
+                    .event
+                    .mask
+                    .remove(EventFlags::KEY_PRESSED);
+            }
+
+            return Some(event);
+        }
+        return None;
+    }
+
+    pub fn handle_keyboard(&mut self, key_pressed: char) {
+        // Get the top child as that is most likely the one selected by user
+        if let Some(selected_window_wrapped) = self.children.head {
+            // Ensure when handling updates it sets the correct mask and key
+            unsafe {
+                (*selected_window_wrapped).payload.event.key_pressed = key_pressed as u8;
+                (*selected_window_wrapped)
+                    .payload
+                    .event
+                    .mask
+                    .insert(EventFlags::KEY_PRESSED);
             }
         }
     }
@@ -150,6 +233,20 @@ impl Window {
             self.drag_child = None;
         }
 
+        // Update mouse coordinates for event object
+        if let Some(selected_window_wrapped) = self.children.head {
+            // Ensure when handling updates it sets the correct mask and key
+            unsafe {
+                (*selected_window_wrapped).payload.event.mouse_x = mouse_x as i32;
+                (*selected_window_wrapped).payload.event.mouse_y = mouse_y as i32;
+                (*selected_window_wrapped)
+                    .payload
+                    .event
+                    .mask
+                    .insert(EventFlags::MOUSE_UPDATED);
+            }
+        }
+
         let mouse_rect = Rectangle::new(
             self.mouse_x,
             self.mouse_y,
@@ -159,7 +256,7 @@ impl Window {
         let mut dirty_rectangles = Stack::<Rectangle>::new();
         dirty_rectangles.push(mouse_rect);
 
-        // Repaint given background
+        // Repaint
         self.paint(dirty_rectangles, true);
 
         // Paint mouse
@@ -225,6 +322,7 @@ impl Window {
             // Clip against self
             self.add_rectangle(&subject_rect);
 
+            // Clip against children
             for (_i, child) in self.children.clone().into_iter().enumerate() {
                 let child_rectangle = Rectangle::from_window(&child.unwrap().payload);
                 self.subtract_rectangle(&child_rectangle);
@@ -374,8 +472,10 @@ impl Window {
             FRAMEBUFFER.lock().draw_string(
                 Some(&self.clipped_rectangles),
                 self.title,
-                self.x + (self.width / 2 - ("Terminal".as_bytes().len() * 8) as u64 / 2),
-                self.y + (WINDOW_TITLE_HEIGHT - 10) / 2,
+                self.x,
+                self.y,
+                self.width,
+                self.height,
             );
         } else {
             // Most likely the background
@@ -644,12 +744,34 @@ impl Framebuffer {
         &mut self,
         clipped_rectangles: Option<&Stack<Rectangle>>,
         string: &str,
-        mut x: u64,
+        x: u64,
         y: u64,
+        width: u64,
+        height: u64,
     ) {
-        for byte in string.as_bytes() {
-            self.draw_clipped_character(clipped_rectangles, *byte as char, x, y);
-            x += 8;
+        let mut centre_x = x + (width / 2 - (string.as_bytes().len() * 8) as u64 / 2);
+        let centre_y = y + (WINDOW_TITLE_HEIGHT - 10) / 2;
+
+        if let Some(rectangles) = clipped_rectangles {
+            for (i, clipped_rect) in rectangles.into_iter().enumerate() {
+                let clip = clipped_rect.unwrap().payload;
+
+                if x >= clip.left
+                    && y >= clip.top
+                    && (x + width) <= clip.right
+                    && (y + height) <= clip.bottom
+                {
+                    for byte in string.as_bytes() {
+                        self.draw_clipped_character(
+                            clipped_rectangles,
+                            *byte as char,
+                            centre_x,
+                            centre_y,
+                        );
+                        centre_x += 8;
+                    }
+                }
+            }
         }
     }
 
@@ -660,38 +782,24 @@ impl Framebuffer {
         x: u64,
         y: u64,
     ) {
-        if let Some(rectangles) = clipped_rectangles {
-            for (i, clipped_rect) in rectangles.into_iter().enumerate() {
-                let clip = clipped_rect.unwrap().payload;
+        if let Some(font) = self.font {
+            let glyph_address =
+                (self.font_start + font.header_size + (font.bytes_per_glyph * (character as u32)))
+                    as *mut u8;
 
-                // Ensure we can't go over the limit
+            for cy in 0..16 {
+                let mut index = 8;
+                for cx in 0..8 {
+                    let adjusted_x = x + cx;
+                    let adjusted_y = y + cy;
 
-                if let Some(font) = self.font {
-                    let glyph_address = (self.font_start
-                        + font.header_size
-                        + (font.bytes_per_glyph * (character as u32)))
-                        as *mut u8;
-
-                    for cy in 0..16 {
-                        let mut index = 8;
-                        for cx in 0..8 {
-                            // Clamp down the values
-                            let x_base = core::cmp::max(x, clip.left);
-                            let y_base = core::cmp::max(y, clip.top);
-
-                            let clamped_x = core::cmp::min(x_base + cx, clip.right);
-                            let clamped_y = core::cmp::min(y_base + cy, clip.bottom);
-
-                            // Load correct bitmap for glyph
-                            let glyph_offset: u16 = unsafe {
-                                (*glyph_address.offset(cy as isize) as u16) & (1 << index)
-                            };
-                            if glyph_offset > 0 {
-                                self.draw_pixel(clamped_x, clamped_y, 0x00);
-                            }
-                            index -= 1;
-                        }
+                    // Load correct bitmap for glyph
+                    let glyph_offset: u16 =
+                        unsafe { (*glyph_address.offset(cy as isize) as u16) & (1 << index) };
+                    if glyph_offset > 0 {
+                        self.draw_pixel(adjusted_x, adjusted_y, 0x00);
                     }
+                    index -= 1;
                 }
             }
         }
@@ -704,9 +812,9 @@ impl Writer for Framebuffer {
     }
 
     fn put_char(&mut self, character: char) {
-        match character {
-            _ => self.draw_clipped_character(None, character, 0, 0),
-        }
+        // match character {
+        // _ => self.draw_clipped_character(None, character, 0, 0, 0, 0),
+        // }
     }
 }
 
