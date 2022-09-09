@@ -16,15 +16,16 @@ int main(int argc, char **argv)
     //     printf("arg %d = %s\n", i, argv[i]);
     // }
 
+    Event *test = get_event();
+    printf("%d\n", test->mouse_x);
+    printf("%d\n", test->mouse_y);
+    printf("%c\n", test->key_pressed);
+
     for (;;)
     {
         // body of the for loop
-        char key_pressed = get_event();
-        int test = (int)key_pressed;
-        if (test != 49 && test != 48 && test != 0)
-        {
-            printf("KEY PRESSED = %c %d\n", key_pressed, test);
-        }
+        // Event *test = get_event();
+        // printf("%d\n", test->mouse_x);
     }
     return 0;
 }

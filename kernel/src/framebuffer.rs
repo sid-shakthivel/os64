@@ -53,12 +53,11 @@ bitflags! {
     Allows usermode process to access mouse, keyboard, (potentially more) data
 */
 #[derive(Copy, Clone, Debug, PartialEq)]
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Event {
-    mask: EventFlags,
-    key_pressed: u8,
     mouse_x: i32,
     mouse_y: i32,
+    key_pressed: u8,
 }
 
 impl Event {
@@ -69,10 +68,9 @@ impl Event {
         mouse_y: u64,
     ) -> Event {
         Event {
-            mask: mask.unwrap(),
-            key_pressed,
             mouse_x: mouse_x as i32,
             mouse_y: mouse_y as i32,
+            key_pressed,
         }
     }
 }
@@ -131,7 +129,7 @@ impl Window {
             mouse_x: 0,
             mouse_y: 0,
             title,
-            event: Event::new(EventFlags::from_bits(0), 0, 0, 0),
+            event: Event::new(EventFlags::from_bits(0), 'w' as u8, 420, 69),
         }
     }
 
@@ -168,23 +166,24 @@ impl Window {
         if let Some(selected_window_wrapped) = self.children.head {
             let selected_window = unsafe { (*selected_window_wrapped).payload.clone() };
             let cloned_event = selected_window.event.clone();
-            let event = kmalloc(core::mem::size_of::<Event>() as u64) as *mut Event;
+            let event = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut Event;
+            PAGE_FRAME_ALLOCATOR.free();
             unsafe {
                 *event = cloned_event;
             }
 
             // Remove flags for event after clone has been made
             unsafe {
-                (*selected_window_wrapped)
-                    .payload
-                    .event
-                    .mask
-                    .remove(EventFlags::KEY_PRESSED);
-                (*selected_window_wrapped)
-                    .payload
-                    .event
-                    .mask
-                    .remove(EventFlags::KEY_PRESSED);
+                // (*selected_window_wrapped)
+                //     .payload
+                //     .event
+                //     .mask
+                //     .remove(EventFlags::KEY_PRESSED);
+                // (*selected_window_wrapped)
+                //     .payload
+                //     .event
+                //     .mask
+                //     .remove(EventFlags::KEY_PRESSED);
             }
 
             return Some(event);
@@ -197,12 +196,12 @@ impl Window {
         if let Some(selected_window_wrapped) = self.children.head {
             // Ensure when handling updates it sets the correct mask and key
             unsafe {
-                (*selected_window_wrapped).payload.event.key_pressed = key_pressed as u8;
-                (*selected_window_wrapped)
-                    .payload
-                    .event
-                    .mask
-                    .insert(EventFlags::KEY_PRESSED);
+                // (*selected_window_wrapped).payload.event.key_pressed = key_pressed as u8;
+                // (*selected_window_wrapped)
+                //     .payload
+                //     .event
+                //     .mask
+                //     .insert(EventFlags::KEY_PRESSED);
             }
         }
     }
@@ -238,12 +237,17 @@ impl Window {
             // Ensure when handling updates it sets the correct mask and key
             unsafe {
                 (*selected_window_wrapped).payload.event.mouse_x = mouse_x as i32;
-                (*selected_window_wrapped).payload.event.mouse_y = mouse_y as i32;
-                (*selected_window_wrapped)
+                let best = core::ptr::read_unaligned(selected_window_wrapped)
                     .payload
                     .event
-                    .mask
-                    .insert(EventFlags::MOUSE_UPDATED);
+                    .mouse_x;
+                print_serial!("best = {}\n", best);
+                //     (*selected_window_wrapped).payload.event.mouse_y = mouse_y as i32;
+                // (*selected_window_wrapped)
+                //     .payload
+                //     .event
+                //     .mask
+                //     .insert(EventFlags::MOUSE_UPDATED);
             }
         }
 

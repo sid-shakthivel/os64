@@ -1,3 +1,10 @@
+typedef struct Event
+{
+    int mouse_x;
+    int mouse_y;
+    char key_pressed;
+} Event;
+
 void _exit();
 int close(int file);
 // char **environ; /* pointer to array of char * strings that define the current environment variables */
@@ -16,7 +23,7 @@ int read(int file, char *ptr, int len);
 // int unlink(char *name);
 int create_window(int x, int y, int width, int height);
 int paint_all();
-char get_event();
+Event *get_event();
 // int wait(int *status);
 int write(int file, char *ptr, int len);
 // int gettimeofday(struct timeval *p, void *restrict);

@@ -14,7 +14,7 @@ Other Tasks:
 - Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
 - Fix binutils and get ld to work properly (doesn't build on MacOS https://github.com/spack/spack/issues/3213)
 - Add syslinks to newlib makefile 
-- Bitflags
+- Bitflags (paging)
 - Priority based round robin
 - Memory start in pfa
 - Custom error handling with enums (custom emails for each file, asserts used instead of panic, use of ?)
@@ -22,9 +22,11 @@ Other Tasks:
 
 Usermode:
 - Switching address space is broken with cr3
+- IPC process
 
 GUI:
 - Double buffering with REP MOVSB 
+- Make a event struct in c
 
 FS:
 - Load userspace programs from fs instead of modules
@@ -56,5 +58,4 @@ impl<A> Locked<A> {
     }
 } -->
 
-
-
+issue is getting the struct down in the first place

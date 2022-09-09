@@ -7,7 +7,7 @@
     Sidos syscall design is inspired by posix
 */
 
-use crate::framebuffer::{self, Rectangle, Window, DESKTOP};
+use crate::framebuffer::{self, Event, Rectangle, Window, DESKTOP};
 use crate::fs::File;
 use crate::hashmap::HashMap;
 use crate::interrupts::Registers;
@@ -296,5 +296,5 @@ fn desktop_paint() -> i64 {
 fn get_event() -> i64 {
     let event = DESKTOP.lock().handle_event().unwrap();
     DESKTOP.free();
-    event as i64
+    unsafe { event.offset(0) as i64 }
 }

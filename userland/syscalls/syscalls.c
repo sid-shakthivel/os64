@@ -108,7 +108,7 @@ int paint_all()
     return (int)result;
 }
 
-char get_event()
+Event *get_event()
 {
     int64_t result;
     asm volatile("mov $13, %%rax \n\t\
@@ -117,5 +117,5 @@ char get_event()
                  : "=r"(result));
 
     asm volatile("xchg %bx, %bx");
-    return (char)result;
+    return (Event *)result;
 }
