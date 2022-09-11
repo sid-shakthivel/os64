@@ -144,7 +144,14 @@ fn kill(pid: u64, sig: u64) -> i64 {
 fn open(name: *const u8, flags: u64) -> i64 {
     // Get name of file
 
-    let filepath = crate::string::get_string_from_ptr(name);
+    let mut filepath = crate::string::get_string_from_ptr(name);
+    filepath = &filepath[0..filepath.len() - 1];
+
+    if filepath == "DOOM1.WAD" {
+        panic!("PERFECT");
+    }
+
+    print_serial!("OPEN'ING {:?}\n", filepath.as_bytes());
 
     // Parse filename
     match filepath.as_bytes()[0] {
@@ -180,7 +187,8 @@ fn open(name: *const u8, flags: u64) -> i64 {
         _ => {
             // Relative path within directory
             // Relative paths are used when files are within same directory
-            panic!("RELATIVE FILE PATH of {}\n", filepath.as_bytes()[0]);
+            // panic!("RELATIVE FILE PATH of {}\n", filepath.as_bytes()[0]);
+            return -1;
         }
     }
 }
@@ -229,6 +237,7 @@ fn write(file: u64, buffer: *mut u8, length: u64) -> i64 {
             }
         }
         _ => {
+            panic!("OH DOOM");
             // Other files can be written to through the fs
             // let wrapped_fd = FILE_TABLE.lock().get(file as usize);
             // FILE_TABLE.free();
@@ -258,6 +267,8 @@ fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
             panic!("STDIN\n");
         }
         _ => {
+            panic!("OH DOOM");
+
             let wrapped_fd = FILE_TABLE.lock().get(file as usize);
             FILE_TABLE.free();
             match wrapped_fd {

@@ -34,7 +34,7 @@ pub enum ProcessPriority {
 }
 
 pub const MAX_PROCESS_NUM: usize = PAGE_SIZE / size_of::<Process>();
-pub static USER_PROCESS_START_ADDRESS: u64 = 0x19ff000;
+pub static USER_PROCESS_START_ADDRESS: u64 = 0x5000000;
 
 // Processes schedular holds all tasks and decides which will be serviced
 pub struct ProcessSchedular {

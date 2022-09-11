@@ -1,10 +1,10 @@
 ENTRY(_start)
-STARTUP(../libc/build/x86_64-sidos/lib/crt0.o)
+STARTUP(../../libc/build/x86_64-sidos/lib/crt0.o)
 OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS
 {
-    . = 0x19ff000; 
+    . = 0x5000000; 
 
     .text BLOCK(4K) : ALIGN(4K)
     {

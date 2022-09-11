@@ -12,13 +12,13 @@ run-bochs: all
 all:
 	# Replace filesystem
 	rm -f isodir/modules/fs.img
-	cp fs.img isodir/modules
+	# cp fs.img isodir/modules
 
 	# Compile syscalls
 	cd $(SYSCALLS) && make
 
 	# Userspace modules
-	cd $(USERLAND_MODULE_1) && make 
+	# cd $(USERLAND_MODULE_1) && make
 
 	# cd $(USERLAND_MODULE_2) && make all
 

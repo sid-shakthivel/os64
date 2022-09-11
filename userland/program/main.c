@@ -42,11 +42,12 @@ int main()
                 // printf("%c\n", keycode);
 
                 // Check for enter key being pressed and do command otherwise, append to string
-                if (keycode == -116 || keycode == 10)
+                if (keycode == -116)
                 {
                     new_window->y_final += 20; // Move onto next line
                     evaluate_command(command); // Evaluate command
                     memset(command, 0, 255);   // Empty string
+                    count = 0;
                 }
                 else
                 {
@@ -67,13 +68,15 @@ int evaluate_command(char command[255])
         // printf("Hello There User\n");
         paint_string("Hello there user", new_window);
     }
-    else if (strcmp(command, "brew") == 0)
+    else if (strcmp(command, "doom") == 0)
     {
-        printf("Brew is not installed\n");
+        // printf("Brew is not installed\n");
+        paint_string("Doom is not installed", new_window);
     }
     else
     {
-        printf("unknown command\n");
+        // printf("unknown command\n");
+        paint_string("Unknown command", new_window);
     }
     new_window->y_final += 20;
 }

@@ -21,7 +21,7 @@ p3_table:
 p2_table:
     resb 4096
 p1_tables:
-    resb 49152 ; Identity map the first 24MB
+    resb 65536 ; Identity map the first 32MB
 stack_bottom:
     resb 16384
 stack_top:
@@ -67,7 +67,7 @@ setup_paging:
     mov [p2_table + ecx * 8], eax
     inc ecx
     add eax, 4096
-    cmp ecx, 12
+    cmp ecx, 16
     jne .map_p2_table
 
     mov ecx, 0
@@ -78,7 +78,7 @@ setup_paging:
     or eax, 0b111 ; Present, Writeable, User
     mov [p1_tables + ecx * 8], eax
     inc ecx
-    cmp ecx, 6144 ; Make 12 tables
+    cmp ecx, 8192 ; Make 16 tables
     jne .map_p1_tables
 
     mov ecx, 0

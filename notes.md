@@ -14,10 +14,8 @@ Other Tasks:
 - Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
 - Fix binutils and get ld to work properly (doesn't build on MacOS https://github.com/spack/spack/issues/3213)
 - Add syslinks to newlib makefile 
-- Bitflags (paging)
 - Priority based round robin
-- Memory start in pfa
-- Custom error handling with enums (custom emails for each file, asserts used instead of panic, use of ?)
+- Custom error handling with enums (custom enums for each file, asserts used instead of panic, use of ?)
 - Clean code (Remove all the static mut)
 
 Usermode:
@@ -26,13 +24,20 @@ Usermode:
 
 GUI:
 - Double buffering with REP MOVSB 
-- Finish keyboard
-- Get usermode terminal application
+- Gradient with clipping and mouse...
+- Handle text on moving
+- Bochs issue - mask value must be corrupted
+- Porting doom
 
 FS:
 - Load userspace programs from fs instead of modules
-- Make verify functions in fs
+- Make new verify functions in fs
 - Creating new files with fs fails (maybe)
+
+Memory:
+- Start of memory
+- malloc/free bugs
+- Bitflags (paging)
 
 Potential Problems:
 - Collisions may fail with hashmap
@@ -59,10 +64,4 @@ impl<A> Locked<A> {
     }
 } -->
 
-lets get 1 usermode application properly working first
-
-1 - syscall with a struct (lean window)
-2 - strange bug with scramble of data...
-
-15167488
-15162928
+check if doom copies bits properly

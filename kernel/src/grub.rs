@@ -21,7 +21,7 @@ use crate::ports::outpw;
 use crate::{print_serial, CONSOLE};
 use multiboot2::BootInformation;
 
-const FILESYSTEM_ON: bool = true;
+const FILESYSTEM_ON: bool = false;
 const VBE_DISPI_IOPORT_INDEX: u16 = 0x01CE;
 const VBE_DISPI_IOPORT_DATA: u16 = 0x01CF;
 const VBE_DISPI_INDEX_ID: u16 = 0;
@@ -51,24 +51,46 @@ pub fn initialise_userland(boot_info: &BootInformation) {
             fs::init(module.start_address());
         } else {
             // Else, modules are userspace programs
-            elf::parse(module.start_address() as u64);
+            if i == 0 {
+                elf::parse(module.start_address() as u64);
 
-            // Alloc some pages and map them accordingly
-            let heap = 0 as *mut u64;
+                // Alloc some pages and map them accordingly
+                let heap = 0 as *mut u64;
 
-            let user_process = multitask::Process::init(
-                multitask::ProcessPriority::High,
-                process_index,
-                heap as i32,
-            );
+                let user_process = multitask::Process::init(
+                    multitask::ProcessPriority::High,
+                    process_index,
+                    heap as i32,
+                );
 
-            // Add process to list of processes
-            multitask::PROCESS_SCHEDULAR
-                .lock()
-                .add_process(user_process);
-            multitask::PROCESS_SCHEDULAR.free();
+                // Add process to list of processes
+                multitask::PROCESS_SCHEDULAR
+                    .lock()
+                    .add_process(user_process);
+                multitask::PROCESS_SCHEDULAR.free();
 
-            process_index += 1;
+                process_index += 1;
+            } else {
+                // doom wad file thing
+                let rounded_size =
+                    crate::page_frame_allocator::round_to_nearest_page(module.module_size() as u64);
+                let number_of_pages = crate::page_frame_allocator::get_page_number(rounded_size);
+
+                print_serial!("PAGES = {}\n", number_of_pages);
+
+                let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as *mut u64;
+                PAGE_FRAME_ALLOCATOR.free();
+
+                let source = module.start_address() as *mut u64;
+
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        source as *mut u8,
+                        dest as *mut u8,
+                        module.module_size() as usize,
+                    );
+                }
+            }
         }
         i += 1;
     }

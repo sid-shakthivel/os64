@@ -11,9 +11,6 @@
     The order of windows is maintained through the stack in which the top most window is at the front and the bottom window is at the back
     Clipping is a method to enable/disable rendering of certain areas by only rendering the topmost pixels in which overlapping regions are not rendered
     A dirty rectangle list is a way to keep track of regions of the screen which need to be repainted which can be used upon the dragging of windows
-*/
-
-/*
     PSF(PC Screen Font) fonts consist of header, font, and unicode information
     Glyphs are bitmaps of 8*16
 */
@@ -34,10 +31,10 @@ use multiboot2::FramebufferTag;
 
 pub const SCREEN_WIDTH: u64 = 1024;
 pub const SCREEN_HEIGHT: u64 = 768;
-pub const WINDOW_BACKGROUND_COLOUR: u32 = 0xFFBBBBBB;
-pub const BACKGROUND_COLOUR: u32 = 0x3499fe;
-const WINDOW_BORDER_COLOUR: u32 = 0xFF000000;
-const WINDOW_TITLE_COLOUR: u32 = 0x7092be;
+pub const BACKGROUND_COLOUR: u32 = 0x0b0554;
+pub const WINDOW_BACKGROUND_COLOUR: u32 = 0xc6d0ff;
+const WINDOW_TITLE_COLOUR: u32 = 0x00b5da;
+
 const WINDOW_TITLE_HEIGHT: u64 = 20;
 
 bitflags! {
@@ -131,7 +128,7 @@ impl Window {
             mouse_x: 0,
             mouse_y: 0,
             title,
-            event: Event::new(EventFlags::from_bits(0), 'w' as u8, 420, 69),
+            event: Event::new(EventFlags::from_bits(0), 0, 420, 69),
         }
     }
 
@@ -444,14 +441,14 @@ impl Window {
             );
 
             // Paint the outline of the window
-            FRAMEBUFFER.lock().draw_rect_outline(
-                Some(&self.clipped_rectangles),
-                self.x,
-                self.y,
-                self.width,
-                self.height,
-                WINDOW_BORDER_COLOUR,
-            );
+            // FRAMEBUFFER.lock().draw_rect_outline(
+            //     Some(&self.clipped_rectangles),
+            //     self.x,
+            //     self.y,
+            //     self.width,
+            //     self.height,
+            //     WINDOW_BORDER_COLOUR,
+            // );
 
             // Paint the title text and centre it
             FRAMEBUFFER.lock().draw_string(
@@ -498,7 +495,6 @@ impl Rectangle {
     }
 
     pub fn from_window(window: &Window) -> Self {
-        // print_serial!("{:?} {:p}\n", window, window as *const Window);
         Self::new(
             window.x,
             window.y,
@@ -659,6 +655,39 @@ impl Framebuffer {
                     }
                 }
             }
+        }
+    }
+
+    pub fn fill_gradient_rect(&mut self, x: u64, y: u64, width: u64, height: u64) {
+        let r1 = ((0x00b5da & 0xFF0000) >> 16) as f64;
+        let r2 = ((0x0b0554 & 0xFF0000) >> 16) as f64;
+
+        let g1 = ((0x00b5da & 0x00FF00) >> 8) as f64;
+        let g2 = ((0x0b0554 & 0x00FF00) >> 8) as f64;
+
+        let b1 = (0x00b5da & 0x0000FF) as f64;
+        let b2 = (0x0b0554 & 0x0000FF) as f64;
+
+        let h = (height) as f64;
+
+        let r_offset: f64 = (r2 - r1) / h;
+        let g_offset: f64 = (g2 - g1) / h;
+        let b_offset: f64 = (b2 - b1) / h;
+
+        let mut current_r = r1;
+        let mut current_g = g1;
+        let mut current_b = b1;
+
+        let mut colour = BACKGROUND_COLOUR;
+
+        for i in y..(y + height) {
+            colour = current_b as u32 | ((current_g as u32) << 8) | ((current_r as u32) << 16);
+            for j in x..(x + width) {
+                self.draw_pixel(j, i, colour);
+            }
+            current_r += r_offset;
+            current_g += g_offset;
+            current_b += b_offset;
         }
     }
 
@@ -840,6 +869,8 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     paging::identity_map_from(framebuffer_tag.address, frontbuffer_address, size_in_mb);
 
     FRAMEBUFFER.lock().frontbuffer = frontbuffer_address;
+
+    print_serial!("FB ADDRESS 0x{:x}\n", frontbuffer_address);
 
     // Setup the back buffer
     // let backbuffer_address = malloc(size_in_bytes) as u64;
