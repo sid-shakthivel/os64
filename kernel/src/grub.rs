@@ -54,8 +54,7 @@ pub fn initialise_userland(boot_info: &BootInformation) {
             elf::parse(module.start_address() as u64);
 
             // Alloc some pages and map them accordingly
-            let heap = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
-            PAGE_FRAME_ALLOCATOR.free();
+            let heap = 0 as *mut u64;
 
             let user_process = multitask::Process::init(
                 multitask::ProcessPriority::High,

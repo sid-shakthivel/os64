@@ -1,9 +1,19 @@
 typedef struct Event
 {
     int mouse_x;
-    int mouse_y;
+    int mask;
     char key_pressed;
 } Event;
+
+typedef struct Window
+{
+    int x;
+    int y;
+    int width;
+    int height;
+    int x_final;
+    int y_final;
+} Window;
 
 void _exit();
 int close(int file);
@@ -24,6 +34,7 @@ int read(int file, char *ptr, int len);
 int create_window(int x, int y, int width, int height);
 int paint_all();
 Event *get_event();
+int paint_string(char *ptr, Window *new_window);
 // int wait(int *status);
 int write(int file, char *ptr, int len);
 // int gettimeofday(struct timeval *p, void *restrict);

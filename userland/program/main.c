@@ -5,27 +5,75 @@
 
 #include "../syscalls/syscalls.h"
 
-int main(int argc, char **argv)
+static Window *new_window;
+
+int main()
 {
-    create_window(10, 10, 300, 300);
-
-    paint_all();
-
     // for (int i = 0; i < argc; i++)
     // {
     //     printf("arg %d = %s\n", i, argv[i]);
     // }
+    new_window = malloc(sizeof(Window));
+    new_window->x = 10;
+    new_window->y = 10;
+    new_window->width = 300;
+    new_window->height = 300;
+    new_window->x_final = 15;
+    new_window->y_final = 35;
 
-    Event *test = get_event();
-    printf("%d\n", test->mouse_x);
-    printf("%d\n", test->mouse_y);
-    printf("%c\n", test->key_pressed);
+    create_window(10, 10, 300, 300);
+
+    paint_all();
+
+    char command[255];
+    int count = 0;
 
     for (;;)
     {
-        // body of the for loop
-        // Event *test = get_event();
-        // printf("%d\n", test->mouse_x);
+        //     Get event (contains data of mouse, keyboard, etc)
+        Event *event = get_event();
+
+        // Check for keyboard event
+        if (event->mask & 0b00000001)
+        {
+            if (count < 255)
+            {
+                int keycode = (int)event->key_pressed;
+                // printf("%c\n", keycode);
+
+                // Check for enter key being pressed and do command otherwise, append to string
+                if (keycode == -116 || keycode == 10)
+                {
+                    new_window->y_final += 20; // Move onto next line
+                    evaluate_command(command); // Evaluate command
+                    memset(command, 0, 255);   // Empty string
+                }
+                else
+                {
+                    command[count] = event->key_pressed;
+                    count++;
+                    paint_string(command, new_window);
+                }
+            }
+        }
     }
     return 0;
+}
+
+int evaluate_command(char command[255])
+{
+    if (strcmp(command, "hello") == 0)
+    {
+        // printf("Hello There User\n");
+        paint_string("Hello there user", new_window);
+    }
+    else if (strcmp(command, "brew") == 0)
+    {
+        printf("Brew is not installed\n");
+    }
+    else
+    {
+        printf("unknown command\n");
+    }
+    new_window->y_final += 20;
 }

@@ -87,7 +87,8 @@ impl PageFrameAllocator {
     pub fn init(&mut self, boot_info: &BootInformation) {
         let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
 
-        let memory_start: u64 = round_to_nearest_page((boot_info.end_address() as u64) + 0x1000);
+        let mut memory_start: u64 =
+            round_to_nearest_page((boot_info.end_address() as u64) + 0x1000);
 
         let memory_end: u64 = round_to_nearest_page(
             memory_map_tag
@@ -97,7 +98,8 @@ impl PageFrameAllocator {
                 .end_address(),
         );
 
-        print_serial!("MEMORY START = 0x{:x}\n", memory_start);
+        // print_serial!("MEMORY START = 0x{:x}\n", memory_start);
+        memory_start = 0xe5d000;
 
         // TODO: Fix this fix - very large modules seem to confuse the multiboot2 package
 

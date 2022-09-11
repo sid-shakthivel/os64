@@ -61,17 +61,25 @@ impl Keyboard {
             let scancode = ps2::ps2_read(0x60).unwrap();
 
             match scancode {
-                0x26 => print_serial!("l"),
+                0x26 => {
+                    // print_serial!("l");
+                    DESKTOP.lock().handle_keyboard('l');
+                    DESKTOP.free();
+                }
                 0x2A => self.is_upper = true,  // Left shift pressed
                 0x36 => self.is_upper = true,  // Right shift pressed
                 0xAA => self.is_upper = false, // Left shift released
                 0xB6 => self.is_upper = false, // Right shift released
                 0x3A => self.is_upper = !self.is_upper, // Caps lock pressed
+                0x1C => {
+                    // Enter pressed
+                    DESKTOP.lock().handle_keyboard(0x8C as char);
+                    DESKTOP.free();
+                }
                 _ => {
                     let letter = self.translate(scancode, false);
 
                     if letter != '0' {
-                        print_serial!("{}", letter);
                         DESKTOP.lock().handle_keyboard(letter);
                         DESKTOP.free();
                     }

@@ -7,7 +7,7 @@
     Sidos syscall design is inspired by posix
 */
 
-use crate::framebuffer::{self, Event, Rectangle, Window, DESKTOP};
+use crate::framebuffer::{self, Event, Rectangle, Window, DESKTOP, FRAMEBUFFER};
 use crate::fs::File;
 use crate::hashmap::HashMap;
 use crate::interrupts::Registers;
@@ -19,6 +19,17 @@ use crate::spinlock::Lock;
 use crate::CONSOLE;
 use bitflags::bitflags;
 use core::panic;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(C)]
+pub struct SlimmedWindow {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    x_final: i32,
+    y_final: i32,
+}
 
 /*
     File descriptor table is hashmap of file descriptors which point to actual files
@@ -63,6 +74,10 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
         11 => create_window(registers.rbx, registers.rcx, registers.rdi, registers.rsi),
         12 => desktop_paint(),
         13 => get_event(),
+        14 => draw_string(
+            registers.rbx as *const u8,
+            registers.rcx as *const SlimmedWindow,
+        ),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -297,4 +312,28 @@ fn get_event() -> i64 {
     let event = DESKTOP.lock().handle_event().unwrap();
     DESKTOP.free();
     unsafe { event.offset(0) as i64 }
+}
+
+fn draw_string(string_ptr: *const u8, window: *const SlimmedWindow) -> i64 {
+    let mut string = crate::string::get_string_from_ptr(string_ptr);
+
+    print_serial!("str = {}\n", string);
+
+    string = &string[0..string.len() - 1]; // Remove null terminator?
+
+    print_serial!("str = {}\n", string);
+
+    let v = unsafe { core::ptr::read_unaligned(window) };
+    FRAMEBUFFER.lock().draw_string(
+        None,
+        string,
+        v.x_final as u64,
+        v.y_final as u64,
+        v.x as u64,
+        v.y as u64,
+        v.width as u64,
+        v.height as u64,
+    );
+
+    return 0;
 }

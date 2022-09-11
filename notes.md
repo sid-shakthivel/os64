@@ -26,7 +26,8 @@ Usermode:
 
 GUI:
 - Double buffering with REP MOVSB 
-- Make a event struct in c
+- Finish keyboard
+- Get usermode terminal application
 
 FS:
 - Load userspace programs from fs instead of modules
@@ -58,4 +59,10 @@ impl<A> Locked<A> {
     }
 } -->
 
-issue is getting the struct down in the first place
+lets get 1 usermode application properly working first
+
+1 - syscall with a struct (lean window)
+2 - strange bug with scramble of data...
+
+15167488
+15162928

@@ -56,7 +56,7 @@ bitflags! {
 #[repr(C, packed)]
 pub struct Event {
     mouse_x: i32,
-    mouse_y: i32,
+    mask: i32,
     key_pressed: u8,
 }
 
@@ -69,11 +69,13 @@ impl Event {
     ) -> Event {
         Event {
             mouse_x: mouse_x as i32,
-            mouse_y: mouse_y as i32,
+            mask: 0,
             key_pressed,
         }
     }
 }
+
+pub static mut EVENT_MEMORY_LOCATION: *mut Event = 0 as *mut Event;
 
 pub static DESKTOP: Lock<Window> = Lock::new(Window::new(
     "Desktop",
@@ -166,27 +168,20 @@ impl Window {
         if let Some(selected_window_wrapped) = self.children.head {
             let selected_window = unsafe { (*selected_window_wrapped).payload.clone() };
             let cloned_event = selected_window.event.clone();
-            let event = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut Event;
-            PAGE_FRAME_ALLOCATOR.free();
             unsafe {
-                *event = cloned_event;
+                core::ptr::write_bytes(EVENT_MEMORY_LOCATION as *mut u8, 0, 512);
+                *EVENT_MEMORY_LOCATION = cloned_event;
             }
 
             // Remove flags for event after clone has been made
             unsafe {
-                // (*selected_window_wrapped)
-                //     .payload
-                //     .event
-                //     .mask
-                //     .remove(EventFlags::KEY_PRESSED);
-                // (*selected_window_wrapped)
-                //     .payload
-                //     .event
-                //     .mask
-                //     .remove(EventFlags::KEY_PRESSED);
+                (*selected_window_wrapped).payload.event.mask &= !0b00000001; // Remove key pressed flag
+                (*selected_window_wrapped).payload.event.mask &= !0b00000010; // Remove mouse updated flag
             }
 
-            return Some(event);
+            unsafe {
+                return Some(EVENT_MEMORY_LOCATION);
+            }
         }
         return None;
     }
@@ -196,12 +191,8 @@ impl Window {
         if let Some(selected_window_wrapped) = self.children.head {
             // Ensure when handling updates it sets the correct mask and key
             unsafe {
-                // (*selected_window_wrapped).payload.event.key_pressed = key_pressed as u8;
-                // (*selected_window_wrapped)
-                //     .payload
-                //     .event
-                //     .mask
-                //     .insert(EventFlags::KEY_PRESSED);
+                (*selected_window_wrapped).payload.event.key_pressed = key_pressed as u8;
+                (*selected_window_wrapped).payload.event.mask |= 0b00000001;
             }
         }
     }
@@ -237,17 +228,7 @@ impl Window {
             // Ensure when handling updates it sets the correct mask and key
             unsafe {
                 (*selected_window_wrapped).payload.event.mouse_x = mouse_x as i32;
-                let best = core::ptr::read_unaligned(selected_window_wrapped)
-                    .payload
-                    .event
-                    .mouse_x;
-                print_serial!("best = {}\n", best);
-                //     (*selected_window_wrapped).payload.event.mouse_y = mouse_y as i32;
-                // (*selected_window_wrapped)
-                //     .payload
-                //     .event
-                //     .mask
-                //     .insert(EventFlags::MOUSE_UPDATED);
+                (*selected_window_wrapped).payload.event.mouse_x |= 0b00000010;
             }
         }
 
@@ -476,6 +457,8 @@ impl Window {
             FRAMEBUFFER.lock().draw_string(
                 Some(&self.clipped_rectangles),
                 self.title,
+                self.x + (self.width / 2 - (self.title.as_bytes().len() * 8) as u64 / 2),
+                self.y + (WINDOW_TITLE_HEIGHT - 10) / 2,
                 self.x,
                 self.y,
                 self.width,
@@ -748,14 +731,13 @@ impl Framebuffer {
         &mut self,
         clipped_rectangles: Option<&Stack<Rectangle>>,
         string: &str,
+        mut final_x: u64,
+        final_y: u64,
         x: u64,
         y: u64,
         width: u64,
         height: u64,
     ) {
-        let mut centre_x = x + (width / 2 - (string.as_bytes().len() * 8) as u64 / 2);
-        let centre_y = y + (WINDOW_TITLE_HEIGHT - 10) / 2;
-
         if let Some(rectangles) = clipped_rectangles {
             for (i, clipped_rect) in rectangles.into_iter().enumerate() {
                 let clip = clipped_rect.unwrap().payload;
@@ -766,26 +748,21 @@ impl Framebuffer {
                     && (y + height) <= clip.bottom
                 {
                     for byte in string.as_bytes() {
-                        self.draw_clipped_character(
-                            clipped_rectangles,
-                            *byte as char,
-                            centre_x,
-                            centre_y,
-                        );
-                        centre_x += 8;
+                        self.draw_clipped_character(*byte as char, final_x, final_y);
+                        final_x += 8;
                     }
                 }
+            }
+        } else {
+            // Temp fix (will break when moving)
+            for byte in string.as_bytes() {
+                self.draw_clipped_character(*byte as char, final_x, final_y);
+                final_x += 8;
             }
         }
     }
 
-    fn draw_clipped_character(
-        &mut self,
-        clipped_rectangles: Option<&Stack<Rectangle>>,
-        character: char,
-        x: u64,
-        y: u64,
-    ) {
+    fn draw_clipped_character(&mut self, character: char, x: u64, y: u64) {
         if let Some(font) = self.font {
             let glyph_address =
                 (self.font_start + font.header_size + (font.bytes_per_glyph * (character as u32)))
@@ -868,6 +845,11 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     // let backbuffer_address = malloc(size_in_bytes) as u64;
 
     FRAMEBUFFER.lock().backbuffer = 0;
+
+    unsafe {
+        EVENT_MEMORY_LOCATION = PAGE_FRAME_ALLOCATOR.lock().alloc_frame() as *mut Event;
+        PAGE_FRAME_ALLOCATOR.free();
+    }
 }
 
 extern "C" {

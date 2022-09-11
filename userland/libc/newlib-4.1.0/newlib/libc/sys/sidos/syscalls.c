@@ -72,7 +72,6 @@ clock_t times(struct tms *buf)
     // asm volatile("mov $107, %rax \n\t\
     //     int $0x80 \n\t\
     //     ");
-    asm volatile("xchg %bx, %bx");
     return 0;
 }
 int unlink(char *name)
@@ -119,6 +118,7 @@ int liballoc_unlock()
 */
 void *liballoc_alloc(int pages)
 {
+    asm volatile("xchg %bx, %bx");
     int64_t result;
     asm volatile("mov %1, %%ebx \n\t\
                  mov $8, %%rax \n\t\

@@ -16,7 +16,7 @@ all: main.o
  	mv program ../../isodir/modules 
  
 main.o: main.c
-	$(CC) -no-pie -static-libgcc -c main.c -o main.o -ffreestanding -nostdlib -Wall -Wextra -I ${LIB_HEADERS}
+	$(CC) -no-pie -static-libgcc -c main.c -o main.o -ffreestanding -nostdlib -fno-builtin -fno-stack-protector -Wall -Wextra -I ${LIB_HEADERS}
 
 clean: 
 	rm -f main.o

@@ -57,6 +57,7 @@ int open(const char *name, int flags, ...)
 
 int write(int file, char *ptr, int len)
 {
+    asm volatile("xchg %bx, %bx");
     int64_t result;
     asm volatile("mov %3, %%ebx \n\t\
         mov %2, %%ecx \n\t\
@@ -116,6 +117,19 @@ Event *get_event()
                  "
                  : "=r"(result));
 
-    asm volatile("xchg %bx, %bx");
+    // asm volatile("xchg %bx, %bx");
     return (Event *)result;
+}
+
+int paint_string(char *ptr, Window *new_window)
+{
+    int64_t result;
+    asm volatile("mov %1, %%ebx \n\t\
+        mov %2, %%ecx \n\t\
+        mov $14, %%eax \n\t\
+        int $0x80 \n\t\
+        "
+                 : "=r"(result)
+                 : "m"(ptr), "m"(new_window));
+    return (int)result;
 }
