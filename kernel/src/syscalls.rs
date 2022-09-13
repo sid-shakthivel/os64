@@ -9,6 +9,7 @@
 
 use crate::framebuffer::{self, Event, Rectangle, Window, DESKTOP, FRAMEBUFFER};
 use crate::fs::File;
+use crate::grub::{DOOM1_WAD_OFFSET, DOOM1_WAD_ORIGINAL, DOOM_SIZE};
 use crate::hashmap::HashMap;
 use crate::interrupts::Registers;
 use crate::list::Stack;
@@ -78,6 +79,7 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
             registers.rbx as *const u8,
             registers.rcx as *const SlimmedWindow,
         ),
+        15 => lseek(registers.rdx, registers.rcx as i64, registers.rbx),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -148,7 +150,8 @@ fn open(name: *const u8, flags: u64) -> i64 {
     filepath = &filepath[0..filepath.len() - 1];
 
     if filepath == "DOOM1.WAD" {
-        panic!("PERFECT");
+        print_serial!("Opening doom1.wad");
+        return 325;
     }
 
     print_serial!("OPEN'ING {:?}\n", filepath.as_bytes());
@@ -267,18 +270,26 @@ fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
             panic!("STDIN\n");
         }
         _ => {
-            panic!("OH DOOM");
-
-            let wrapped_fd = FILE_TABLE.lock().get(file as usize);
-            FILE_TABLE.free();
-            match wrapped_fd {
-                Some(mut fd) => {
-                    fd.read(buffer, length as usize).unwrap();
-                }
-                None => {
-                    return -1;
+            // Copies length bytes to a buffer
+            print_serial!("READ'ING {} {:p} {}\n", file, buffer, length);
+            unsafe {
+                let src_buffer = DOOM1_WAD_ORIGINAL as *mut u8;
+                for i in 0..length {
+                    *buffer.offset(i as isize) = *src_buffer.offset(i as isize);
                 }
             }
+
+            // File system is out of action /
+            // let wrapped_fd = FILE_TABLE.lock().get(file as usize);
+            // FILE_TABLE.free();
+            // match wrapped_fd {
+            //     Some(mut fd) => {
+            //         fd.read(buffer, length as usize).unwrap();
+            //     }
+            //     None => {
+            //         return -1;
+            //     }
+            // }
         }
     }
 
@@ -347,4 +358,39 @@ fn draw_string(string_ptr: *const u8, window: *const SlimmedWindow) -> i64 {
     );
 
     return 0;
+}
+
+fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
+    print_serial!("LSEEK'ING {} {} {}\n", file, offset, whence);
+
+    if offset < 0 {
+        panic!("oh dear");
+    }
+
+    match whence {
+        0 => {
+            // SEEK_SET (begining of file)
+            unsafe {
+                DOOM1_WAD_OFFSET = (offset as u64) + DOOM1_WAD_ORIGINAL;
+                return 0;
+            }
+        }
+        1 => {
+            // SEEK_CUR (current location of file)
+            unsafe {
+                DOOM1_WAD_OFFSET += offset as u64;
+                return 0;
+            }
+        }
+        2 => {
+            // SEEK_END (end of file)
+            unsafe {
+                DOOM1_WAD_OFFSET = DOOM1_WAD_ORIGINAL + DOOM_SIZE + offset as u64;
+                return 0;
+            }
+        }
+        _ => panic!("OH NOP"),
+    }
+
+    return -1;
 }

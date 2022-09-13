@@ -13,51 +13,51 @@ int main()
     // {
     //     printf("arg %d = %s\n", i, argv[i]);
     // }
-    new_window = malloc(sizeof(Window));
-    new_window->x = 10;
-    new_window->y = 10;
-    new_window->width = 300;
-    new_window->height = 300;
-    new_window->x_final = 15;
-    new_window->y_final = 35;
+    // new_window = malloc(sizeof(Window));
+    // new_window->x = 10;
+    // new_window->y = 10;
+    // new_window->width = 300;
+    // new_window->height = 300;
+    // new_window->x_final = 15;
+    // new_window->y_final = 35;
 
-    create_window(10, 10, 300, 300);
+    // create_window(10, 10, 300, 300);
 
-    paint_all();
+    // paint_all();
 
-    char command[255];
-    int count = 0;
+    // char command[255];
+    // int count = 0;
 
-    for (;;)
-    {
-        //     Get event (contains data of mouse, keyboard, etc)
-        Event *event = get_event();
+    // for (;;)
+    // {
+    //     //     Get event (contains data of mouse, keyboard, etc)
+    //     Event *event = get_event();
 
-        // Check for keyboard event
-        if (event->mask & 0b00000001)
-        {
-            if (count < 255)
-            {
-                int keycode = (int)event->key_pressed;
-                // printf("%c\n", keycode);
+    //     // Check for keyboard event
+    //     if (event->mask & 0b00000001)
+    //     {
+    //         if (count < 255)
+    //         {
+    //             int keycode = (int)event->key_pressed;
+    //             // printf("%c\n", keycode);
 
-                // Check for enter key being pressed and do command otherwise, append to string
-                if (keycode == -116)
-                {
-                    new_window->y_final += 20; // Move onto next line
-                    evaluate_command(command); // Evaluate command
-                    memset(command, 0, 255);   // Empty string
-                    count = 0;
-                }
-                else
-                {
-                    command[count] = event->key_pressed;
-                    count++;
-                    paint_string(command, new_window);
-                }
-            }
-        }
-    }
+    //             // Check for enter key being pressed and do command otherwise, append to string
+    //             if (keycode == -116)
+    //             {
+    //                 new_window->y_final += 20; // Move onto next line
+    //                 evaluate_command(command); // Evaluate command
+    //                 memset(command, 0, 255);   // Empty string
+    //                 count = 0;
+    //             }
+    //             else
+    //             {
+    //                 command[count] = event->key_pressed;
+    //                 count++;
+    //                 paint_string(command, new_window);
+    //             }
+    //         }
+    //     }
+    // }
     return 0;
 }
 

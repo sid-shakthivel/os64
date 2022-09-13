@@ -52,13 +52,7 @@ int link(char *old, char *new)
     errno = EMLINK;
     return -1;
 }
-int lseek(int file, int ptr, int dir)
-{
-    asm volatile("mov $105, %rax \n\t\
-        int $0x80 \n\t\
-        ");
-    return 0;
-}
+
 int stat(const char *file, struct stat *st)
 {
     asm volatile("mov $106, %rax \n\t\
@@ -118,7 +112,6 @@ int liballoc_unlock()
 */
 void *liballoc_alloc(int pages)
 {
-    asm volatile("xchg %bx, %bx");
     int64_t result;
     asm volatile("mov %1, %%ebx \n\t\
                  mov $8, %%rax \n\t\

@@ -36,6 +36,10 @@ const VBE_DISPI_INDEX_X_OFFSET: u16 = 8;
 const VBE_DISPI_INDEX_Y_OFFSET: u16 = 9;
 const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
+pub static mut DOOM1_WAD_ORIGINAL: u64 = 0x00;
+pub static mut DOOM1_WAD_OFFSET: u64 = 0x00;
+pub static mut DOOM_SIZE: u64 = 0x00;
+
 pub fn initialise_userland(boot_info: &BootInformation) {
     let mut i = 0;
 
@@ -84,7 +88,13 @@ pub fn initialise_userland(boot_info: &BootInformation) {
                 let source = module.start_address() as *mut u64;
 
                 unsafe {
-                    core::ptr::copy_nonoverlapping(
+                    DOOM1_WAD_ORIGINAL = dest as u64;
+                    DOOM1_WAD_OFFSET = dest as u64;
+                    DOOM_SIZE = module.module_size() as u64;
+                }
+
+                unsafe {
+                    core::ptr::copy(
                         source as *mut u8,
                         dest as *mut u8,
                         module.module_size() as usize,

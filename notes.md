@@ -21,6 +21,7 @@ Other Tasks:
 Usermode:
 - Switching address space is broken with cr3
 - IPC process
+- Timer bug with RSP
 
 GUI:
 - Double buffering with REP MOVSB 
@@ -64,4 +65,5 @@ impl<A> Locked<A> {
     }
 } -->
 
-check if doom copies bits properly
+check if doom copies bits properly to fb
+make program more reliable - same output each time (30 minutes, post to reddit)

@@ -57,7 +57,6 @@ int open(const char *name, int flags, ...)
 
 int write(int file, char *ptr, int len)
 {
-    asm volatile("xchg %bx, %bx");
     int64_t result;
     asm volatile("mov %3, %%ebx \n\t\
         mov %2, %%ecx \n\t\
@@ -116,8 +115,6 @@ Event *get_event()
                  int $0x80 \n\t\
                  "
                  : "=r"(result));
-
-    // asm volatile("xchg %bx, %bx");
     return (Event *)result;
 }
 
@@ -131,5 +128,29 @@ int paint_string(char *ptr, Window *new_window)
         "
                  : "=r"(result)
                  : "m"(ptr), "m"(new_window));
+    return (int)result;
+}
+
+int lseek(int file, int ptr, int dir)
+{
+    uint64_t result;
+    // asm volatile("mov %1, %%ebx \n\t\
+    //     mov %2, %%ecx \n\t\
+    //     mov %3, %%edx \n\t\
+    //     mov $15, %%eax \n\t\
+    //     xchg %%bx, %%bx \n\t\
+    //     int $0x80 \n\t\
+    // "
+    //              : "=r"(result)
+    //              : "r"(file), "r"(ptr), "r"(dir));
+
+    asm volatile("mov %3, %%ebx \n\t\
+        mov %2, %%ecx \n\t\
+        mov %1, %%edx \n\t\
+        mov $15, %%eax \n\t\
+        int $0x80 \n\t\
+        "
+                 : "=r"(result)
+                 : "r"(file), "r"(ptr), "r"(dir));
     return (int)result;
 }
