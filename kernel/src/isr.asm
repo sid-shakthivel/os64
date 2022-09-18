@@ -67,18 +67,22 @@ handle_interrupt%1:
 
 global handle_pit_interrupt
 handle_pit_interrupt:
+    pushaq
+    cld
     call pit_handler
+    popaq
 
-    mov rsp, [old_process + 24]
-    push qword [old_process + 32]
-    push qword [old_process + 24]
-    push qword [old_process + 16]
-    push qword [old_process + 8]
-    push qword [old_process]
+    mov rsp, [old_process + 72]
+
+    push qword [old_process + 80]
+    push qword [old_process + 72]
+    push qword [old_process + 64]
+    push qword [old_process + 56]
+    push qword [old_process + 48]
 
     pushaq
 
-    mov rax, cr3
+    ; mov rax, cr3
     push rax
 
     mov rsp, [new_process_rsp]
@@ -137,4 +141,4 @@ handle_err_exception 30
 handle_no_err_exception 31
 
 handle_interrupt 33
-handle_interrupt 44
+handle_interrupt 44 

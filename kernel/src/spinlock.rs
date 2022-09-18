@@ -17,7 +17,10 @@ impl<T> Lock<T> {
 
     pub fn lock(&self) -> &mut T {
         if self.active.load(Ordering::Acquire) {
-            panic!("spinlock already locked");
+            panic!(
+                "spinlock already locked of type {}",
+                core::any::type_name::<T>()
+            );
         }
         self.active.store(true, Ordering::Release);
 

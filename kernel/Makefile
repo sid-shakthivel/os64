@@ -3,7 +3,7 @@ TARGET = x86_64-unknown-none
 R_COMPILER = cargo
 
 ASSEMBLER = nasm
-ASSEMBLER_FLAGS = -f elf64
+ASSEMBLER_FLAGS = -f elf64 -O0
 
 OBJ := object_files
 RUST_LIBRARY := target/$(TARGET)/debug/libkernel.a

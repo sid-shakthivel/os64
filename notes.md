@@ -64,10 +64,3 @@ impl<A> Locked<A> {
         self.inner.lock()
     }
 } -->
-
-check if doom copies bits properly to fb
-why does it lseek the file size then set back to 0 twice?
-
-offsets at a memory address, 
-goes 20 times
-(maybe) goes out of bounds

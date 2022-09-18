@@ -87,7 +87,7 @@ impl ProcessSchedular {
         }
 
         if self.is_from_kernel == true {
-            // If this is the first process to be called, it stems from kernel and that stack need not be saved
+            // If this is the first process to be called, it stems from kernel and that stack need not be saved as it's not a usermode process
             unsafe {
                 KERNEL_STACK = old_rsp;
             }
@@ -102,6 +102,8 @@ impl ProcessSchedular {
             };
             self.tasks[0] = Some(updated_process);
             self.current_process_index += 1;
+
+            // print_serial!("RSP TO BE SAVED = 0x{:x}\n", old_rsp);
         }
 
         // Select next process and ensure it's not empty
@@ -124,9 +126,7 @@ impl ProcessSchedular {
         // Remove index
         self.tasks[index] = None;
 
-        // TODO: Verify this works correctly
-
-        // Shift all further processes back
+        // Shift all further processes back one place
         if index + 1 < MAX_PROCESS_NUM {
             index += 1;
 
@@ -225,7 +225,7 @@ impl Process {
 
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0x0; // RFLAGS which enable interrupts
+            *rsp.offset(-3) = 0x202; // RFLAGS which enable interrupts
             *rsp.offset(-4) = 0x18 | 0x3; // CS
             *rsp.offset(-5) = v_address; // RIP
             *rsp.offset(-6) = 0x00; // RAX
@@ -249,7 +249,3 @@ impl Process {
 }
 
 pub static PROCESS_SCHEDULAR: Lock<ProcessSchedular> = Lock::new(ProcessSchedular::new());
-
-/*
-    Call functions on code from different files with specific data that needs to be stored
-*/

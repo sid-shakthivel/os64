@@ -56,7 +56,7 @@ pub enum PrivilegeLevel {
     Ring3, // Userspace
 }
 
-// These registers are pushed onto the stack on an interrupt
+// These registers are pushed onto the stack by the kernel on an interrupt
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct Registers {
@@ -75,15 +75,21 @@ pub struct Registers {
     pub ss: u64,
 }
 
-// These registers are pushed on an int
+// These registers are pushed on an interrupt
 #[derive(Debug, Copy, Clone)]
 #[repr(C, packed)]
 pub struct IretStack {
-    rip: u64,
-    cs: u64,
-    rflags: u64,
-    rsp: u64,
-    ss: u64,
+    pub rdi: u64,
+    pub rsi: u64,
+    pub rdx: u64,
+    pub rcx: u64,
+    pub rbx: u64,
+    pub rax: u64,
+    pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
+    pub rsp: u64,
+    pub ss: u64,
 }
 
 #[no_mangle]
@@ -164,6 +170,12 @@ impl idt_entry {
 impl IretStack {
     pub const fn new() -> IretStack {
         IretStack {
+            rdi: 0,
+            rsi: 0,
+            rdx: 0,
+            rcx: 0,
+            rbx: 0,
+            rax: 0,
             rip: 0,
             cs: 0,
             rflags: 0,
@@ -208,10 +220,10 @@ pub extern "C" fn interrupt_handler(registers: Registers) {
 }
 
 #[no_mangle]
-pub extern "C" fn pit_handler(iret_stack: IretStack) -> *const u64 {
+pub extern "C" fn pit_handler(iret_stack: IretStack) {
     // Acknowledge interrupt and timer
-    PICS.lock().acknowledge(0x20);
-    PIT.lock().handle_timer();
+    // PICS.lock().acknowledge(0x20);
+    // PIT.lock().handle_timer();
 
     let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(iret_stack.rsp);
     PROCESS_SCHEDULAR.free();
@@ -225,10 +237,6 @@ pub extern "C" fn pit_handler(iret_stack: IretStack) -> *const u64 {
         old_process = iret_stack;
         new_process_rsp = new_stack.unwrap() as u64;
     }
-
-    // PICS.lock().clean_mask(0x20);
-
-    return new_stack.unwrap();
 }
 
 pub extern "C" fn enable() {
