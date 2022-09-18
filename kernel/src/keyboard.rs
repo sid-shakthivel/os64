@@ -77,6 +77,7 @@ impl Keyboard {
                     DESKTOP.free();
                 }
                 _ => {
+                    print_serial!("SCANCODE = 0x{:x}\n", scancode);
                     let letter = self.translate(scancode, false);
 
                     if letter != '0' {

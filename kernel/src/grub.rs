@@ -36,7 +36,7 @@ const VBE_DISPI_INDEX_X_OFFSET: u16 = 8;
 const VBE_DISPI_INDEX_Y_OFFSET: u16 = 9;
 const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
-pub static mut DOOM1_WAD_ORIGINAL: u64 = 0x00;
+pub static mut DOOM1_WAD_ADDRESS: u64 = 0x00;
 pub static mut DOOM1_WAD_OFFSET: u64 = 0x00;
 pub static mut DOOM_SIZE: u64 = 0x00;
 
@@ -46,7 +46,7 @@ pub fn initialise_userland(boot_info: &BootInformation) {
     let mut process_index = 0; // This index determines the PID for each process
     for module in boot_info.module_tags() {
         print_serial!(
-            "MODULE ADDRESS = 0x{:x} 0x{:x}\n",
+            "MODULE ADDRESS = 0x{:x}, SIZE =  0x{:x}\n",
             module.start_address(),
             module.module_size()
         );
@@ -84,13 +84,16 @@ pub fn initialise_userland(boot_info: &BootInformation) {
 
                 let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as *mut u64;
                 PAGE_FRAME_ALLOCATOR.free();
-
                 let source = module.start_address() as *mut u64;
 
                 unsafe {
-                    DOOM1_WAD_ORIGINAL = dest as u64;
-                    DOOM1_WAD_OFFSET = dest as u64;
+                    DOOM1_WAD_ADDRESS = dest as u64;
+                    DOOM1_WAD_OFFSET = 0;
                     DOOM_SIZE = module.module_size() as u64;
+                    print_serial!(
+                        "ADDRESS OF END IS = 0x{:x}\n",
+                        module.module_size() as u64 + dest as u64
+                    );
                 }
 
                 unsafe {

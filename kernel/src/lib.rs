@@ -65,9 +65,9 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
 
     grub::bga_set_video_mode();
 
-    grub::initialise_userland(&boot_info);
-
     framebuffer::init(boot_info.framebuffer_tag().unwrap());
+
+    grub::initialise_userland(&boot_info);
 
     setup_wm();
 

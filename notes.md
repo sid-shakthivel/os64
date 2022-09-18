@@ -66,4 +66,8 @@ impl<A> Locked<A> {
 } -->
 
 check if doom copies bits properly to fb
-make program more reliable - same output each time (30 minutes, post to reddit)
+why does it lseek the file size then set back to 0 twice?
+
+offsets at a memory address, 
+goes 20 times
+(maybe) goes out of bounds

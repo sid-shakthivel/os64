@@ -2,12 +2,13 @@
 
 /*
     Preemptive multitasking is when the CPU splits up its time between various processes to give the illusion they are happening simultaneously
-    Interprocess communication is way processes communicate with each other 
+    Interprocess communication is way processes communicate with each other
     Message passing model - processes communicate through kernel by sending and recieving messages through kernel without sharing same address space (can syncrynse actions)
     Messages can be fixed or variable length
     Communication link must exist between 2 processes like buffering, synchronisation,
 */
 
+use crate::list::Stack;
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR, PAGE_SIZE};
 use crate::paging::Table;
 use crate::spinlock::Lock;
@@ -15,7 +16,6 @@ use crate::CONSOLE;
 use crate::{paging, print_serial};
 use core::mem::size_of;
 use core::prelude::v1::Some;
-use list::Stack;
 
 /*
     Processes are running programs with an individual address space, stack and data
@@ -28,7 +28,6 @@ pub struct Process {
     pub rsp: *const u64,
     pub process_priority: ProcessPriority,
     pub cr3: *mut Table,
-    pub messages: Stack<Message>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -36,12 +35,11 @@ pub struct Message {
     command: &'static str,
 }
 
-
 /*
     Messages will be sent asyncronously (sender is not bothered whether reciever accepts the message)
     Non-blocking send - sending process sends message and resumes operation
     Non-blocking recieve - recieves retrives value or null
-    Queue of messages is used to store messages sent between events 
+    Queue of messages is used to store messages sent between events
 */
 impl Message {
     pub fn new(command: &'static str) -> Message {
@@ -151,31 +149,31 @@ impl ProcessSchedular {
         Sends a message from current task to another task in which messages are strings which can be processed
         Works by appending a message to the other process' message stack
     */
-    pub fn send_message(&mut self, pid: u64, message_contents: &str) {
-        // Get the process
-        for i in 0..MAX_PROCESS_NUM {
-            if i == pid {
-                self.tasks[i]
-                    .unwrap()
-                    .messages
-                    .push(Message::new(message_contents));
-            }
-        }
-    }
+    // pub fn send_message(&mut self, pid: u64, message_contents: &str) {
+    //     // Get the process
+    //     for i in 0..MAX_PROCESS_NUM {
+    //         if i == pid {
+    //             self.tasks[i]
+    //                 .unwrap()
+    //                 .messages
+    //                 .push(Message::new(message_contents));
+    //         }
+    //     }
+    // }
 
     /*
         Recieve a message from task for a specific process
     */
-    pub fn receive_message(&mut self, pid: u64) -> Message {
-        // Get the process
-        for i in 0..MAX_PROCESS_NUM {
-            if i == pid {
-                if let Some(message) = self.tasks[i].unwrap().messages.pop() {
-                    message.clone()
-                }
-            }
-        }
-    }
+    // pub fn receive_message(&mut self, pid: u64) -> Message {
+    //     // Get the process
+    //     for i in 0..MAX_PROCESS_NUM {
+    //         if i == pid {
+    //             if let Some(message) = self.tasks[i].unwrap().messages.pop() {
+    //                 message.clone()
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 impl Process {
@@ -227,7 +225,7 @@ impl Process {
 
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
-            *rsp.offset(-3) = 0; // RFLAGS which enable interrupts
+            *rsp.offset(-3) = 0x0; // RFLAGS which enable interrupts
             *rsp.offset(-4) = 0x18 | 0x3; // CS
             *rsp.offset(-5) = v_address; // RIP
             *rsp.offset(-6) = 0x00; // RAX
@@ -246,7 +244,6 @@ impl Process {
             rsp: rsp,
             process_priority: process_priority,
             cr3: new_p4,
-            messages: Stack::<Message>::new(),
         }
     }
 }
