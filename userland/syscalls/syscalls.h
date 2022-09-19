@@ -33,6 +33,7 @@ int read(int file, char *ptr, int len);
 int create_window(int x, int y, int width, int height);
 int paint_all();
 Event *get_event();
+int get_current_scancode();
 int paint_string(char *ptr, Window *new_window);
 // int wait(int *status);
 int lseek(int file, int ptr, int dir);

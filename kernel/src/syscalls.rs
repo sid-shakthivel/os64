@@ -80,6 +80,7 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
             registers.rcx as *const SlimmedWindow,
         ),
         15 => lseek(registers.rdx, registers.rcx as i64, registers.rbx),
+        16 => get_current_scancode(),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -401,4 +402,12 @@ fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
     }
 
     return -1;
+}
+
+fn get_current_scancode() -> i64 {
+    unsafe {
+        let current_scancode = crate::keyboard::CURRENT_SCANCODE as i64;
+        crate::keyboard::CURRENT_SCANCODE = 0; // Reset the scancode
+        current_scancode
+    }
 }

@@ -28,7 +28,6 @@ GUI:
 - Gradient with clipping and mouse...
 - Handle text on moving
 - Bochs issue - mask value must be corrupted
-- Porting doom
 
 FS:
 - Load userspace programs from fs instead of modules

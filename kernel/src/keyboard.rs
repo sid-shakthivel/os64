@@ -29,6 +29,8 @@ pub static KEYBOARD: Mutex<Keyboard> = Mutex::new(Keyboard {
     scancode_set: ScancodeSet::ScancodeSet1,
 });
 
+pub static mut CURRENT_SCANCODE: u8 = 0;
+
 #[derive(PartialEq, Debug)]
 enum ScancodeSet {
     ScancodeSet1,
@@ -73,11 +75,18 @@ impl Keyboard {
                 0x3A => self.is_upper = !self.is_upper, // Caps lock pressed
                 0x1C => {
                     // Enter pressed
+                    unsafe {
+                        CURRENT_SCANCODE = scancode;
+                    }
+
                     DESKTOP.lock().handle_keyboard(0x8C as char);
                     DESKTOP.free();
                 }
                 _ => {
-                    print_serial!("SCANCODE = 0x{:x}\n", scancode);
+                    // print_serial!("SCANCODE = 0x{:x}\n", scancode);
+                    unsafe {
+                        CURRENT_SCANCODE = scancode;
+                    }
                     let letter = self.translate(scancode, false);
 
                     if letter != '0' {

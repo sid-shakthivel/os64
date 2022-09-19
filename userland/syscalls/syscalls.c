@@ -118,6 +118,16 @@ Event *get_event()
     return (Event *)result;
 }
 
+int get_current_scancode()
+{
+    int64_t result;
+    asm volatile("mov $16, %%rax \n\t\
+                 int $0x80 \n\t\
+                 "
+                 : "=r"(result));
+    return (int)result;
+}
+
 int paint_string(char *ptr, Window *new_window)
 {
     int64_t result;
@@ -134,16 +144,6 @@ int paint_string(char *ptr, Window *new_window)
 int lseek(int file, int ptr, int dir)
 {
     uint64_t result;
-    // asm volatile("mov %1, %%ebx \n\t\
-    //     mov %2, %%ecx \n\t\
-    //     mov %3, %%edx \n\t\
-    //     mov $15, %%eax \n\t\
-    //     xchg %%bx, %%bx \n\t\
-    //     int $0x80 \n\t\
-    // "
-    //              : "=r"(result)
-    //              : "r"(file), "r"(ptr), "r"(dir));
-
     asm volatile("mov %3, %%ebx \n\t\
         mov %2, %%ecx \n\t\
         mov %1, %%edx \n\t\
