@@ -1,5 +1,5 @@
 ENTRY(_start)
-STARTUP(../../libc/build/x86_64-sidos/lib/crt0.o)
+STARTUP(../libc/build/x86_64-sidos/lib/crt0.o)
 OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS

@@ -18,9 +18,9 @@ use core::mem::size_of;
 use core::prelude::v1::Some;
 
 /*
-    Processes are running programs with an individual address space, stack and data
-    There are kernel processes (run in kernel mode) and user processes (run in user mode)
+    Processes are running programs with an individual address space, stack and data which run in userspace
     Processes will be selected based on what priority they are
+    Procesess are mapped into a specific address space
 */
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Process {
@@ -30,9 +30,15 @@ pub struct Process {
     pub cr3: *mut Table,
 }
 
+/*
+    Structure of messages includes
+    - a command (what program should do)
+    - pid of the process which requested the action (in order to send it an ACK)
+*/
 #[derive(Copy, Clone, Debug)]
 pub struct Message {
     command: &'static str,
+    return_pid: u64,
 }
 
 /*
@@ -42,8 +48,11 @@ pub struct Message {
     Queue of messages is used to store messages sent between events
 */
 impl Message {
-    pub fn new(command: &'static str) -> Message {
-        Message { command }
+    pub fn new(command: &'static str, return_pid: u64) -> Message {
+        Message {
+            command,
+            return_pid,
+        }
     }
 }
 
@@ -78,8 +87,8 @@ impl ProcessSchedular {
     }
 
     /*
-        Round robin in which there is a single queue so when timer interrupt is triggered the next process is scheduled
-        TODO: Switch to priority based round robin
+        Round robin in which there is a single queue
+        When timer interrupt is triggered the next process is selected
     */
     pub fn schedule_process(&mut self, mut old_rsp: u64) -> Option<*const u64> {
         if self.tasks[0].is_none() {
@@ -102,8 +111,6 @@ impl ProcessSchedular {
             };
             self.tasks[0] = Some(updated_process);
             self.current_process_index += 1;
-
-            // print_serial!("RSP TO BE SAVED = 0x{:x}\n", old_rsp);
         }
 
         // Select next process and ensure it's not empty
@@ -178,7 +185,7 @@ impl ProcessSchedular {
 
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
-    pub fn init(process_priority: ProcessPriority, pid: u64, heap_address: i32) -> Process {
+    pub fn init(process_priority: ProcessPriority, pid: u64) -> Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4

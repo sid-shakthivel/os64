@@ -16,11 +16,11 @@
 */
 
 use crate::framebuffer;
+use crate::framebuffer::WINDOW_MANAGER;
 use crate::ports::io_wait;
 use crate::print_serial;
 use crate::ps2;
 use crate::spinlock::Lock;
-use crate::DESKTOP;
 
 #[derive(PartialEq)]
 pub enum MouseState {
@@ -121,10 +121,10 @@ impl Mouse {
             self.mouse_y = self.mouse_y.wrapping_add(adjusted_y as u64);
         }
 
-        DESKTOP
+        WINDOW_MANAGER
             .lock()
             .handle_mouse(self.mouse_x, self.mouse_y, is_left_clicked);
-        DESKTOP.free();
+        WINDOW_MANAGER.free();
     }
 
     fn enable_scanning(&self) {

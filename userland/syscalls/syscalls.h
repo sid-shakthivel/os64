@@ -1,6 +1,7 @@
 typedef struct Event
 {
     int mouse_x;
+    int mouse_y;
     int mask;
     char key_pressed;
 } Event;

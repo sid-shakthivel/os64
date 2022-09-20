@@ -59,13 +59,9 @@ pub fn initialise_userland(boot_info: &BootInformation) {
                 elf::parse(module.start_address() as u64);
 
                 // Alloc some pages and map them accordingly
-                let heap = 0 as *mut u64;
 
-                let user_process = multitask::Process::init(
-                    multitask::ProcessPriority::High,
-                    process_index,
-                    heap as i32,
-                );
+                let user_process =
+                    multitask::Process::init(multitask::ProcessPriority::High, process_index);
 
                 // Add process to list of processes
                 multitask::PROCESS_SCHEDULAR

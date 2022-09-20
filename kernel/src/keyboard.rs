@@ -4,9 +4,10 @@
     PS/2 Keyboard which uses serial communication
     Accepts commands and sends scancodes which comply to a scancode set
     Scancode is simply a byte and scan code set is map between ascii characters and bytes sent
+    Scanset 1 is used
 */
 
-use crate::framebuffer::DESKTOP;
+use crate::framebuffer::WINDOW_MANAGER;
 use crate::print_serial;
 use crate::ps2;
 use crate::CONSOLE;
@@ -47,6 +48,12 @@ impl Keyboard {
     }
 
     fn translate(&self, scancode: u8, uppercase: bool) -> char {
+        // Check for enter key
+        if scancode == 0x1c {
+            return scancode as char;
+        }
+
+        // Key must be released
         if scancode > 0x3A {
             return '0';
         }
@@ -64,34 +71,25 @@ impl Keyboard {
 
             match scancode {
                 0x26 => {
-                    // print_serial!("l");
-                    DESKTOP.lock().handle_keyboard('l');
-                    DESKTOP.free();
+                    WINDOW_MANAGER.lock().handle_keyboard('l');
+                    WINDOW_MANAGER.free();
                 }
                 0x2A => self.is_upper = true,  // Left shift pressed
                 0x36 => self.is_upper = true,  // Right shift pressed
                 0xAA => self.is_upper = false, // Left shift released
                 0xB6 => self.is_upper = false, // Right shift released
                 0x3A => self.is_upper = !self.is_upper, // Caps lock pressed
-                0x1C => {
-                    // Enter pressed
-                    unsafe {
-                        CURRENT_SCANCODE = scancode;
-                    }
-
-                    DESKTOP.lock().handle_keyboard(0x8C as char);
-                    DESKTOP.free();
-                }
                 _ => {
-                    // print_serial!("SCANCODE = 0x{:x}\n", scancode);
                     unsafe {
                         CURRENT_SCANCODE = scancode;
                     }
-                    let letter = self.translate(scancode, false);
 
-                    if letter != '0' {
-                        DESKTOP.lock().handle_keyboard(letter);
-                        DESKTOP.free();
+                    let letter = self.translate(scancode, self.is_upper);
+
+                    // Check for letter or enter key
+                    if scancode == 0x1c || letter != '0' {
+                        WINDOW_MANAGER.lock().handle_keyboard(letter);
+                        WINDOW_MANAGER.free();
                     }
                 }
             }

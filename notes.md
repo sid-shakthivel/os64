@@ -63,3 +63,29 @@ impl<A> Locked<A> {
         self.inner.lock()
     }
 } -->
+
+<!-- // Moves window to the top of the stack and trigers a repaint
+// fn raise(&mut self, index: usize) {
+//     // Move window if it isn't head (already at the top of the stack)
+//     if (&*(*parent).children.head.unwrap()).payload.clone() != self.clone() {
+//         let address = (*parent).children.remove_at(index);
+//         // kfree(address as *mut u64);
+//         (*parent).children.push(self.clone());
+//     }
+// } -->
+
+<!-- // Paint the title text and centre it
+// FRAMEBUFFER.lock().draw_string(
+//     Some(&self.clipped_rectangles),
+//     self.title,
+//     self.x + (self.width / 2 - (self.title.as_bytes().len() * 8) as u64 / 2),
+//     self.y + (WINDOW_TITLE_HEIGHT - 10) / 2,
+//     self.x,
+//     self.y,
+//     self.width,
+//     self.height,
+// ); -->
+
+paint - calls refresh which copies data to framebuffer (should use clipping rects at some point)
+update buffer - updates the internal buffer to a colour (can also copy the stuff from doom)
+figure out clipping with dirty rects (clipped rectangles)

@@ -7,7 +7,7 @@
     Sidos syscall design is inspired by posix
 */
 
-use crate::framebuffer::{self, Event, Rectangle, Window, DESKTOP, FRAMEBUFFER};
+use crate::framebuffer::{self, Event, Rectangle, Window, FRAMEBUFFER, WINDOW_MANAGER};
 use crate::fs::File;
 use crate::grub::{DOOM1_WAD_ADDRESS, DOOM1_WAD_OFFSET, DOOM_SIZE};
 use crate::hashmap::HashMap;
@@ -308,19 +308,36 @@ fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
     Custom syscall which creates a new window
 */
 fn create_window(x: u64, y: u64, width: u64, height: u64) -> i64 {
-    let new_window = Window::new(
-        "Window",
+    let mut new_window = Window::new(
+        "Terminal",
         x,
         y,
         width,
         height,
-        Some(DESKTOP.lock()),
+        Some(WINDOW_MANAGER.lock()),
         framebuffer::WINDOW_BACKGROUND_COLOUR,
     );
-    DESKTOP.free();
+    WINDOW_MANAGER.free();
 
-    DESKTOP.lock().add_sub_window(new_window);
-    DESKTOP.free();
+    new_window.update_buffer_region_to_colour(
+        0,
+        width,
+        0,
+        20,
+        crate::framebuffer::WINDOW_TITLE_COLOUR,
+    );
+    new_window.update_buffer_region_to_colour(
+        0,
+        width,
+        20,
+        height,
+        crate::framebuffer::WINDOW_BACKGROUND_COLOUR,
+    );
+
+    new_window.draw_string("h", 0, 40);
+
+    WINDOW_MANAGER.lock().add_sub_window(new_window);
+    WINDOW_MANAGER.free();
 
     0
 }
@@ -329,29 +346,24 @@ fn create_window(x: u64, y: u64, width: u64, height: u64) -> i64 {
     Custom syscall which paints the desktop
 */
 fn desktop_paint() -> i64 {
-    DESKTOP.lock().paint(Stack::<Rectangle>::new(), true);
-    DESKTOP.free();
+    WINDOW_MANAGER.lock().paint(Stack::<Rectangle>::new(), true);
+    WINDOW_MANAGER.free();
 
     0
 }
 
 /*
-    Returns the key that a user pressed
+    Returns an event which encapsulates mouse coordinates, and current scancode
 */
 fn get_event() -> i64 {
-    let event = DESKTOP.lock().handle_event().unwrap();
-    DESKTOP.free();
-    unsafe { event.offset(0) as i64 }
+    let event = WINDOW_MANAGER.lock().handle_event().unwrap();
+    WINDOW_MANAGER.free();
+    event as i64
 }
 
 fn draw_string(string_ptr: *const u8, window: *const SlimmedWindow) -> i64 {
     let mut string = crate::string::get_string_from_ptr(string_ptr);
-
-    print_serial!("str = {}\n", string);
-
     string = &string[0..string.len() - 1]; // Remove null terminator?
-
-    print_serial!("str = {}\n", string);
 
     let v = unsafe { core::ptr::read_unaligned(window) };
     FRAMEBUFFER.lock().draw_string(
@@ -369,8 +381,6 @@ fn draw_string(string_ptr: *const u8, window: *const SlimmedWindow) -> i64 {
 }
 
 fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
-    // print_serial!("LSEEK'ING {} {} {}\n", file, offset, whence);
-
     if offset < 0 {
         panic!("oh dear");
     }
