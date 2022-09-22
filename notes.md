@@ -86,6 +86,7 @@ impl<A> Locked<A> {
 //     self.height,
 // ); -->
 
-paint - calls refresh which copies data to framebuffer (should use clipping rects at some point)
-update buffer - updates the internal buffer to a colour (can also copy the stuff from doom)
-figure out clipping with dirty rects (clipped rectangles)
+Doesn't copy to buffer properly (text gets scrambled - roughly correct)
+Fill window buffer through syscall
+Rewrite the whole 
+Get doom working through a window

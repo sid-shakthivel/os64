@@ -334,7 +334,7 @@ fn create_window(x: u64, y: u64, width: u64, height: u64) -> i64 {
         crate::framebuffer::WINDOW_BACKGROUND_COLOUR,
     );
 
-    new_window.draw_string("h", 0, 40);
+    new_window.draw_string("hello world", 0, 40);
 
     WINDOW_MANAGER.lock().add_sub_window(new_window);
     WINDOW_MANAGER.free();

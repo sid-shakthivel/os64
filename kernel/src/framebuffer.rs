@@ -150,8 +150,8 @@ impl WindowManager {
             clipped_rectangles: Stack::<Rectangle>::new(),
             child_windows: Stack::<Window>::new(),
             drag_child: None,
-            mouse_x: 0,
-            mouse_y: 0,
+            mouse_x: SCREEN_WIDTH / 2,
+            mouse_y: SCREEN_HEIGHT / 2,
             drag_x_offset: 0,
             drag_y_offset: 0,
         }
@@ -294,7 +294,7 @@ impl WindowManager {
         // Paint mouse
         FRAMEBUFFER
             .lock()
-            .fill_rect(None, mouse_x, mouse_y, 5, 5, 0x00FF);
+            .fill_rect(None, mouse_x, mouse_y, 5, 5, 0xFF0000);
 
         self.mouse_x = mouse_x;
         self.mouse_y = mouse_y;
@@ -612,28 +612,34 @@ impl FramebuffferEntity for Window {
         for (_i, clipped_rectangle) in self.clipped_rectangles.into_iter().enumerate() {
             let clip = clipped_rectangle.unwrap().payload;
 
-            // Clamp printable area to clipped region itself
-            let x_base = core::cmp::max(self.x, clip.left);
-            let y_base = core::cmp::max(self.y, clip.top);
-            let x_limit = core::cmp::min(self.x + self.width, clip.right);
-            let y_limit = core::cmp::min(self.y + self.height, clip.bottom);
+            // Check whether the clipped rect is within the window
+            if clip.top >= self.y
+                && clip.bottom <= (self.y + self.height)
+                && clip.left >= self.x
+                && clip.right <= (self.x + self.width)
+            {
+                // TODO: CLAMP VALUES
 
-            // print_serial!("{} {} {} {}\n", x_base, x_limit, y_base, y_limit);
+                let x_base = clip.left;
+                let y_base = clip.top;
+                let x_limit = clip.right;
+                let y_limit = clip.bottom;
 
-            let mut buffer_x = (x_limit - x_base) - self.width;
-            let mut buffer_y = (y_limit - y_base) - self.height;
+                let mut buffer_x = (x_base - self.x);
+                let mut buffer_y = (y_base - self.y);
 
-            for y in y_base..y_limit {
-                for x in x_base..x_limit {
-                    let offset = (0xa00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
-                    let buffer_p = self.buffer as *const u32;
-                    unsafe {
-                        *offset = *buffer_p.offset((buffer_y * self.height + buffer_x) as isize)
+                for y in y_base..y_limit {
+                    for x in x_base..x_limit {
+                        let offset = (0xa00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                        let buffer_p = self.buffer as *const u32;
+                        unsafe {
+                            *offset = *buffer_p.offset((buffer_y * self.height + buffer_x) as isize)
+                        }
+                        buffer_x += 1;
                     }
-                    buffer_x += 1;
+                    buffer_x = 0;
+                    buffer_y += 1;
                 }
-                buffer_x = 0;
-                buffer_y += 1;
             }
         }
     }
