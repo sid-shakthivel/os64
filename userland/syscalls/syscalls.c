@@ -83,18 +83,15 @@ int read(int file, char *ptr, int len)
     return (int)result;
 }
 
-int create_window(int x, int y, int width, int height)
+int create_window(Window *new_window)
 {
     int64_t result;
-    asm volatile("mov %3, %%edi \n\t\
-        mov %1, %%ebx \n\t\
-        mov %2, %%ecx \n\t\
-        mov %4, %%esi \n\t\
+    asm volatile("mov %1, %%ebx \n\t\
         mov $11, %%eax \n\t\
         int $0x80 \n\t\
         "
                  : "=r"(result)
-                 : "r"(x), "r"(y), "r"(width), "r"(height));
+                 : "m"(new_window));
     return (int)result;
 }
 
@@ -128,19 +125,6 @@ int get_current_scancode()
     return (int)result;
 }
 
-int paint_string(char *ptr, Window *new_window)
-{
-    int64_t result;
-    asm volatile("mov %1, %%ebx \n\t\
-        mov %2, %%ecx \n\t\
-        mov $14, %%eax \n\t\
-        int $0x80 \n\t\
-        "
-                 : "=r"(result)
-                 : "m"(ptr), "m"(new_window));
-    return (int)result;
-}
-
 int lseek(int file, int ptr, int dir)
 {
     uint64_t result;
@@ -152,5 +136,45 @@ int lseek(int file, int ptr, int dir)
         "
                  : "=r"(result)
                  : "r"(file), "r"(ptr), "r"(dir));
+    return (int)result;
+}
+
+int paint_string(char *ptr, int wid, int x, int y)
+{
+    int64_t result;
+    asm volatile("mov %4, %%edi \n\t\
+        mov %1, %%ebx \n\t\
+        mov %2, %%ecx \n\t\
+        mov %3, %%esi \n\t\
+        mov $14, %%eax \n\t\
+        int $0x80 \n\t\
+        "
+                 : "=r"(result)
+                 : "m"(ptr), "r"(wid), "r"(x), "r"(y));
+    return (int)result;
+}
+
+int initalise_window_buffer(int wid)
+{
+    int64_t result;
+    asm volatile("mov %0, %%rbx \n\t\
+                 mov $17, %%rax \n\t\
+                 int $0x80 \n\t\
+                 "
+                 : "=r"(result)
+                 : "r"(wid));
+    return (int)result;
+}
+
+int copy_to_buffer(int wid, uint32_t *buffer)
+{
+    int64_t result;
+    asm volatile("mov %1, %%ebx \n\t\
+        mov %2, %%ecx \n\t\
+        mov $18, %%eax \n\t\
+        int $0x80 \n\t\
+        "
+                 : "=r"(result)
+                 : "r"(wid), "m"(buffer));
     return (int)result;
 }

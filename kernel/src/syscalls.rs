@@ -7,7 +7,9 @@
     Sidos syscall design is inspired by posix
 */
 
-use crate::framebuffer::{self, Event, Rectangle, Window, FRAMEBUFFER, WINDOW_MANAGER};
+use crate::framebuffer::{
+    self, Event, FramebuffferEntity, Rectangle, Window, FRAMEBUFFER, WINDOW_MANAGER,
+};
 use crate::fs::File;
 use crate::grub::{DOOM1_WAD_ADDRESS, DOOM1_WAD_OFFSET, DOOM_SIZE};
 use crate::hashmap::HashMap;
@@ -23,13 +25,12 @@ use core::panic;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(C)]
-pub struct SlimmedWindow {
+pub struct CondensedWindow {
     x: i32,
     y: i32,
     width: i32,
     height: i32,
-    x_final: i32,
-    y_final: i32,
+    name: *const u8,
 }
 
 /*
@@ -37,7 +38,7 @@ pub struct SlimmedWindow {
     File table entries are created when a process requests to open a file and this maintains its validity and is used
 */
 pub static FILE_TABLE: Lock<HashMap<File>> = Lock::new(HashMap::<File>::new());
-pub static mut COUNTER: i64 = 0;
+pub static mut FILE_TABLE_COUNTER: i64 = 0;
 
 bitflags! {
     struct Flags: u32 {
@@ -72,15 +73,19 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
         8 => allocate_pages(registers.rbx),
         9 => write(registers.rbx, registers.rcx as *mut u8, registers.rdx),
         10 => read(registers.rbx, registers.rcx as *mut u8, registers.rdx),
-        11 => create_window(registers.rbx, registers.rcx, registers.rdi, registers.rsi),
+        11 => create_window(registers.rbx as *const CondensedWindow),
         12 => desktop_paint(),
         13 => get_event(),
         14 => draw_string(
             registers.rbx as *const u8,
-            registers.rcx as *const SlimmedWindow,
+            registers.rcx,
+            registers.rsi,
+            registers.rdi,
         ),
         15 => lseek(registers.rdx, registers.rcx as i64, registers.rbx),
         16 => get_current_scancode(),
+        17 => initalise_window_buffer(registers.rbx),
+        18 => copy_to_buffer(registers.rbx, registers.rcx as *mut u32),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -163,12 +168,12 @@ fn open(name: *const u8, flags: u64) -> i64 {
             // Absolute path starting from the root of the entire fs
             match crate::fs::parse_absolute_filepath(filepath) {
                 Ok(file) => unsafe {
-                    COUNTER += 1;
+                    FILE_TABLE_COUNTER += 1;
 
-                    FILE_TABLE.lock().set(COUNTER as usize, file);
+                    FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
                     FILE_TABLE.free();
 
-                    return COUNTER;
+                    return FILE_TABLE_COUNTER;
                 },
                 Err(error) => {
                     let file_flags = Flags::from_bits_truncate(flags as u32);
@@ -176,11 +181,11 @@ fn open(name: *const u8, flags: u64) -> i64 {
                     if file_flags.contains(Flags::O_CREAT) {
                         let file = crate::fs::create_new_root_file(filepath);
                         unsafe {
-                            COUNTER += 1;
-                            FILE_TABLE.lock().set(COUNTER as usize, file);
+                            FILE_TABLE_COUNTER += 1;
+                            FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
                             FILE_TABLE.free();
 
-                            return COUNTER as i64;
+                            return FILE_TABLE_COUNTER as i64;
                         }
                     }
 
@@ -304,82 +309,6 @@ fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
     length as i64
 }
 
-/*
-    Custom syscall which creates a new window
-*/
-fn create_window(x: u64, y: u64, width: u64, height: u64) -> i64 {
-    let mut new_window = Window::new(
-        "Terminal",
-        x,
-        y,
-        width,
-        height,
-        Some(WINDOW_MANAGER.lock()),
-        framebuffer::WINDOW_BACKGROUND_COLOUR,
-    );
-    WINDOW_MANAGER.free();
-
-    new_window.update_buffer_region_to_colour(
-        0,
-        width,
-        0,
-        20,
-        crate::framebuffer::WINDOW_TITLE_COLOUR,
-    );
-    new_window.update_buffer_region_to_colour(
-        0,
-        width,
-        20,
-        height,
-        crate::framebuffer::WINDOW_BACKGROUND_COLOUR,
-    );
-
-    new_window.draw_string("hello world", 0, 40);
-
-    WINDOW_MANAGER.lock().add_sub_window(new_window);
-    WINDOW_MANAGER.free();
-
-    0
-}
-
-/*
-    Custom syscall which paints the desktop
-*/
-fn desktop_paint() -> i64 {
-    WINDOW_MANAGER.lock().paint(Stack::<Rectangle>::new(), true);
-    WINDOW_MANAGER.free();
-
-    0
-}
-
-/*
-    Returns an event which encapsulates mouse coordinates, and current scancode
-*/
-fn get_event() -> i64 {
-    let event = WINDOW_MANAGER.lock().handle_event().unwrap();
-    WINDOW_MANAGER.free();
-    event as i64
-}
-
-fn draw_string(string_ptr: *const u8, window: *const SlimmedWindow) -> i64 {
-    let mut string = crate::string::get_string_from_ptr(string_ptr);
-    string = &string[0..string.len() - 1]; // Remove null terminator?
-
-    let v = unsafe { core::ptr::read_unaligned(window) };
-    FRAMEBUFFER.lock().draw_string(
-        None,
-        string,
-        v.x_final as u64,
-        v.y_final as u64,
-        v.x as u64,
-        v.y as u64,
-        v.width as u64,
-        v.height as u64,
-    );
-
-    return 0;
-}
-
 fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
     if offset < 0 {
         panic!("oh dear");
@@ -412,6 +341,133 @@ fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
     }
 
     return -1;
+}
+
+// Create a new window given dimensions, adds to window manager and returns the wid
+fn create_window(new_window_data_p: *const CondensedWindow) -> i64 {
+    let new_window_data = unsafe { &*new_window_data_p };
+
+    let new_window_name = crate::string::get_string_from_ptr(new_window_data.name);
+
+    let mut new_window = Window::new(
+        new_window_name,
+        new_window_data.x as u64,
+        new_window_data.y as u64,
+        new_window_data.width as u64,
+        new_window_data.height as u64,
+        Some(WINDOW_MANAGER.lock()),
+        framebuffer::WINDOW_BACKGROUND_COLOUR,
+    );
+    WINDOW_MANAGER.free();
+
+    print_serial!("{:?}\n", new_window);
+
+    let wid = WINDOW_MANAGER.lock().add_sub_window(&mut new_window);
+    WINDOW_MANAGER.free();
+
+    wid as i64
+}
+
+// Initalises the window buffer to a base level by drawing a title bar, background and title text for a window given it's wid
+fn initalise_window_buffer(wid: u64) -> i64 {
+    for (i, window) in WINDOW_MANAGER.lock().child_windows.into_iter().enumerate() {
+        if window.unwrap().payload.clone().wid == wid {
+            let const_window_ptr = &window.unwrap().payload as *const Window;
+            let mut_window_ptr = const_window_ptr as *mut Window;
+
+            unsafe {
+                let width = (*mut_window_ptr).width;
+                let height = (*mut_window_ptr).height;
+
+                print_serial!("Initalising the window buffer\n");
+                (*mut_window_ptr).update_buffer_region_to_colour(
+                    0,
+                    width,
+                    0,
+                    20,
+                    crate::framebuffer::WINDOW_TITLE_COLOUR,
+                );
+
+                print_serial!("Continuing init'ing window buffer\n");
+
+                (*mut_window_ptr).update_buffer_region_to_colour(
+                    0,
+                    width,
+                    20,
+                    height,
+                    crate::framebuffer::WINDOW_BACKGROUND_COLOUR,
+                );
+
+                // (*mut_window_ptr).draw_string("Hello", 5, 20);
+            }
+
+            print_serial!("Finished init'ing window buffer\n");
+        }
+    }
+
+    WINDOW_MANAGER.free();
+
+    print_serial!("Finished init'ing window buffer\n");
+
+    return 0;
+}
+
+// Copies data from one buffer into an internal buffer of a window and refreshes the screen
+fn copy_to_buffer(wid: u64, buffer: *mut u32) -> i64 {
+    for (i, window) in WINDOW_MANAGER.lock().child_windows.into_iter().enumerate() {
+        if window.unwrap().payload.clone().wid == wid {
+            let const_window_ptr = &window.unwrap().payload as *const Window;
+            let mut_window_ptr = const_window_ptr as *mut Window;
+
+            unsafe {
+                (*mut_window_ptr).update_buffer_from_buffer(buffer);
+                (*mut_window_ptr).paint(Stack::<Rectangle>::new());
+            }
+        }
+    }
+    WINDOW_MANAGER.free();
+    return 0;
+}
+
+// Paints everything from scratch
+fn desktop_paint() -> i64 {
+    print_serial!("Gonna paint it all\n");
+
+    WINDOW_MANAGER.lock().paint(Stack::<Rectangle>::new(), true);
+    WINDOW_MANAGER.free();
+
+    0
+}
+
+// Returns an event which encapsulates mouse coordinates, and current scancode
+fn get_event() -> i64 {
+    let event = WINDOW_MANAGER.lock().handle_event().unwrap();
+    WINDOW_MANAGER.free();
+    event as i64
+}
+
+// Draws a string upon a window given a pid
+fn draw_string(string_ptr: *const u8, wid: u64, x: u64, y: u64) -> i64 {
+    let mut string = crate::string::get_string_from_ptr(string_ptr);
+    string = &string[0..string.len() - 1]; // Remove null terminator?
+
+    for (i, window) in WINDOW_MANAGER.lock().child_windows.into_iter().enumerate() {
+        if window.unwrap().payload.clone().wid == wid {
+            let const_window_ptr = &window.unwrap().payload as *const Window;
+            let mut_window_ptr = const_window_ptr as *mut Window;
+
+            unsafe {
+                let adjusted_x = x - (*mut_window_ptr).x;
+                let adjusted_y = y - (*mut_window_ptr).y;
+                (*mut_window_ptr).draw_string(string, adjusted_x, adjusted_y);
+                (*mut_window_ptr).paint(Stack::<Rectangle>::new());
+            }
+        }
+    }
+
+    WINDOW_MANAGER.free();
+
+    return 0;
 }
 
 fn get_current_scancode() -> i64 {

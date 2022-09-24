@@ -6,6 +6,8 @@
 #include "../syscalls/syscalls.h"
 
 static Window *new_window;
+static int x_base = 515;
+static int y_base = 470;
 
 int main()
 {
@@ -14,14 +16,14 @@ int main()
     //     printf("arg %d = %s\n", i, argv[i]);
     // }
     new_window = malloc(sizeof(Window));
-    new_window->x = 510;
-    new_window->y = 450;
-    new_window->width = 300;
-    new_window->height = 300;
-    new_window->x_final = 515;
-    new_window->y_final = 475;
+    new_window->x = 200;
+    new_window->y = 200;
+    new_window->width = 600;
+    new_window->height = 400;
+    new_window->name = "Terminal";
 
-    create_window(510, 450, 300, 300);
+    int wid = create_window(new_window);
+    initalise_window_buffer(wid);
 
     paint_all();
 
@@ -43,7 +45,7 @@ int main()
                 // Check for enter key being pressed and do command otherwise, append to string
                 if (keycode == 0x1c)
                 {
-                    new_window->y_final += 20; // Move onto next line
+                    y_base += 20;              // Move onto next line
                     evaluate_command(command); // Evaluate command
                     memset(command, 0, 255);   // Empty string
                     count = 0;
@@ -52,27 +54,26 @@ int main()
                 {
                     command[count] = event->key_pressed;
                     count++;
-                    paint_string(command, new_window);
+                    paint_string(command, 0, x_base, y_base);
                 }
             }
         }
     }
-    return 0;
 }
 
 int evaluate_command(char command[255])
 {
     if (strcmp(command, "hello") == 0)
     {
-        paint_string("Hello there user", new_window);
+        paint_string("Hello there user", 0, x_base, y_base);
     }
     else if (strcmp(command, "doom") == 0)
     {
-        paint_string("Doom rus on sidos!", new_window);
+        paint_string("Doom runs on sidos!", 0, x_base, y_base);
     }
     else
     {
-        paint_string("Unknown command", new_window);
+        paint_string("Unknown command", 0, x_base, y_base);
     }
-    new_window->y_final += 20;
+    y_base += 20;
 }

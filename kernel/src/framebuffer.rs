@@ -83,7 +83,7 @@ pub static mut EVENT_MEMORY_LOCATION: *mut Event = 0 as *mut Event;
 
 pub static WINDOW_MANAGER: Lock<WindowManager> = Lock::new(WindowManager::new(1024, 768));
 
-trait FramebuffferEntity {
+pub trait FramebuffferEntity {
     fn clip(&mut self, dirty_rectangles: Stack<Rectangle>) {} // Performs clipping
     fn refresh(&mut self) {} // Writes pixels from buffer to framebuffer essentially refreshing the screen
     fn clipped_rectangles(&mut self) -> &mut Stack<Rectangle>; // Returns a reference to clipped rectangles
@@ -134,12 +134,13 @@ pub struct WindowManager {
     width: u64,
     height: u64,
     clipped_rectangles: Stack<Rectangle>,
-    child_windows: Stack<Window>,
+    pub child_windows: Stack<Window>,
     drag_child: Option<*mut Window>,
     mouse_x: u64,
     mouse_y: u64,
     drag_x_offset: u64,
     drag_y_offset: u64,
+    wid_counter: u64,
 }
 
 impl WindowManager {
@@ -154,6 +155,7 @@ impl WindowManager {
             mouse_y: SCREEN_HEIGHT / 2,
             drag_x_offset: 0,
             drag_y_offset: 0,
+            wid_counter: 0,
         }
     }
 
@@ -180,8 +182,11 @@ impl WindowManager {
     }
 
     // Creates a new window within itself (utilised for the desktop window)
-    pub fn add_sub_window(&mut self, window: Window) {
-        self.child_windows.push(window);
+    pub fn add_sub_window(&mut self, window: &mut Window) -> u64 {
+        window.wid = self.wid_counter;
+        self.wid_counter += 1;
+        self.child_windows.push(window.clone());
+        window.wid
     }
 
     // Updates the event upon a selected window being sent for a process
@@ -344,7 +349,7 @@ impl FramebuffferEntity for WindowManager {
 
             for y in y_base..y_limit {
                 for x in x_base..x_limit {
-                    let offset = (0xa00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                    let offset = (0xc00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
                     unsafe {
                         *offset = BACKGROUND_COLOUR;
                     }
@@ -366,15 +371,16 @@ impl FramebuffferEntity for WindowManager {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Window {
     title: &'static str,
-    x: u64,
-    y: u64,
-    width: u64,
-    height: u64,
+    pub x: u64,
+    pub y: u64,
+    pub width: u64,
+    pub height: u64,
     colour: u32,
     clipped_rectangles: Stack<Rectangle>,
     event: Event,
     buffer: u64,
     parent: Option<*mut WindowManager>,
+    pub wid: u64,
 }
 
 impl Window {
@@ -387,7 +393,7 @@ impl Window {
         parent: Option<*mut WindowManager>,
         colour: u32,
     ) -> Self {
-        let buffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(90) as u64;
+        let buffer_address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(350) as u64;
         PAGE_FRAME_ALLOCATOR.free();
         Window {
             title,
@@ -400,6 +406,7 @@ impl Window {
             clipped_rectangles: Stack::<Rectangle>::new(),
             event: Event::new(0, 0, 0, 0, 0),
             buffer: 0,
+            wid: 0,
         }
     }
 
@@ -407,7 +414,7 @@ impl Window {
         Paints window upon it's internal buffer
         Note: Does not modify actual framebuffer
     */
-    fn paint(&mut self, dirty_rectangles: Stack<Rectangle>) {
+    pub fn paint(&mut self, dirty_rectangles: Stack<Rectangle>) {
         // Apply bound clipping to obtain visible parts of window
         self.clip(dirty_rectangles.clone());
 
@@ -420,13 +427,29 @@ impl Window {
 
     /*
         Contents of window which is stored within bufer is what is copied to framebuffer upon a redraw
-        Copies bytes from another bufer to this internal buffer
+        Copies bytes from another bufer to this internal buffer (works well for games like doom)
     */
-    pub fn update_buffer_from_buffer(&mut self) {}
+    pub fn update_buffer_from_buffer(&mut self, buffer_src: *const u32) {
+        let buffer_dest = self.buffer as *mut u32;
+
+        // For testing begin at y=20
+
+        let mut buffer_y = 0;
+
+        for y in 20..(400) {
+            for x in 0..(self.width - 5) {
+                unsafe {
+                    *buffer_dest.offset((y * self.width + x) as isize) =
+                        *buffer_src.offset((buffer_y * self.width + x) as isize);
+                }
+            }
+            buffer_y += 1;
+        }
+    }
 
     /*
         Contents of window which is stored within bufer is what is copied to framebuffer upon a redraw
-        Update region of the buffer by writting pixels to a certain area
+        Update region of the buffer by writting pixels of colour to a certain area
     */
     pub fn update_buffer_region_to_colour(
         &mut self,
@@ -436,12 +459,21 @@ impl Window {
         y_limit: u64,
         colour: u32,
     ) {
-        // Update portion of buffer to a certain colour
         let buffer_p = self.buffer as *mut u32;
+
+        print_serial!(
+            "x_base {}, x_limit {}, y_base {}, y_limit: {}\n",
+            x_base,
+            x_limit,
+            y_base,
+            y_limit
+        );
+
         for y in y_base..y_limit {
             for x in x_base..x_limit {
                 unsafe {
                     *buffer_p.offset((y * self.width + x) as isize) = colour;
+                    // print_serial!("{} {}\n", x, y);
                 }
             }
         }
@@ -469,7 +501,12 @@ impl Window {
                                 (*glyph_address.offset(cy as isize) as u16) & (1 << index);
                             if glyph_offset > 0 {
                                 *buffer_p.offset((adjusted_y * self.width + adjusted_x) as isize) =
-                                    0x00;
+                                    0x01;
+
+                                // print_serial!(
+                                //     "WRITING STRING TO {}\n",
+                                //     (adjusted_y * self.width + adjusted_x)
+                                // );
                             }
                             index -= 1;
                         }
@@ -625,15 +662,17 @@ impl FramebuffferEntity for Window {
                 let x_limit = clip.right;
                 let y_limit = clip.bottom;
 
-                let mut buffer_x = (x_base - self.x);
-                let mut buffer_y = (y_base - self.y);
+                let mut buffer_x = 0;
+                let mut buffer_y = 0;
+
+                // print_serial!("{:?} index {}\n", clip, (buffer_y * self.width + buffer_x));
 
                 for y in y_base..y_limit {
                     for x in x_base..x_limit {
-                        let offset = (0xa00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                        let offset = (0xc00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
                         let buffer_p = self.buffer as *const u32;
                         unsafe {
-                            *offset = *buffer_p.offset((buffer_y * self.height + buffer_x) as isize)
+                            *offset = *buffer_p.offset((buffer_y * self.width + buffer_x) as isize)
                         }
                         buffer_x += 1;
                     }

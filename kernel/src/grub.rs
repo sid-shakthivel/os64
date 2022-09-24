@@ -86,10 +86,6 @@ pub fn initialise_userland(boot_info: &BootInformation) {
                     DOOM1_WAD_ADDRESS = dest as u64;
                     DOOM1_WAD_OFFSET = 0;
                     DOOM_SIZE = module.module_size() as u64;
-                    print_serial!(
-                        "ADDRESS OF END IS = 0x{:x}\n",
-                        module.module_size() as u64 + dest as u64
-                    );
                 }
 
                 unsafe {

@@ -28,6 +28,7 @@ pub struct Process {
     pub rsp: *const u64,
     pub process_priority: ProcessPriority,
     pub cr3: *mut Table,
+    pub messages: Stack<Message>,
 }
 
 /*
@@ -35,7 +36,7 @@ pub struct Process {
     - a command (what program should do)
     - pid of the process which requested the action (in order to send it an ACK)
 */
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Message {
     command: &'static str,
     return_pid: u64,
@@ -156,31 +157,32 @@ impl ProcessSchedular {
         Sends a message from current task to another task in which messages are strings which can be processed
         Works by appending a message to the other process' message stack
     */
-    // pub fn send_message(&mut self, pid: u64, message_contents: &str) {
-    //     // Get the process
-    //     for i in 0..MAX_PROCESS_NUM {
-    //         if i == pid {
-    //             self.tasks[i]
-    //                 .unwrap()
-    //                 .messages
-    //                 .push(Message::new(message_contents));
-    //         }
-    //     }
-    // }
+    pub fn send_message(&mut self, pid: u64, message_contents: &'static str) {
+        // Get the process
+        for i in 0..MAX_PROCESS_NUM {
+            if i == (pid as usize) {
+                self.tasks[i]
+                    .unwrap()
+                    .messages
+                    .push(Message::new(message_contents, pid));
+            }
+        }
+    }
 
     /*
         Recieve a message from task for a specific process
     */
-    // pub fn receive_message(&mut self, pid: u64) -> Message {
-    //     // Get the process
-    //     for i in 0..MAX_PROCESS_NUM {
-    //         if i == pid {
-    //             if let Some(message) = self.tasks[i].unwrap().messages.pop() {
-    //                 message.clone()
-    //             }
-    //         }
-    //     }
-    // }
+    pub fn receive_message(&mut self, pid: u64) -> Option<Message> {
+        // Get the process
+        for i in 0..MAX_PROCESS_NUM {
+            if i == (pid as usize) {
+                unsafe {
+                    return Some((*self.tasks[i].unwrap().messages.pop()).payload);
+                }
+            }
+        }
+        return None;
+    }
 }
 
 impl Process {
@@ -251,6 +253,7 @@ impl Process {
             rsp: rsp,
             process_priority: process_priority,
             cr3: new_p4,
+            messages: Stack::<Message>::new(),
         }
     }
 }

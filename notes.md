@@ -24,18 +24,22 @@ Usermode:
 - Timer bug with RSP
 
 GUI:
-- Double buffering with REP MOVSB 
-- Gradient with clipping and mouse...
-- Handle text on moving
+- Writeup double buffering
+- Gradient with clipping and mouse (working on it)
 - Bochs issue - mask value must be corrupted
+- Get doom working within syscalls (rewrite them using fs to clean up)
+- Doesn't copy to buffer properly (text gets scrambled - roughly correct)
+- Cetnre title text within initalise_window_buffer (syscalls)
+- Add scancode to Event properly
 
 FS:
 - Load userspace programs from fs instead of modules
+- Fully integrate the fs
 - Make new verify functions in fs
 - Creating new files with fs fails (maybe)
 
 Memory:
-- Start of memory
+- Start of memory bug
 - malloc/free bugs
 - Bitflags (paging)
 
@@ -86,7 +90,9 @@ impl<A> Locked<A> {
 //     self.height,
 // ); -->
 
-Doesn't copy to buffer properly (text gets scrambled - roughly correct)
-Fill window buffer through syscall
-Rewrite the whole 
-Get doom working through a window
+fix draw string moving bug (use buffer coords in thing)
+update_buffer_region_to_colour fails with doom second time
+syscall to copy to internal buffer fails
+
+after window is over 300 then random failure
+the issue lies with copying to the buffer

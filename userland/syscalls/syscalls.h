@@ -1,19 +1,21 @@
+#include <stdint.h>
+
 typedef struct Event
 {
     int mouse_x;
     int mouse_y;
+    int scancode;
     int mask;
     char key_pressed;
 } Event;
 
-typedef struct Window
+typedef struct Windowss
 {
     int x;
     int y;
     int width;
     int height;
-    int x_final;
-    int y_final;
+    char *name;
 } Window;
 
 void _exit();
@@ -31,11 +33,14 @@ int read(int file, char *ptr, int len);
 // int stat(const char *file, struct stat *st);
 // clock_t times(struct tms *buf);
 // int unlink(char *name);
-int create_window(int x, int y, int width, int height);
+int create_window(Window *new_window);
 int paint_all();
 Event *get_event();
 int get_current_scancode();
-int paint_string(char *ptr, Window *new_window);
+int paint_string(char *ptr, int wid, int x, int y);
+int initalise_window_buffer(int wid);
+int copy_to_buffer(int wid, uint32_t *buffer);
+
 // int wait(int *status);
 int lseek(int file, int ptr, int dir);
 int write(int file, char *ptr, int len);
