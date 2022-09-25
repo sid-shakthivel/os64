@@ -6,8 +6,8 @@
 #include "../syscalls/syscalls.h"
 
 static Window *new_window;
-static int x_base = 515;
-static int y_base = 470;
+static int x_base = 5;
+static int y_base = 20;
 
 int main()
 {
@@ -43,7 +43,7 @@ int main()
                 int keycode = (int)event->key_pressed;
 
                 // Check for enter key being pressed and do command otherwise, append to string
-                if (keycode == 0x1c)
+                if (event->scancode == 0x1c)
                 {
                     y_base += 20;              // Move onto next line
                     evaluate_command(command); // Evaluate command

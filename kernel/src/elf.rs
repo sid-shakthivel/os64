@@ -21,7 +21,6 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::multitask::USER_PROCESS_START_ADDRESS;
 use crate::page_frame_allocator::{self, FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::CONSOLE;
 use crate::{paging, print_serial};
@@ -186,8 +185,6 @@ fn validate_file(elf_header: &ElfHeader) -> bool {
 */
 fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
     // Loop through the headers and load each loadable segment into memory
-    let mut begin_address = USER_PROCESS_START_ADDRESS;
-
     for i in 0..elf_header.e_phnum {
         let address = file_start
             + elf_header.e_phoff
@@ -198,7 +195,7 @@ fn parse_program_headers(file_start: u64, elf_header: &ElfHeader) {
             1 => {
                 // LOAD
                 let source = file_start + program_header.p_offset as u64;
-                begin_address = load_segment_into_memory(
+                load_segment_into_memory(
                     source,
                     program_header.p_filesz,
                     program_header.p_memsz,

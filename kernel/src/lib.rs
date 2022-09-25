@@ -34,16 +34,11 @@ extern crate multiboot2;
 extern crate bitflags;
 extern crate x86_64;
 
-use crate::framebuffer::Rectangle;
-use crate::framebuffer::Window;
 use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
-use core::f32::consts::FRAC_1_PI;
 use core::panic::PanicInfo;
-use framebuffer::FRAMEBUFFER;
-use list::Stack;
 use multiboot2::load;
 
 #[no_mangle]

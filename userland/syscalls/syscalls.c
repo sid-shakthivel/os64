@@ -166,15 +166,16 @@ int initalise_window_buffer(int wid)
     return (int)result;
 }
 
-int copy_to_buffer(int wid, uint32_t *buffer)
+int copy_to_buffer(int wid, uint32_t *buffer, int y_offset)
 {
     int64_t result;
     asm volatile("mov %1, %%ebx \n\t\
         mov %2, %%ecx \n\t\
+        mov %3, %%edx \n\t\
         mov $18, %%eax \n\t\
         int $0x80 \n\t\
         "
                  : "=r"(result)
-                 : "r"(wid), "m"(buffer));
+                 : "r"(wid), "m"(buffer), "r"(y_offset));
     return (int)result;
 }

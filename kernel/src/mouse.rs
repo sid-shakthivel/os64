@@ -17,7 +17,6 @@
 
 use crate::framebuffer;
 use crate::framebuffer::WINDOW_MANAGER;
-use crate::ports::io_wait;
 use crate::print_serial;
 use crate::ps2;
 use crate::spinlock::Lock;

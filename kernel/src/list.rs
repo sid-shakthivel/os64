@@ -1,7 +1,6 @@
 // src/list.rs
 
 use crate::{
-    allocator::kmalloc,
     page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
 };
 

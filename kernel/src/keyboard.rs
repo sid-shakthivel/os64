@@ -71,7 +71,7 @@ impl Keyboard {
 
             match scancode {
                 0x26 => {
-                    WINDOW_MANAGER.lock().handle_keyboard('l');
+                    WINDOW_MANAGER.lock().handle_keyboard('l', 0x26);
                     WINDOW_MANAGER.free();
                 }
                 0x2A => self.is_upper = true,  // Left shift pressed
@@ -88,7 +88,7 @@ impl Keyboard {
 
                     // Check for letter or enter key
                     if scancode == 0x1c || letter != '0' {
-                        WINDOW_MANAGER.lock().handle_keyboard(letter);
+                        WINDOW_MANAGER.lock().handle_keyboard(letter, scancode);
                         WINDOW_MANAGER.free();
                     }
                 }

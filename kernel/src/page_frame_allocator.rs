@@ -9,7 +9,6 @@ A stack of free pages along with a pointer to the first page will be used in ord
 
 use crate::{list::Stack, print_serial, spinlock::Lock, CONSOLE};
 use multiboot2::BootInformation;
-use x86_64::structures::paging::page;
 pub struct PageFrameAllocator {
     pub free_frames: Stack<u64>,
     pub current_page: u64,

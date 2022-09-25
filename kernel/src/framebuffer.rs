@@ -13,15 +13,16 @@
     A dirty rectangle list is a way to keep track of regions of the screen which need to be repainted which can be used upon the dragging of windows
     PSF(PC Screen Font) fonts consist of header, font, and unicode information
     Glyphs are bitmaps of 8*16
+
+    Utilises double buffering of sorts
     Each window contains a buffer of it's internal state in which work is completed upon
-    This buffer is written to video memory through the ffron buffer
+    The frontbuffer is written to through each window buffer
     Advantage is users do not see pixel modifications and writting to video memory is expensive
 */
 
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use crate::allocator::kmalloc;
 use crate::list::Stack;
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR};
 use crate::print_serial;
@@ -212,12 +213,13 @@ impl WindowManager {
     }
 
     // Updates event field upon a selected window on a key click
-    pub fn handle_keyboard(&mut self, key_pressed: char) {
+    pub fn handle_keyboard(&mut self, key_pressed: char, scancode: u8) {
         // Get the top child as that is likely selected by user
         if let Some(selected_window_wrapped) = self.child_windows.head {
             // Ensure when handling updates it sets the correct mask and key
             unsafe {
                 (*selected_window_wrapped).payload.event.key_pressed = key_pressed as u8;
+                (*selected_window_wrapped).payload.event.scancode = scancode as i32;
                 (*selected_window_wrapped).payload.event.mask |= 0b00000001;
             }
         }
@@ -370,7 +372,7 @@ impl FramebuffferEntity for WindowManager {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Window {
-    title: &'static str,
+    pub title: &'static str,
     pub x: u64,
     pub y: u64,
     pub width: u64,
@@ -405,7 +407,7 @@ impl Window {
             parent,
             clipped_rectangles: Stack::<Rectangle>::new(),
             event: Event::new(0, 0, 0, 0, 0),
-            buffer: 0,
+            buffer: buffer_address,
             wid: 0,
         }
     }
@@ -427,17 +429,16 @@ impl Window {
 
     /*
         Contents of window which is stored within bufer is what is copied to framebuffer upon a redraw
+        Takes a y offset
         Copies bytes from another bufer to this internal buffer (works well for games like doom)
     */
-    pub fn update_buffer_from_buffer(&mut self, buffer_src: *const u32) {
+    pub fn update_buffer_from_buffer(&mut self, buffer_src: *const u32, y_offset: u64) {
         let buffer_dest = self.buffer as *mut u32;
-
-        // For testing begin at y=20
 
         let mut buffer_y = 0;
 
-        for y in 20..(400) {
-            for x in 0..(self.width - 5) {
+        for y in y_offset..self.height {
+            for x in 0..self.width {
                 unsafe {
                     *buffer_dest.offset((y * self.width + x) as isize) =
                         *buffer_src.offset((buffer_y * self.width + x) as isize);
@@ -473,7 +474,6 @@ impl Window {
             for x in x_base..x_limit {
                 unsafe {
                     *buffer_p.offset((y * self.width + x) as isize) = colour;
-                    // print_serial!("{} {}\n", x, y);
                 }
             }
         }
@@ -502,11 +502,6 @@ impl Window {
                             if glyph_offset > 0 {
                                 *buffer_p.offset((adjusted_y * self.width + adjusted_x) as isize) =
                                     0x01;
-
-                                // print_serial!(
-                                //     "WRITING STRING TO {}\n",
-                                //     (adjusted_y * self.width + adjusted_x)
-                                // );
                             }
                             index -= 1;
                         }
@@ -655,17 +650,15 @@ impl FramebuffferEntity for Window {
                 && clip.left >= self.x
                 && clip.right <= (self.x + self.width)
             {
-                // TODO: CLAMP VALUES
+                // Copy each clipping rectangle to the framebuffer
 
                 let x_base = clip.left;
                 let y_base = clip.top;
                 let x_limit = clip.right;
                 let y_limit = clip.bottom;
 
-                let mut buffer_x = 0;
-                let mut buffer_y = 0;
-
-                // print_serial!("{:?} index {}\n", clip, (buffer_y * self.width + buffer_x));
+                let mut buffer_x = x_base - self.x;
+                let mut buffer_y = y_base - self.y;
 
                 for y in y_base..y_limit {
                     for x in x_base..x_limit {

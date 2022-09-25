@@ -14,33 +14,24 @@ Other Tasks:
 - Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
 - Fix binutils and get ld to work properly (doesn't build on MacOS https://github.com/spack/spack/issues/3213)
 - Add syslinks to newlib makefile 
-- Priority based round robin
 - Custom error handling with enums (custom enums for each file, asserts used instead of panic, use of ?)
-- Clean code (Remove all the static mut)
+- Clean code 
 
 Usermode:
 - Switching address space is broken with cr3
-- IPC process
 - Timer bug with RSP
-
-GUI:
-- Writeup double buffering
-- Gradient with clipping and mouse (working on it)
-- Bochs issue - mask value must be corrupted
-- Get doom working within syscalls (rewrite them using fs to clean up)
-- Doesn't copy to buffer properly (text gets scrambled - roughly correct)
-- Cetnre title text within initalise_window_buffer (syscalls)
-- Add scancode to Event properly
+- Test IPC
+- Priority based round robin
 
 FS:
 - Load userspace programs from fs instead of modules
-- Fully integrate the fs
+- Fix syscalls and integrate with fs
 - Make new verify functions in fs
-- Creating new files with fs fails (maybe)
+- Test creating new files with fs fails 
 
 Memory:
 - Start of memory bug
-- malloc/free bugs
+- malloc/free bugs 
 - Bitflags (paging)
 
 Potential Problems:
@@ -78,21 +69,3 @@ impl<A> Locked<A> {
 //     }
 // } -->
 
-<!-- // Paint the title text and centre it
-// FRAMEBUFFER.lock().draw_string(
-//     Some(&self.clipped_rectangles),
-//     self.title,
-//     self.x + (self.width / 2 - (self.title.as_bytes().len() * 8) as u64 / 2),
-//     self.y + (WINDOW_TITLE_HEIGHT - 10) / 2,
-//     self.x,
-//     self.y,
-//     self.width,
-//     self.height,
-// ); -->
-
-fix draw string moving bug (use buffer coords in thing)
-update_buffer_region_to_colour fails with doom second time
-syscall to copy to internal buffer fails
-
-after window is over 300 then random failure
-the issue lies with copying to the buffer

@@ -85,7 +85,7 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
         15 => lseek(registers.rdx, registers.rcx as i64, registers.rbx),
         16 => get_current_scancode(),
         17 => initalise_window_buffer(registers.rbx),
-        18 => copy_to_buffer(registers.rbx, registers.rcx as *mut u32),
+        18 => copy_to_buffer(registers.rbx, registers.rcx as *mut u32, registers.rdx),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -347,7 +347,8 @@ fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
 fn create_window(new_window_data_p: *const CondensedWindow) -> i64 {
     let new_window_data = unsafe { &*new_window_data_p };
 
-    let new_window_name = crate::string::get_string_from_ptr(new_window_data.name);
+    let mut new_window_name = crate::string::get_string_from_ptr(new_window_data.name);
+    new_window_name = &new_window_name[0..new_window_name.len() - 1];
 
     let mut new_window = Window::new(
         new_window_name,
@@ -378,6 +379,7 @@ fn initalise_window_buffer(wid: u64) -> i64 {
             unsafe {
                 let width = (*mut_window_ptr).width;
                 let height = (*mut_window_ptr).height;
+                let title = (*mut_window_ptr).title;
 
                 print_serial!("Initalising the window buffer\n");
                 (*mut_window_ptr).update_buffer_region_to_colour(
@@ -398,7 +400,11 @@ fn initalise_window_buffer(wid: u64) -> i64 {
                     crate::framebuffer::WINDOW_BACKGROUND_COLOUR,
                 );
 
-                // (*mut_window_ptr).draw_string("Hello", 5, 20);
+                (*mut_window_ptr).draw_string(
+                    title,
+                    width / 2 - (title.as_bytes().len() * 8) as u64 / 2,
+                    2,
+                );
             }
 
             print_serial!("Finished init'ing window buffer\n");
@@ -413,14 +419,15 @@ fn initalise_window_buffer(wid: u64) -> i64 {
 }
 
 // Copies data from one buffer into an internal buffer of a window and refreshes the screen
-fn copy_to_buffer(wid: u64, buffer: *mut u32) -> i64 {
+fn copy_to_buffer(wid: u64, buffer: *mut u32, y_offset: u64) -> i64 {
+    // panic!("y offset = {}", y_offset);
     for (i, window) in WINDOW_MANAGER.lock().child_windows.into_iter().enumerate() {
         if window.unwrap().payload.clone().wid == wid {
             let const_window_ptr = &window.unwrap().payload as *const Window;
             let mut_window_ptr = const_window_ptr as *mut Window;
 
             unsafe {
-                (*mut_window_ptr).update_buffer_from_buffer(buffer);
+                (*mut_window_ptr).update_buffer_from_buffer(buffer, y_offset);
                 (*mut_window_ptr).paint(Stack::<Rectangle>::new());
             }
         }
@@ -457,9 +464,7 @@ fn draw_string(string_ptr: *const u8, wid: u64, x: u64, y: u64) -> i64 {
             let mut_window_ptr = const_window_ptr as *mut Window;
 
             unsafe {
-                let adjusted_x = x - (*mut_window_ptr).x;
-                let adjusted_y = y - (*mut_window_ptr).y;
-                (*mut_window_ptr).draw_string(string, adjusted_x, adjusted_y);
+                (*mut_window_ptr).draw_string(string, x, y);
                 (*mut_window_ptr).paint(Stack::<Rectangle>::new());
             }
         }
