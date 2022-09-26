@@ -119,6 +119,44 @@ impl<T: Copy + Debug + PartialEq> HashMap<T> {
         }
     }
 
+    pub fn get_mut_ref(&self, key: usize) -> Option<*mut T> {
+        let index = self.hash(key);
+        if index > CAPACITY {
+            return None;
+        }
+
+        match self.items[index] {
+            Some(item) => {
+                // Check if the item required is the node
+                if item.key == key {
+                    let const_ptr = &item as *const HashItem<T>;
+                    let mut_ptr = const_ptr as *mut HashItem<T>;
+                    let best = unsafe { &mut (*mut_ptr).value as *mut T };
+
+                    return Some(best);
+                }
+
+                if let Some(list) = item.list {
+                    for (_i, item) in list.into_iter().enumerate() {
+                        let const_ptr = &item.unwrap().payload as *const HashItem<T>;
+                        let mut_ptr = const_ptr as *mut HashItem<T>;
+
+                        unsafe {
+                            let best = &mut (*mut_ptr).value as *mut T;
+
+                            if (*mut_ptr).key == key {
+                                return Some(best);
+                            }
+                        }
+                    }
+                }
+
+                None
+            }
+            None => None,
+        }
+    }
+
     // Removes an element from the hashmap
     pub fn remove(&mut self, key: usize) {
         let index = self.hash(key);

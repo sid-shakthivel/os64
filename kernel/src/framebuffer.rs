@@ -299,9 +299,14 @@ impl WindowManager {
         self.paint(dirty_rectangles, true);
 
         // Paint mouse
-        FRAMEBUFFER
-            .lock()
-            .fill_rect(None, mouse_x, mouse_y, 5, 5, 0xFF0000);
+        for y in mouse_y..(mouse_y + 5) {
+            for x in (mouse_x)..(mouse_x + 5) {
+                let offset = (0xf50000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                unsafe {
+                    *offset = 0xFF0000;
+                }
+            }
+        }
 
         self.mouse_x = mouse_x;
         self.mouse_y = mouse_y;
@@ -351,7 +356,7 @@ impl FramebuffferEntity for WindowManager {
 
             for y in y_base..y_limit {
                 for x in x_base..x_limit {
-                    let offset = (0xc00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                    let offset = (0xf50000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
                     unsafe {
                         *offset = BACKGROUND_COLOUR;
                     }
@@ -662,7 +667,7 @@ impl FramebuffferEntity for Window {
 
                 for y in y_base..y_limit {
                     for x in x_base..x_limit {
-                        let offset = (0xc00000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                        let offset = (0xf50000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
                         let buffer_p = self.buffer as *const u32;
                         unsafe {
                             *offset = *buffer_p.offset((buffer_y * self.width + buffer_x) as isize)
@@ -757,14 +762,6 @@ impl Rectangle {
     }
 }
 
-pub struct Framebuffer {
-    pitch: u64,
-    bpp: u64,
-    frontbuffer: u64,
-    font_start: u32,
-    font: Option<PsfFont>,
-}
-
 #[derive(Copy, Clone, Debug)]
 struct PsfFont {
     magic: u32,
@@ -798,217 +795,9 @@ impl PsfFont {
     }
 }
 
-pub static FRAMEBUFFER: spin::Mutex<Framebuffer> = spin::Mutex::new(Framebuffer::new());
-
-impl Framebuffer {
-    pub const fn new() -> Framebuffer {
-        Framebuffer {
-            pitch: 0,
-            bpp: 0,
-            frontbuffer: 0,
-            font_start: 0,
-            font: None,
-        }
-    }
-
-    /*  Recives a list of clipped rectangles (these rectangles are to be rendered upon the screen)
-        Loops through that list and clamps the clipping rects to the window before drawing
-        If clipped rectangles are not supplied, simply clamps to the screen and draws pixels
-    */
-    pub fn fill_rect(
-        &mut self,
-        clipped_rectangles: Option<&Stack<Rectangle>>,
-        mut x: u64,
-        mut y: u64,
-        width: u64,
-        height: u64,
-        colour: u32,
-    ) {
-        match clipped_rectangles {
-            Some(rectangles) => {
-                for (_i, clipped_rectangle) in rectangles.into_iter().enumerate() {
-                    let clip = clipped_rectangle.unwrap().payload;
-
-                    // Clamp printable area to clipped region itself
-                    let x_base = core::cmp::max(x, clip.left);
-                    let y_base = core::cmp::max(y, clip.top);
-                    let x_limit = core::cmp::min(x + width, clip.right);
-                    let y_limit = core::cmp::min(y + height, clip.bottom);
-
-                    for i in x_base..x_limit {
-                        for j in y_base..y_limit {
-                            self.draw_pixel(i, j, colour);
-                        }
-                    }
-                }
-            }
-            None => {
-                x = core::cmp::max(x, 0);
-                y = core::cmp::max(y, 0);
-
-                if x.checked_add(width).is_some() && y.checked_add(height).is_some() {
-                    let x_limit = core::cmp::min(x + width, SCREEN_WIDTH);
-                    let y_limit = core::cmp::min(y + height, SCREEN_HEIGHT);
-
-                    for i in x..x_limit {
-                        for j in y..y_limit {
-                            self.draw_pixel(i, j, colour);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn fill_gradient_rect(&mut self, x: u64, y: u64, width: u64, height: u64) {
-        let r1 = ((0x00b5da & 0xFF0000) >> 16) as f64;
-        let r2 = ((0x0b0554 & 0xFF0000) >> 16) as f64;
-
-        let g1 = ((0x00b5da & 0x00FF00) >> 8) as f64;
-        let g2 = ((0x0b0554 & 0x00FF00) >> 8) as f64;
-
-        let b1 = (0x00b5da & 0x0000FF) as f64;
-        let b2 = (0x0b0554 & 0x0000FF) as f64;
-
-        let h = (height) as f64;
-
-        let r_offset: f64 = (r2 - r1) / h;
-        let g_offset: f64 = (g2 - g1) / h;
-        let b_offset: f64 = (b2 - b1) / h;
-
-        let mut current_r = r1;
-        let mut current_g = g1;
-        let mut current_b = b1;
-
-        let mut colour = BACKGROUND_COLOUR;
-
-        for i in y..(y + height) {
-            colour = current_b as u32 | ((current_g as u32) << 8) | ((current_r as u32) << 16);
-            for j in x..(x + width) {
-                self.draw_pixel(j, i, colour);
-            }
-            current_r += r_offset;
-            current_g += g_offset;
-            current_b += b_offset;
-        }
-    }
-
-    // Draws outline of rectangle only
-    pub fn draw_rect_outline(
-        &mut self,
-        clipped_rectangles: Option<&Stack<Rectangle>>,
-        x: u64,
-        y: u64,
-        width: u64,
-        height: u64,
-        colour: u32,
-    ) {
-        if x.checked_add(width).is_some() && y.checked_add(height).is_some() {
-            // Top bar
-            self.draw_horizontal_line(clipped_rectangles, x, y, width, colour);
-
-            // Bottom bar
-            self.draw_horizontal_line(clipped_rectangles, x, y + height - 3, width, colour);
-
-            // Left bar
-            self.draw_vertical_line(clipped_rectangles, x, y, height, colour);
-
-            // Right bar
-            self.draw_vertical_line(clipped_rectangles, x + width - 3, y, height, colour);
-        }
-    }
-
-    pub fn draw_pixel(&mut self, x: u64, y: u64, byte: u32) {
-        let offset = (self.frontbuffer + (y * 4096) + ((x * 32) / 8)) as *mut u32;
-        unsafe {
-            *offset = byte;
-        }
-    }
-
-    fn draw_horizontal_line(
-        &mut self,
-        clipped_rectangles: Option<&Stack<Rectangle>>,
-        x: u64,
-        y: u64,
-        length: u64,
-        colour: u32,
-    ) {
-        self.fill_rect(clipped_rectangles, x, y, length, 3, colour);
-    }
-
-    fn draw_vertical_line(
-        &mut self,
-        clipped_rectangles: Option<&Stack<Rectangle>>,
-        x: u64,
-        y: u64,
-        length: u64,
-        colour: u32,
-    ) {
-        self.fill_rect(clipped_rectangles, x, y, 3, length, colour);
-    }
-
-    pub fn draw_string(
-        &mut self,
-        clipped_rectangles: Option<&Stack<Rectangle>>,
-        string: &str,
-        mut final_x: u64,
-        final_y: u64,
-        x: u64,
-        y: u64,
-        width: u64,
-        height: u64,
-    ) {
-        if let Some(rectangles) = clipped_rectangles {
-            for (i, clipped_rect) in rectangles.into_iter().enumerate() {
-                let clip = clipped_rect.unwrap().payload;
-
-                if x >= clip.left
-                    && y >= clip.top
-                    && (x + width) <= clip.right
-                    && (y + height) <= clip.bottom
-                {
-                    for byte in string.as_bytes() {
-                        self.draw_clipped_character(*byte as char, final_x, final_y);
-                        final_x += 8;
-                    }
-                }
-            }
-        } else {
-            for byte in string.as_bytes() {
-                self.draw_clipped_character(*byte as char, final_x, final_y);
-                final_x += 8;
-            }
-        }
-    }
-
-    fn draw_clipped_character(&mut self, character: char, x: u64, y: u64) {
-        if let Some(font) = self.font {
-            let glyph_address =
-                (self.font_start + font.header_size + (font.bytes_per_glyph * (character as u32)))
-                    as *mut u8;
-
-            for cy in 0..16 {
-                let mut index = 8;
-                for cx in 0..8 {
-                    let adjusted_x = x + cx;
-                    let adjusted_y = y + cy;
-
-                    // Load correct bitmap for glyph
-                    let glyph_offset: u16 =
-                        unsafe { (*glyph_address.offset(cy as isize) as u16) & (1 << index) };
-                    if glyph_offset > 0 {
-                        self.draw_pixel(adjusted_x, adjusted_y, 0x00);
-                    }
-                    index -= 1;
-                }
-            }
-        }
-    }
-}
-
-impl Writer for Framebuffer {
+impl Writer for WindowManager {
     fn clear(&mut self) {
-        self.fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x00);
+        // self.fill_rect(None, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0x00);
     }
 
     fn put_char(&mut self, character: char) {
@@ -1028,15 +817,10 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     let font_start = font_end - font_size;
 
     unsafe {
-        FONT = unsafe { Some(*(font_start as *const PsfFont)) };
+        FONT = Some(*(font_start as *const PsfFont));
         FONT_START = font_start;
         FONT.unwrap().verify();
     }
-
-    FRAMEBUFFER.lock().pitch = framebuffer_tag.pitch as u64;
-    FRAMEBUFFER.lock().bpp = framebuffer_tag.bpp as u64;
-    // FRAMEBUFFER.lock().font = Some(font.clone());
-    FRAMEBUFFER.lock().font_start = font_start;
 
     // Calulate sizes of the framebuffer
     let size_in_bytes = ((framebuffer_tag.bpp as u64)
@@ -1057,8 +841,6 @@ pub fn init(framebuffer_tag: FramebufferTag) {
     // Identity map this buffer so it maps to video memory
     paging::identity_map_from(framebuffer_tag.address, frontbuffer_address, size_in_mb);
 
-    FRAMEBUFFER.lock().frontbuffer = frontbuffer_address;
-
     print_serial!("FB ADDRESS 0x{:x}\n", frontbuffer_address);
 
     unsafe {
@@ -1066,6 +848,39 @@ pub fn init(framebuffer_tag: FramebufferTag) {
         PAGE_FRAME_ALLOCATOR.free();
     }
 }
+
+// pub fn fill_gradient_rect(&mut self, x: u64, y: u64, width: u64, height: u64) {
+//     let r1 = ((0x00b5da & 0xFF0000) >> 16) as f64;
+//     let r2 = ((0x0b0554 & 0xFF0000) >> 16) as f64;
+
+//     let g1 = ((0x00b5da & 0x00FF00) >> 8) as f64;
+//     let g2 = ((0x0b0554 & 0x00FF00) >> 8) as f64;
+
+//     let b1 = (0x00b5da & 0x0000FF) as f64;
+//     let b2 = (0x0b0554 & 0x0000FF) as f64;
+
+//     let h = (height) as f64;
+
+//     let r_offset: f64 = (r2 - r1) / h;
+//     let g_offset: f64 = (g2 - g1) / h;
+//     let b_offset: f64 = (b2 - b1) / h;
+
+//     let mut current_r = r1;
+//     let mut current_g = g1;
+//     let mut current_b = b1;
+
+//     let mut colour = BACKGROUND_COLOUR;
+
+//     for i in y..(y + height) {
+//         colour = current_b as u32 | ((current_g as u32) << 8) | ((current_r as u32) << 16);
+//         for j in x..(x + width) {
+//             self.draw_pixel(j, i, colour);
+//         }
+//         current_r += r_offset;
+//         current_g += g_offset;
+//         current_b += b_offset;
+//     }
+// }
 
 extern "C" {
     pub(crate) static _binary_font_psf_end: usize;

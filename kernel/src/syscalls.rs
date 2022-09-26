@@ -7,9 +7,7 @@
     Sidos syscall design is inspired by posix
 */
 
-use crate::framebuffer::{
-    self, Event, FramebuffferEntity, Rectangle, Window, FRAMEBUFFER, WINDOW_MANAGER,
-};
+use crate::framebuffer::{self, Event, FramebuffferEntity, Rectangle, Window, WINDOW_MANAGER};
 use crate::fs::File;
 use crate::grub::{DOOM1_WAD_ADDRESS, DOOM1_WAD_OFFSET, DOOM_SIZE};
 use crate::hashmap::HashMap;
@@ -148,60 +146,9 @@ fn kill(pid: u64, sig: u64) -> i64 {
     return 0;
 }
 
-// Used to open a file for reading/writing and returns the file number
-fn open(name: *const u8, flags: u64) -> i64 {
-    // Get name of file
-
-    let mut filepath = crate::string::get_string_from_ptr(name);
-    filepath = &filepath[0..filepath.len() - 1];
-
-    if filepath == "DOOM1.WAD" {
-        print_serial!("Opening doom1.wad");
-        return 325;
-    }
-
-    print_serial!("OPEN'ING {:?}\n", filepath.as_bytes());
-
-    // Parse filename
-    match filepath.as_bytes()[0] {
-        0x2F => {
-            // Absolute path starting from the root of the entire fs
-            match crate::fs::parse_absolute_filepath(filepath) {
-                Ok(file) => unsafe {
-                    FILE_TABLE_COUNTER += 1;
-
-                    FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
-                    FILE_TABLE.free();
-
-                    return FILE_TABLE_COUNTER;
-                },
-                Err(error) => {
-                    let file_flags = Flags::from_bits_truncate(flags as u32);
-
-                    if file_flags.contains(Flags::O_CREAT) {
-                        let file = crate::fs::create_new_root_file(filepath);
-                        unsafe {
-                            FILE_TABLE_COUNTER += 1;
-                            FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
-                            FILE_TABLE.free();
-
-                            return FILE_TABLE_COUNTER as i64;
-                        }
-                    }
-
-                    1
-                }
-            }
-        }
-        _ => {
-            // Relative path within directory
-            // Relative paths are used when files are within same directory
-            // panic!("RELATIVE FILE PATH of {}\n", filepath.as_bytes()[0]);
-            return -1;
-        }
-    }
-}
-
+/*
+    Allocates a number of pages for liballoc syscall
+*/
 fn allocate_pages(pages_required: u64) -> i64 {
     let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(pages_required);
     PAGE_FRAME_ALLOCATOR.free();
@@ -218,6 +165,50 @@ fn allocate_pages(pages_required: u64) -> i64 {
     address as i64
 }
 
+// Used to open a file for reading/writing and returns the file number
+fn open(name: *const u8, flags: u64) -> i64 {
+    // Get name of file
+    let mut filepath = crate::string::get_string_from_ptr(name);
+    filepath = &filepath[0..filepath.len() - 1];
+
+    // For now ignore relative and absolute filepaths
+    match crate::fs::parse_absolute_filepath(filepath) {
+        Ok(mut file) => unsafe {
+            FILE_TABLE_COUNTER += 1;
+
+            FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
+            FILE_TABLE.free();
+
+            return FILE_TABLE_COUNTER;
+        },
+        Err(error) => {
+            let file_flags = Flags::from_bits_truncate(flags as u32);
+
+            if file_flags.contains(Flags::O_CREAT) {
+                let mut file = crate::fs::create_new_root_file(filepath);
+                unsafe {
+                    FILE_TABLE_COUNTER += 1;
+                    FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
+                    FILE_TABLE.free();
+
+                    return FILE_TABLE_COUNTER as i64;
+                }
+            }
+
+            1
+        }
+    }
+
+    // match filepath.as_bytes()[0] {
+    //     0x2F => {
+    //         panic!("Absolute");
+    //     }
+    //     _ => {
+    //         // Relative path within directory and are used when files are within same directory
+    //         panic!("Relative");
+    //     }
+    // }
+}
 /*
     Writes given length of bytes from buffer to the file specified
     Length must be above 0 and under max value
@@ -264,83 +255,89 @@ fn write(file: u64, buffer: *mut u8, length: u64) -> i64 {
     length as i64
 }
 
-/*
-    Reads given length of bytes into the buffer
-*/
-fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
-    // TODO: Account for special files like stdin
 
+// Reads given length of bytes into the buffer
+fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
     match file {
         0 => {
             // stdin
             panic!("STDIN\n");
         }
         _ => {
-            // Copies length bytes to a buffer
-            unsafe {
-                let src_buffer = (DOOM1_WAD_ADDRESS + DOOM1_WAD_OFFSET) as *mut u8;
-                // print_serial!(
-                //     "READ'ING {} {:p} {} AT {:p}\n",
-                //     file,
-                //     buffer,
-                //     length,
-                //     src_buffer
-                // );
-                for i in 0..length {
-                    *buffer.offset(i as isize) = *src_buffer.offset(i as isize);
+            let wrapped_fd = FILE_TABLE.lock().get(file as usize);
+            FILE_TABLE.free();
+            match wrapped_fd {
+                Some(mut fd) => {
+                    fd.read(buffer, length as usize).unwrap();
+                    FILE_TABLE.lock().set(file as usize, fd.clone());
+                    FILE_TABLE.free();
                 }
-                DOOM1_WAD_OFFSET += length;
+                None => {
+                    return -1;
+                }
             }
-
-            // File system is out of action /
-            // let wrapped_fd = FILE_TABLE.lock().get(file as usize);
-            // FILE_TABLE.free();
-            // match wrapped_fd {
-            //     Some(mut fd) => {
-            //         fd.read(buffer, length as usize).unwrap();
-            //     }
-            //     None => {
-            //         return -1;
-            //     }
-            // }
         }
     }
 
     length as i64
 }
 
+// Reppositions the file offset for an open file depending on whence
 fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
     if offset < 0 {
         panic!("oh dear");
     }
 
-    match whence {
-        0 => {
-            // SEEK_SET (begining of file)
-            unsafe {
-                DOOM1_WAD_OFFSET = offset as u64;
-                return DOOM1_WAD_OFFSET as i64;
-            }
-        }
-        1 => {
-            // SEEK_CUR (current location of file)
-            unsafe {
-                DOOM1_WAD_OFFSET += offset as u64;
-                return DOOM1_WAD_OFFSET as i64;
-            }
-        }
-        2 => {
-            // SEEK_END (end of file)
-            unsafe {
-                DOOM1_WAD_OFFSET = DOOM_SIZE + offset as u64;
-                print_serial!("SIZE OF FILE IS {}\n", DOOM_SIZE);
-                return DOOM1_WAD_OFFSET as i64;
-            }
-        }
-        _ => panic!("OH NOP"),
-    }
+    let wrapped_fd = FILE_TABLE.lock().get(file as usize);
+    FILE_TABLE.free();
 
-    return -1;
+    match wrapped_fd {
+        Some(mut fd) => {
+            match whence {
+                0 => {
+                    // SEEK_SET (beginning of file)
+                    fd.set_offset(offset);
+                    FILE_TABLE.lock().set(file as usize, fd.clone());
+                    FILE_TABLE.free();
+                }
+                1 => {
+                    // SEEK_CUR (current location of file)
+                    fd.set_offset(offset + fd.get_offset());
+                    FILE_TABLE.lock().set(file as usize, fd.clone());
+                    FILE_TABLE.free();
+                }
+                2 => {
+                    // SEEK_END (end of file)
+                    fd.set_offset(offset + fd.get_size() as i64);
+                    FILE_TABLE.lock().set(file as usize, fd.clone());
+                    FILE_TABLE.free();
+                }
+                _ => panic!("Unknown Whence"),
+            }
+
+            return fd.get_offset();
+        }
+        None => {
+            return -1;
+        }
+    }
+}
+
+// Paints everything from scratch
+fn desktop_paint() -> i64 {
+    print_serial!("Gonna paint it all\n");
+
+    WINDOW_MANAGER.lock().paint(Stack::<Rectangle>::new(), true);
+    WINDOW_MANAGER.free();
+
+    0
+}
+
+// Returns an event which encapsulates mouse coordinates, and current scancode
+fn get_event() -> i64 {
+    let event = WINDOW_MANAGER.lock().handle_event().unwrap();
+    WINDOW_MANAGER.free();
+    event as i64
 }
 
 // Create a new window given dimensions, adds to window manager and returns the wid
@@ -434,23 +431,6 @@ fn copy_to_buffer(wid: u64, buffer: *mut u32, y_offset: u64) -> i64 {
     }
     WINDOW_MANAGER.free();
     return 0;
-}
-
-// Paints everything from scratch
-fn desktop_paint() -> i64 {
-    print_serial!("Gonna paint it all\n");
-
-    WINDOW_MANAGER.lock().paint(Stack::<Rectangle>::new(), true);
-    WINDOW_MANAGER.free();
-
-    0
-}
-
-// Returns an event which encapsulates mouse coordinates, and current scancode
-fn get_event() -> i64 {
-    let event = WINDOW_MANAGER.lock().handle_event().unwrap();
-    WINDOW_MANAGER.free();
-    event as i64
 }
 
 // Draws a string upon a window given a pid

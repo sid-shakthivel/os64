@@ -23,16 +23,20 @@ Usermode:
 - Test IPC
 - Priority based round robin
 
-FS:
-- Load userspace programs from fs instead of modules
+GUI:
+- Random page faults
+
+FS/Syscalls:
 - Fix syscalls and integrate with fs
 - Make new verify functions in fs
-- Test creating new files with fs fails 
+- Test creating new files with fs fails
+- Reduce size of syscalls.c file by making generic function
 
 Memory:
 - Start of memory bug
 - malloc/free bugs 
 - Bitflags (paging)
+- Write a free syscall
 
 Potential Problems:
 - Collisions may fail with hashmap
@@ -69,3 +73,13 @@ impl<A> Locked<A> {
 //     }
 // } -->
 
+
+<!-- //     // print_serial!(
+//     //     "READ'ING {} {:p} {} AT {:p}\n",
+//     //     file,
+//     //     buffer,
+//     //     length,
+//     //     src_buffer
+//     // ); -->
+
+not modiying the actual fs (not a reference just a clone)

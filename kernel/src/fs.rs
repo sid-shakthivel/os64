@@ -105,6 +105,7 @@ pub struct File {
     cluster: u32,
     index: u32,
     file_type: FileType,
+    offset: i64,
     // permissions: u32,
     // uid: u32,
     // gid: u32,
@@ -126,7 +127,20 @@ impl File {
             size: size,
             cluster: cluster_num,
             file_type: file_type,
+            offset: 0,
         };
+    }
+
+    pub fn set_offset(&mut self, new_offset: i64) {
+        self.offset = new_offset;
+    }
+
+    pub fn get_offset(&self) -> i64 {
+        self.offset
+    }
+
+    pub fn get_size(&self) -> u32 {
+        self.size
     }
 
     pub fn read(&mut self, buffer: *mut u8, length: usize) -> Result<u64, &str> {
@@ -266,6 +280,29 @@ impl File {
         let mut total_count = 0;
         let mut i = 0;
 
+        let cluster_clone = self.cluster;
+
+        // Get the correct cluster which needs to be addressed using the current offset
+        unsafe {
+            let offset = self.offset;
+            if offset >= 2048 {
+                for j in 0..(offset / 2048) {
+                    match get_next_cluster(self.cluster) {
+                        None => return, // End of file
+                        Some(cluster_num) => {
+                            cluster_address = convert_sector_to_bytes(get_lba(cluster_num))
+                                + FS.lock().first_data_sector_address;
+                            file_contents = cluster_address as *mut u8;
+                            self.cluster = cluster_num;
+                        }
+                    }
+                }
+                file_contents = file_contents.offset((self.offset % 2048) as isize);
+            } else {
+                file_contents = file_contents.offset(self.offset as isize);
+            }
+        }
+
         while total_count < length {
             unsafe {
                 if write {
@@ -273,10 +310,12 @@ impl File {
                 } else {
                     *buffer.offset(total_count as isize) = *file_contents.offset(i as isize);
                 }
+
                 i += 1;
                 total_count += 1;
 
                 if i >= 2048 {
+                    panic!("READING OVER A CLUSTER?");
                     i = 0;
                     match get_next_cluster(self.cluster) {
                         None => return, // End of file
@@ -289,6 +328,8 @@ impl File {
                 }
             }
         }
+        self.offset += length as i64;
+        self.cluster = cluster_clone;
     }
 
     fn _find(&self, filename: &str, mut cluster_address: u32) -> Result<File, &str> {
@@ -395,7 +436,7 @@ impl File {
                         let mut node = File::new(
                             directory_entry.cluster_low as u32,
                             directory_entry.file_size,
-                            FileType::Directory,
+                            FileType::File,
                         );
                         node.name = directory_entry.filename;
                         return Ok(node);
@@ -432,7 +473,9 @@ fn validate_fat(ebr: &ExtendedBootRecord) -> bool {
     if ebr.signature != 0x28 && ebr.signature != 0x29 {
         panic!("Invalid signature, {:x}", ebr.signature);
     }
-    // if (ebr.bootable_partition_signature != 0xAA55) { panic!("Invalid partition signature"); }
+    // if (ebr.bootable_partition_signature != 0xAA55) {
+    //     panic!("Invalid partition signature");
+    // }
 
     return true;
 }
@@ -531,7 +574,7 @@ pub unsafe fn memcpy_cluster(dest: *mut u8, src: *mut u8, index: u32) {
     File descriptor is a unqiue unsigned integer which is used to identify an open file
 */
 pub fn parse_absolute_filepath(filepath: &str) -> Result<File, &str> {
-    let cleaned_filepath: &str = &filepath[1..filepath.len()]; // Remove the initial / for ease
+    let cleaned_filepath: &str = &filepath[0..filepath.len()]; // Remove the initial / for ease
 
     let mut current_fd = FS.lock().initrd.unwrap();
 

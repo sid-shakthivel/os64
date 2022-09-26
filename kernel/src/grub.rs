@@ -21,7 +21,8 @@ use crate::ports::outpw;
 use crate::{print_serial, CONSOLE};
 use multiboot2::BootInformation;
 
-const FILESYSTEM_ON: bool = false;
+const FILESYSTEM_ON: bool = true;
+
 const VBE_DISPI_IOPORT_INDEX: u16 = 0x01CE;
 const VBE_DISPI_IOPORT_DATA: u16 = 0x01CF;
 const VBE_DISPI_INDEX_ID: u16 = 0;
@@ -46,19 +47,19 @@ pub fn initialise_userland(boot_info: &BootInformation) {
     let mut process_index = 0; // This index determines the PID for each process
     for module in boot_info.module_tags() {
         print_serial!(
-            "MODULE ADDRESS = 0x{:x}, SIZE =  0x{:x}\n",
+            "MODULE ADDRESS = 0x{:x}, SIZE =  0x{:x} END ADDRESS = 0x{:x}\n",
             module.start_address(),
-            module.module_size()
+            module.module_size(),
+            module.end_address(),
         );
         // First module will be filesystem if given and constant is true
         if FILESYSTEM_ON && i == 0 {
             fs::init(module.start_address());
         } else {
             // Else, modules are userspace programs
-            if i == 0 {
+            if i == 1 {
+                // Allocate memory for the usermode process
                 elf::parse(module.start_address() as u64);
-
-                // Alloc some pages and map them accordingly
 
                 let user_process =
                     multitask::Process::init(multitask::ProcessPriority::High, process_index);
@@ -71,7 +72,10 @@ pub fn initialise_userland(boot_info: &BootInformation) {
 
                 process_index += 1;
             } else {
-                // doom wad file thing
+                panic!("SHOULDN'T BE HERE");
+                // Should be unneeded soon....
+
+                // Doom wad file thing
                 let rounded_size =
                     crate::page_frame_allocator::round_to_nearest_page(module.module_size() as u64);
                 let number_of_pages = crate::page_frame_allocator::get_page_number(rounded_size);
@@ -97,6 +101,7 @@ pub fn initialise_userland(boot_info: &BootInformation) {
                 }
             }
         }
+
         i += 1;
     }
 }
