@@ -18,7 +18,7 @@
 #![allow(unused_variables)]
 
 use crate::CONSOLE;
-use core::mem;
+use core::{mem, panic};
 use spin::Mutex;
 
 use crate::print_serial;
@@ -58,7 +58,7 @@ struct ExtendedBootRecord {
     nt_flags: u8,
     signature: u8,
     serial: u32,
-    volume_label: [char; 11],
+    volume_label: [u8; 11],
     system_ud_string: u64,
     bootcode: [u8; 448],
     bootable_partition_signature: u16,
@@ -465,15 +465,28 @@ impl Fat16 {
 }
 
 // Should ensure it's FAT16 and check certain values
-fn validate_fat(ebr: &ExtendedBootRecord) -> bool {
+fn validate_fat(bpb: &BiosParameterBlock, ebr: &ExtendedBootRecord) -> bool {
     // TODO: Calculate number of clusters and check whether smaller then 65525 and expand
+    assert!(
+        ebr.signature == 0x28 || ebr.signature == 0x29,
+        "Invalid signature"
+    );
+    assert!(
+        ebr.bootable_partition_signature == 0xAA55,
+        "Bootable partition signature is not 0xAA55"
+    );
 
-    if ebr.signature != 0x28 && ebr.signature != 0x29 {
-        panic!("Invalid signature, {:x}", ebr.signature);
-    }
-    // if ebr.bootable_partition_signature != 0xAA55 {
-    //     panic!("Invalid partition signature");
-    // }
+    let root_directory_sectors =
+        (bpb.root_entry_count * 32) + (bpb.bytes_per_sector - 1) / bpb.bytes_per_sector;
+
+    let data_sectors = bpb.sector_count_16
+        - (bpb.reserved_sector_count
+            + (bpb.table_count as u16 * bpb.table_size_16)
+            + root_directory_sectors);
+
+    let total_clusters = data_sectors / bpb.sectors_per_track;
+
+    assert!(total_clusters < 65525, "File system is FAT16");
 
     return true;
 }
@@ -533,7 +546,7 @@ pub fn init(start_address: u32) {
     let ebr_address = start_address + (mem::size_of::<BiosParameterBlock>() as u32);
     let ebr = unsafe { &*(ebr_address as *const ExtendedBootRecord) };
 
-    validate_fat(ebr);
+    validate_fat(bpb, ebr);
 
     let first_fat = start_address + convert_sector_to_bytes(bpb.reserved_sector_count as u32);
     let fat_size: u32 = bpb.table_size_16 as u32;
@@ -552,6 +565,7 @@ pub fn init(start_address: u32) {
     let initrd: File = File::new(root_directory_sector, 512, FileType::Directory);
 
     FS.lock().bpb = Some(bpb.clone());
+
     FS.lock().start_address = start_address;
     FS.lock().fat_address = first_fat;
     FS.lock().first_data_sector_address = first_data_sector;

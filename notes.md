@@ -27,7 +27,6 @@ GUI:
 - Random page faults
 
 FS/Syscalls:
-- Make new verify functions in fs
 - Test creating new files with fs fails
 
 Memory:
