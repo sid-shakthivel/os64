@@ -223,7 +223,7 @@ pub extern "C" fn interrupt_handler(registers: Registers) {
 pub extern "C" fn pit_handler(iret_stack: IretStack) {
     // Acknowledge interrupt and timer
     PICS.lock().acknowledge(0x20);
-    // PIT.lock().handle_timer();
+    PIT.lock().handle_timer();
 
     let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(iret_stack.rsp);
     PROCESS_SCHEDULAR.free();

@@ -82,13 +82,14 @@ handle_pit_interrupt:
 
     pushaq
 
-    ; mov rax, cr3
+    mov rax, cr3
     push rax
 
     mov rsp, [new_process_rsp]
+    xchg bx, bx
 
     pop rax
-    ; mov cr3, rax
+    mov cr3, rax
     popaq
 
     iretq 

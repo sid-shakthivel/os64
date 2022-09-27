@@ -1,6 +1,9 @@
 // src/list.rs
 
+use core::mem::size_of;
+
 use crate::{
+    allocator::kmalloc,
     page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR},
 };
 
@@ -69,10 +72,10 @@ impl<T: Clone + core::cmp::PartialEq + core::fmt::Debug> Stack<T> {
 
     // Appends a new node to the start of the stack and allocates memory for it
     pub fn push(&mut self, value: T) {
-        // let size = size_of::<Node<T>>();
-        // let address = kmalloc(size as u64);
-        let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
-        PAGE_FRAME_ALLOCATOR.free();
+        let size = size_of::<Node<T>>();
+        let address = kmalloc(size as u64);
+        // let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frame();
+        // PAGE_FRAME_ALLOCATOR.free();p
 
         let new_node = Node::new(address as u64, value);
 

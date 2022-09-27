@@ -97,8 +97,7 @@ impl PageFrameAllocator {
                 .end_address(),
         );
 
-        // print_serial!("MEMORY START = 0x{:x}\n", memory_start);
-        // memory_start = 0xe5d000;
+        print_serial!("MEMORY START = 0x{:x}\n", memory_start);
         memory_start = 0xf50000;
 
         // TODO: Fix this fix - very large modules seem to confuse the multiboot2 package

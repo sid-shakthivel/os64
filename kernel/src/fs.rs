@@ -14,8 +14,6 @@
     Node graph which represents files/directories which have methods (read, write, etc)
 */
 
-// TODO: Long File Names
-
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
@@ -473,7 +471,7 @@ fn validate_fat(ebr: &ExtendedBootRecord) -> bool {
     if ebr.signature != 0x28 && ebr.signature != 0x29 {
         panic!("Invalid signature, {:x}", ebr.signature);
     }
-    // if (ebr.bootable_partition_signature != 0xAA55) {
+    // if ebr.bootable_partition_signature != 0xAA55 {
     //     panic!("Invalid partition signature");
     // }
 

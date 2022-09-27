@@ -37,10 +37,6 @@ const VBE_DISPI_INDEX_X_OFFSET: u16 = 8;
 const VBE_DISPI_INDEX_Y_OFFSET: u16 = 9;
 const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
-pub static mut DOOM1_WAD_ADDRESS: u64 = 0x00;
-pub static mut DOOM1_WAD_OFFSET: u64 = 0x00;
-pub static mut DOOM_SIZE: u64 = 0x00;
-
 pub fn initialise_userland(boot_info: &BootInformation) {
     let mut i = 0;
 
@@ -57,49 +53,19 @@ pub fn initialise_userland(boot_info: &BootInformation) {
             fs::init(module.start_address());
         } else {
             // Else, modules are userspace programs
-            if i == 1 {
-                // Allocate memory for the usermode process
-                elf::parse(module.start_address() as u64);
+            elf::parse(module.start_address() as u64);
 
-                let user_process =
-                    multitask::Process::init(multitask::ProcessPriority::High, process_index);
+            // Allocate memory for the usermode process
+            let user_process =
+                multitask::Process::init(multitask::ProcessPriority::High, process_index);
 
-                // Add process to list of processes
-                multitask::PROCESS_SCHEDULAR
-                    .lock()
-                    .add_process(user_process);
-                multitask::PROCESS_SCHEDULAR.free();
+            // Add process to list of processes
+            multitask::PROCESS_SCHEDULAR
+                .lock()
+                .add_process(user_process);
+            multitask::PROCESS_SCHEDULAR.free();
 
-                process_index += 1;
-            } else {
-                panic!("SHOULDN'T BE HERE");
-                // Should be unneeded soon....
-
-                // Doom wad file thing
-                let rounded_size =
-                    crate::page_frame_allocator::round_to_nearest_page(module.module_size() as u64);
-                let number_of_pages = crate::page_frame_allocator::get_page_number(rounded_size);
-
-                print_serial!("PAGES = {}\n", number_of_pages);
-
-                let dest = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(number_of_pages) as *mut u64;
-                PAGE_FRAME_ALLOCATOR.free();
-                let source = module.start_address() as *mut u64;
-
-                unsafe {
-                    DOOM1_WAD_ADDRESS = dest as u64;
-                    DOOM1_WAD_OFFSET = 0;
-                    DOOM_SIZE = module.module_size() as u64;
-                }
-
-                unsafe {
-                    core::ptr::copy(
-                        source as *mut u8,
-                        dest as *mut u8,
-                        module.module_size() as usize,
-                    );
-                }
-            }
+            process_index += 1;
         }
 
         i += 1;

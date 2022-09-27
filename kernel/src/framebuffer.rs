@@ -467,14 +467,6 @@ impl Window {
     ) {
         let buffer_p = self.buffer as *mut u32;
 
-        print_serial!(
-            "x_base {}, x_limit {}, y_base {}, y_limit: {}\n",
-            x_base,
-            x_limit,
-            y_base,
-            y_limit
-        );
-
         for y in y_base..y_limit {
             for x in x_base..x_limit {
                 unsafe {

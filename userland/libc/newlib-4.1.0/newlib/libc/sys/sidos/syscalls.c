@@ -123,13 +123,20 @@ void *liballoc_alloc(int pages)
 }
 /*
     Frees previously allocated memory
-    void* is a pointer to the allocated memory
+    void* is a pointer to the allocated memory (same as value returned from liballoc_alloc)
     Returns 0 on success
 */
 int liballoc_free(void *memory, int pages)
 {
-    write(1, "free\n", 5);
-    return 0;
+    int64_t result;
+    asm volatile("mov %0, %%rcx \n\t\
+        mov %1, %%rbx \n\t\
+        mov $19, %%rax \n\t\
+        int $0x80 \n\t\
+        "
+                 : "=r"(result)
+                 : "m"(memory), "r"(pages));
+    return (int)result;
 }
 
 void *_malloc_r(struct _reent *r, size_t n)

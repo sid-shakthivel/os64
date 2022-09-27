@@ -16,10 +16,10 @@ Other Tasks:
 - Add syslinks to newlib makefile 
 - Custom error handling with enums (custom enums for each file, asserts used instead of panic, use of ?)
 - Clean code 
+- Make generic functions in syscalls.c
 
 Usermode:
-- Switching address space is broken with cr3
-- Timer bug with RSP
+- PIT bug (works with terminal but not doom - perhaps registers are clobered)
 - Test IPC
 - Priority based round robin
 
@@ -27,16 +27,13 @@ GUI:
 - Random page faults
 
 FS/Syscalls:
-- Fix syscalls and integrate with fs
 - Make new verify functions in fs
 - Test creating new files with fs fails
-- Reduce size of syscalls.c file by making generic function
 
 Memory:
 - Start of memory bug
 - malloc/free bugs 
 - Bitflags (paging)
-- Write a free syscall
 
 Potential Problems:
 - Collisions may fail with hashmap
@@ -72,14 +69,3 @@ impl<A> Locked<A> {
 //         (*parent).children.push(self.clone());
 //     }
 // } -->
-
-
-<!-- //     // print_serial!(
-//     //     "READ'ING {} {:p} {} AT {:p}\n",
-//     //     file,
-//     //     buffer,
-//     //     length,
-//     //     src_buffer
-//     // ); -->
-
-not modiying the actual fs (not a reference just a clone)

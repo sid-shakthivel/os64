@@ -191,8 +191,7 @@ impl Process {
         let v_address = USER_PROCESS_START_ADDRESS;
 
         // Copy current address space by creating a new P4
-        // let new_p4: *mut Table = paging::deep_clone();
-        let new_p4 = 0 as *mut Table;
+        let new_p4: *mut Table = paging::deep_clone();
 
         // Create and setup a stack as though an interrupt has been fired
         let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(8);
@@ -223,6 +222,7 @@ impl Process {
 
         unsafe {
             print_serial!("RSP = {:p} 0x{:x}\n", rsp, rsp.offset(4095) as u64);
+            print_serial!("P4 ADDRESS = {:p}\n", new_p4);
 
             rsp = rsp.offset(4095);
             let stack_top = rsp as u64;

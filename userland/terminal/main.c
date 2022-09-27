@@ -71,6 +71,10 @@ int evaluate_command(char command[255])
     {
         paint_string("Doom runs on sidos!", 0, x_base, y_base);
     }
+    else if (strcmp(command, "who was in paris") == 0)
+    {
+        paint_string("...", 0, x_base, y_base);
+    }
     else
     {
         paint_string("Unknown command", 0, x_base, y_base);

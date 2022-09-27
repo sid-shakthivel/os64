@@ -9,7 +9,6 @@
 
 use crate::framebuffer::{self, Event, FramebuffferEntity, Rectangle, Window, WINDOW_MANAGER};
 use crate::fs::File;
-use crate::grub::{DOOM1_WAD_ADDRESS, DOOM1_WAD_OFFSET, DOOM_SIZE};
 use crate::hashmap::HashMap;
 use crate::interrupts::Registers;
 use crate::list::Stack;
@@ -84,6 +83,7 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
         16 => get_current_scancode(),
         17 => initalise_window_buffer(registers.rbx),
         18 => copy_to_buffer(registers.rbx, registers.rcx as *mut u32, registers.rdx),
+        19 => free_pages(registers.rbx as *mut u64, registers.rcx),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -146,23 +146,20 @@ fn kill(pid: u64, sig: u64) -> i64 {
     return 0;
 }
 
-/*
-    Allocates a number of pages for liballoc syscall
-*/
+// Allocates a number of pages for liballoc_alloc
 fn allocate_pages(pages_required: u64) -> i64 {
     let address = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(pages_required);
     PAGE_FRAME_ALLOCATOR.free();
-    unsafe {
-        *address = 1;
-        *address = 0;
-    }
-    print_serial!(
-        "ALLOC PAGES = {} 0x{:x} {:p}\n",
-        pages_required,
-        address as i64,
-        address
-    );
     address as i64
+}
+
+// Frees a number of pages for liballoc_free
+fn free_pages(memory_address: *mut u64, pages_required: u64) -> i64 {
+    PAGE_FRAME_ALLOCATOR
+        .lock()
+        .free_frames(memory_address, pages_required);
+    PAGE_FRAME_ALLOCATOR.free();
+    0
 }
 
 // Used to open a file for reading/writing and returns the file number
@@ -173,7 +170,7 @@ fn open(name: *const u8, flags: u64) -> i64 {
 
     // For now ignore relative and absolute filepaths
     match crate::fs::parse_absolute_filepath(filepath) {
-        Ok(mut file) => unsafe {
+        Ok(file) => unsafe {
             FILE_TABLE_COUNTER += 1;
 
             FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
@@ -185,7 +182,7 @@ fn open(name: *const u8, flags: u64) -> i64 {
             let file_flags = Flags::from_bits_truncate(flags as u32);
 
             if file_flags.contains(Flags::O_CREAT) {
-                let mut file = crate::fs::create_new_root_file(filepath);
+                let file = crate::fs::create_new_root_file(filepath);
                 unsafe {
                     FILE_TABLE_COUNTER += 1;
                     FILE_TABLE.lock().set(FILE_TABLE_COUNTER as usize, file);
@@ -237,24 +234,24 @@ fn write(file: u64, buffer: *mut u8, length: u64) -> i64 {
             }
         }
         _ => {
-            panic!("OH DOOM");
             // Other files can be written to through the fs
-            // let wrapped_fd = FILE_TABLE.lock().get(file as usize);
-            // FILE_TABLE.free();
-            // match wrapped_fd {
-            //     Some(mut fd) => {
-            //         fd.write(buffer, length as usize).unwrap();
-            //     }
-            //     None => {
-            //         return -1;
-            //     }
-            // }
+            let wrapped_fd = FILE_TABLE.lock().get(file as usize);
+            FILE_TABLE.free();
+            match wrapped_fd {
+                Some(mut fd) => {
+                    fd.write(buffer, length as usize).unwrap();
+                    FILE_TABLE.lock().set(file as usize, fd.clone());
+                    FILE_TABLE.free();
+                }
+                None => {
+                    return -1;
+                }
+            }
         }
     }
 
     length as i64
 }
-
 
 // Reads given length of bytes into the buffer
 fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
@@ -282,7 +279,7 @@ fn read(file: u64, buffer: *mut u8, length: u64) -> i64 {
     length as i64
 }
 
-// Reppositions the file offset for an open file depending on whence
+// Repositions the file offset for an open file depending on whence
 fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
     if offset < 0 {
         panic!("oh dear");
@@ -325,8 +322,6 @@ fn lseek(file: u64, offset: i64, whence: u64) -> i64 {
 
 // Paints everything from scratch
 fn desktop_paint() -> i64 {
-    print_serial!("Gonna paint it all\n");
-
     WINDOW_MANAGER.lock().paint(Stack::<Rectangle>::new(), true);
     WINDOW_MANAGER.free();
 
@@ -358,8 +353,6 @@ fn create_window(new_window_data_p: *const CondensedWindow) -> i64 {
     );
     WINDOW_MANAGER.free();
 
-    print_serial!("{:?}\n", new_window);
-
     let wid = WINDOW_MANAGER.lock().add_sub_window(&mut new_window);
     WINDOW_MANAGER.free();
 
@@ -378,7 +371,6 @@ fn initalise_window_buffer(wid: u64) -> i64 {
                 let height = (*mut_window_ptr).height;
                 let title = (*mut_window_ptr).title;
 
-                print_serial!("Initalising the window buffer\n");
                 (*mut_window_ptr).update_buffer_region_to_colour(
                     0,
                     width,
@@ -386,8 +378,6 @@ fn initalise_window_buffer(wid: u64) -> i64 {
                     20,
                     crate::framebuffer::WINDOW_TITLE_COLOUR,
                 );
-
-                print_serial!("Continuing init'ing window buffer\n");
 
                 (*mut_window_ptr).update_buffer_region_to_colour(
                     0,
@@ -403,14 +393,10 @@ fn initalise_window_buffer(wid: u64) -> i64 {
                     2,
                 );
             }
-
-            print_serial!("Finished init'ing window buffer\n");
         }
     }
 
     WINDOW_MANAGER.free();
-
-    print_serial!("Finished init'ing window buffer\n");
 
     return 0;
 }
