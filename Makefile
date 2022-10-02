@@ -5,7 +5,7 @@ USERLAND_MODULE_3 = $(shell pwd)/userland/doomgeneric
 SYSCALLS = $(shell pwd)/userland/syscalls
 
 run-qemu: all
-	qemu-system-x86_64 -serial stdio -cdrom os64.iso
+	qemu-system-x86_64 -accel hvf -serial stdio -cdrom os64.iso
 
 run-bochs: all
 	bochs -f bochs/bochsrc.txt -q

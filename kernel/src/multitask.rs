@@ -8,6 +8,7 @@
     Communication link must exist between 2 processes like buffering, synchronisation,
 */
 
+use crate::allocator::kmalloc;
 use crate::list::Stack;
 use crate::page_frame_allocator::{FrameAllocator, PAGE_FRAME_ALLOCATOR, PAGE_SIZE};
 use crate::paging::Table;
@@ -92,7 +93,8 @@ impl ProcessSchedular {
         When timer interrupt is triggered the next process is selected
     */
     pub fn schedule_process(&mut self, mut old_rsp: u64) -> Option<*const u64> {
-        if self.tasks[0].is_none() {
+        // print_serial!("Picking new process\n");
+        if self.tasks[self.current_process_index].is_none() {
             return None;
         }
 
@@ -105,12 +107,18 @@ impl ProcessSchedular {
         } else {
             // TODO: Find more efficient way
             // Save the old RSP into the process but adjust the value as certain values are pushed
+            // print_serial!("OLD RSP 0x{:x}\n", old_rsp);
             old_rsp -= 0x60;
             let updated_process = Process {
                 rsp: old_rsp as *const _,
-                ..self.tasks[0].unwrap()
+                ..self.tasks[self.current_process_index].unwrap()
             };
-            self.tasks[0] = Some(updated_process);
+            self.tasks[self.current_process_index] = Some(updated_process);
+            // print_serial!(
+            //     "Saving process {}, RSP = 0x{:x}\n",
+            //     self.current_process_index,
+            //     old_rsp
+            // );
             self.current_process_index += 1;
         }
 
@@ -120,6 +128,8 @@ impl ProcessSchedular {
             self.current_process_index = 0;
             current_task = self.tasks[self.current_process_index];
         }
+
+        // print_serial!("Picked task {}\n", self.current_process_index);
 
         return Some(current_task.unwrap().rsp);
     }
@@ -157,45 +167,32 @@ impl ProcessSchedular {
         Sends a message from current task to another task in which messages are strings which can be processed
         Works by appending a message to the other process' message stack
     */
-    pub fn send_message(&mut self, pid: u64, message_contents: &'static str) {
+    pub fn send_message(&mut self, pid: u64, message_contents: &'static str, return_pid: u64) {
         // Get the process
         for i in 0..MAX_PROCESS_NUM {
             if i == (pid as usize) {
-                self.tasks[i]
-                    .unwrap()
-                    .messages
-                    .push(Message::new(message_contents, pid));
+                let mut messages = self.tasks[i].unwrap().messages;
+                messages.push(Message::new(message_contents, return_pid));
+                let updated_process = Process {
+                    messages,
+                    ..self.tasks[i].unwrap()
+                };
+                self.tasks[i] = Some(updated_process);
             }
         }
-    }
-
-    /*
-        Recieve a message from task for a specific process
-    */
-    pub fn receive_message(&mut self, pid: u64) -> Option<Message> {
-        // Get the process
-        for i in 0..MAX_PROCESS_NUM {
-            if i == (pid as usize) {
-                unsafe {
-                    return Some((*self.tasks[i].unwrap().messages.pop()).payload);
-                }
-            }
-        }
-        return None;
     }
 }
 
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
     pub fn init(process_priority: ProcessPriority, pid: u64) -> Process {
-        let v_address = USER_PROCESS_START_ADDRESS;
+        let v_address = unsafe { USER_PROCESS_START_ADDRESS };
 
         // Copy current address space by creating a new P4
         let new_p4: *mut Table = paging::deep_clone();
 
         // Create and setup a stack as though an interrupt has been fired
-        let mut rsp = PAGE_FRAME_ALLOCATOR.lock().alloc_frames(8);
-        PAGE_FRAME_ALLOCATOR.free();
+        let mut rsp = kmalloc(8 * crate::page_frame_allocator::PAGE_SIZE as u64);
 
         // Test argc and argv
         // let arguments = ["hey\0", "there\0"];
@@ -231,7 +228,6 @@ impl Process {
                When interrupt is called certain registers are pushed as follows: SS -> RSP -> RFLAGS -> CS -> RIP
                These registers are then pushed: RAX -> RBX -> RBC -> RDX -> RSI -> RDI
             */
-
             *rsp.offset(-1) = 0x20 | 0x3; // SS
             *rsp.offset(-2) = stack_top; // RSP
             *rsp.offset(-3) = 0x202; // RFLAGS which enable interrupts
@@ -254,6 +250,38 @@ impl Process {
             process_priority: process_priority,
             cr3: new_p4,
             messages: Stack::<Message>::new(),
+        }
+    }
+
+    /*
+        Recieve a message from another task and pop it off the stack of messages to analyse
+    */
+    pub fn receive_message(&mut self) -> Option<Message> {
+        // Get message or none
+        unsafe {
+            if self.messages.length > 0 {
+                let mut messages = self.messages;
+                let message = (*messages.pop()).payload;
+
+                let updated_process = Process {
+                    messages,
+                    ..self.clone()
+                };
+
+                PROCESS_SCHEDULAR.lock().tasks[self.pid as usize] = Some(updated_process);
+                PROCESS_SCHEDULAR.free();
+
+                Some(message)
+            } else {
+                None
+            }
+        }
+    }
+
+    pub fn analyse_message(&mut self, message: &Message) {
+        match message.command {
+            "test" => print_serial!("Message sent successfully\n"),
+            _ => print_serial!("Unknown message sent"),
         }
     }
 }

@@ -40,7 +40,7 @@ int get_current_scancode();
 int paint_string(char *ptr, int wid, int x, int y);
 int initalise_window_buffer(int wid);
 int copy_to_buffer(int wid, uint32_t *buffer, int y_offset);
-
+int send_message(int cpid, int pid, char *ptr);
 // int wait(int *status);
 int lseek(int file, int ptr, int dir);
 int write(int file, char *ptr, int len);

@@ -179,3 +179,17 @@ int copy_to_buffer(int wid, uint32_t *buffer, int y_offset)
                  : "r"(wid), "m"(buffer), "r"(y_offset));
     return (int)result;
 }
+
+int send_message(int cpid, int pid, char *ptr)
+{
+    int64_t result;
+    asm volatile("mov %1, %%ebx \n\t\
+        mov %2, %%ecx \n\t\
+        mov %3, %%edx \n\t\
+        mov $20, %%eax \n\t\
+        int $0x80 \n\t\
+        "
+                 : "=r"(result)
+                 : "r"(cpid), "r"(pid), "m"(ptr));
+    return (int)result;
+}

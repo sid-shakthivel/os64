@@ -225,17 +225,24 @@ pub extern "C" fn pit_handler(iret_stack: IretStack) {
     PICS.lock().acknowledge(0x20);
     PIT.lock().handle_timer();
 
-    let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(iret_stack.rsp);
-    PROCESS_SCHEDULAR.free();
-
-    // Update TSS to have a clean stack when coming from user to kernel
     unsafe {
+        let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(iret_stack.rsp);
+        PROCESS_SCHEDULAR.free();
+
+        // Update TSS to have a clean stack when coming from user to kernel
         TSS.privilege_stack_table[0] = VirtAddr::new(multitask::KERNEL_STACK as u64);
-    }
 
-    unsafe {
         old_process = iret_stack;
         new_process_rsp = new_stack.unwrap() as u64;
+
+        // Get current process and check
+        let current_process = PROCESS_SCHEDULAR.lock().get_current_process();
+        PROCESS_SCHEDULAR.free();
+        if let Some(mut process) = current_process {
+            if let Some(message) = process.receive_message() {
+                process.analyse_message(&message);
+            }
+        }
     }
 }
 

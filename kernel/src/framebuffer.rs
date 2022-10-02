@@ -301,7 +301,7 @@ impl WindowManager {
         // Paint mouse
         for y in mouse_y..(mouse_y + 5) {
             for x in (mouse_x)..(mouse_x + 5) {
-                let offset = (0xf50000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                let offset = (0xf90000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
                 unsafe {
                     *offset = 0xFF0000;
                 }
@@ -356,7 +356,7 @@ impl FramebuffferEntity for WindowManager {
 
             for y in y_base..y_limit {
                 for x in x_base..x_limit {
-                    let offset = (0xf50000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                    let offset = (0xf90000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
                     unsafe {
                         *offset = BACKGROUND_COLOUR;
                     }
@@ -659,7 +659,7 @@ impl FramebuffferEntity for Window {
 
                 for y in y_base..y_limit {
                     for x in x_base..x_limit {
-                        let offset = (0xf50000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
+                        let offset = (0xf90000 + (y * 4096) + ((x * 32) / 8)) as *mut u32;
                         let buffer_p = self.buffer as *const u32;
                         unsafe {
                             *offset = *buffer_p.offset((buffer_y * self.width + buffer_x) as isize)

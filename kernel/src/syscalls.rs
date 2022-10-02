@@ -84,6 +84,7 @@ pub extern "C" fn syscall_handler(registers: Registers) -> i64 {
         17 => initalise_window_buffer(registers.rbx),
         18 => copy_to_buffer(registers.rbx, registers.rcx as *mut u32, registers.rdx),
         19 => free_pages(registers.rbx as *mut u64, registers.rcx),
+        20 => send_message(registers.rbx, registers.rcx, registers.rdx as *const u8),
         _ => panic!("Unknown Syscall {}\n", syscall_id),
     };
 }
@@ -447,4 +448,14 @@ fn get_current_scancode() -> i64 {
         crate::keyboard::CURRENT_SCANCODE = 0; // Reset the scancode
         current_scancode
     }
+}
+
+fn send_message(cpid: u64, pid: u64, string_ptr: *const u8) -> i64 {
+    let mut string = crate::string::get_string_from_ptr(string_ptr);
+    string = &string[0..string.len() - 1]; // Remove null terminator?
+
+    PROCESS_SCHEDULAR.lock().send_message(cpid, string, pid);
+    PROCESS_SCHEDULAR.free();
+
+    0
 }

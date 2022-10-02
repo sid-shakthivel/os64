@@ -2,46 +2,17 @@
 
 Bochs magic breakpoint is xchg bx, bx
 
-Large Tasks:
-- Basic GUI
-- Extend usermode/syscall capabilities 
-- Extend multitasking
-- Polish (GUI, Code, etc)
-
-Other Tasks:
-- Fix the formatting (fixed with jetbrains licence?)
-- Improve spinlock
-- Replace the clones (https://www.youtube.com/watch?v=79phqVpE7cU) 
-- Fix binutils and get ld to work properly (doesn't build on MacOS https://github.com/spack/spack/issues/3213)
-- Add syslinks to newlib makefile 
-- Custom error handling with enums (custom enums for each file, asserts used instead of panic, use of ?)
-- Clean code 
-- Make generic functions in syscalls.c
-
-Usermode:
-- PIT bug (works with terminal but not doom - perhaps registers are clobered)
-- Test IPC
-- Priority based round robin
-
-GUI:
-- Random page faults
-
-FS/Syscalls:
-- Test creating new files with fs fails
-
-Memory:
-- Start of memory bug
-- malloc/free bugs 
-- Bitflags (paging)
-
-Potential Problems:
-- Collisions may fail with hashmap
+Todo:
+Fix PIT Bug
+IPC (stubs in syscalls.c/syscalls.rs tommorow)
 
 ln -s /usr/local/bin/x86_64-elf-ar x86_64-sidos-ar
 ln -s /usr/local/bin/x86_64-elf-as x86_64-sidos-as
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-gcc
 ln -s /usr/local/bin/x86_64-elf-gcc x86_64-sidos-cc
 ln -s /usr/local/bin/x86_64-elf-ranlib x86_64-sidos-ranlib
+
+Things to add:
 
 <!-- pub struct Locked<A> {
     inner: spin::Mutex<A>,

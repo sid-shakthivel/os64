@@ -90,6 +90,7 @@ handle_pit_interrupt:
 
     pop rax
     mov cr3, rax
+
     popaq
 
     iretq 

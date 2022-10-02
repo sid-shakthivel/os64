@@ -16,10 +16,10 @@ int main()
     //     printf("arg %d = %s\n", i, argv[i]);
     // }
     new_window = malloc(sizeof(Window));
-    new_window->x = 200;
-    new_window->y = 200;
-    new_window->width = 600;
-    new_window->height = 400;
+    new_window->x = 700;
+    new_window->y = 400;
+    new_window->width = 300;
+    new_window->height = 300;
     new_window->name = "Terminal";
 
     int wid = create_window(new_window);
