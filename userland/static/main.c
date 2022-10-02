@@ -27,7 +27,7 @@ int main()
 
     // paint_all();
 
-    send_message(0, 1, "test");
+    send_message(1, 0, "test");
 
     for (;;)
     {

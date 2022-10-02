@@ -220,19 +220,20 @@ pub extern "C" fn interrupt_handler(registers: Registers) {
 }
 
 #[no_mangle]
-pub extern "C" fn pit_handler(iret_stack: IretStack) {
+pub extern "C" fn pit_handler() {
     // Acknowledge interrupt and timer
     PICS.lock().acknowledge(0x20);
     PIT.lock().handle_timer();
 
+    // print_serial!("PIT INTERRUPT\n");
+
     unsafe {
-        let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(iret_stack.rsp);
+        let new_stack = PROCESS_SCHEDULAR.lock().schedule_process(old_process.rsp);
         PROCESS_SCHEDULAR.free();
 
         // Update TSS to have a clean stack when coming from user to kernel
         TSS.privilege_stack_table[0] = VirtAddr::new(multitask::KERNEL_STACK as u64);
 
-        old_process = iret_stack;
         new_process_rsp = new_stack.unwrap() as u64;
 
         // Get current process and check
@@ -531,6 +532,6 @@ extern "C" {
     fn handle_pit_interrupt(); // Timer
     fn handle_interrupt33(); // PPS2 Keyboard
     fn handle_interrupt44(); // PS2 Mouse
-    fn handle_syscall(); // Syscall
+    fn handle_syscall(); // Syscalls
     fn idt_flush();
 }

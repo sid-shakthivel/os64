@@ -108,7 +108,7 @@ impl ProcessSchedular {
             // TODO: Find more efficient way
             // Save the old RSP into the process but adjust the value as certain values are pushed
             // print_serial!("OLD RSP 0x{:x}\n", old_rsp);
-            old_rsp -= 0x60;
+            old_rsp -= 168;
             let updated_process = Process {
                 rsp: old_rsp as *const _,
                 ..self.tasks[self.current_process_index].unwrap()
@@ -186,7 +186,8 @@ impl ProcessSchedular {
 impl Process {
     // The entrypoint for each process is 0x800000 which has already been mapped into memory
     pub fn init(process_priority: ProcessPriority, pid: u64) -> Process {
-        let v_address = unsafe { USER_PROCESS_START_ADDRESS };
+        let v_address =
+            unsafe { USER_PROCESS_START_ADDRESS + (0x1000000 * crate::grub::process_index) };
 
         // Copy current address space by creating a new P4
         let new_p4: *mut Table = paging::deep_clone();
@@ -235,13 +236,21 @@ impl Process {
             *rsp.offset(-5) = v_address; // RIP
             *rsp.offset(-6) = 0x00; // RAX
             *rsp.offset(-7) = 0x00; // RBX
-            *rsp.offset(-8) = 0x00; // RBC
+            *rsp.offset(-8) = 0x00; // RCX
             *rsp.offset(-9) = 0x00; // RDX
-            *rsp.offset(-10) = 0; // RSI (argv)
-            *rsp.offset(-11) = 0; // RDI (argc)
-            *rsp.offset(-12) = new_p4 as u64; // CR3
-
-            rsp = rsp.offset(-12);
+            *rsp.offset(-10) = 0; // RBP
+            *rsp.offset(-11) = 0; // RDI (argv)
+            *rsp.offset(-12) = 0; // RSI (argc)
+            *rsp.offset(-13) = 0; // R8
+            *rsp.offset(-14) = 0; // R8
+            *rsp.offset(-15) = 0; // R9
+            *rsp.offset(-16) = 0; // R10
+            *rsp.offset(-17) = 0; // R11
+            *rsp.offset(-18) = 0; // R12
+            *rsp.offset(-19) = 0; // R14
+            *rsp.offset(-20) = 0; // R15
+            *rsp.offset(-21) = new_p4 as u64; // CR3
+            rsp = rsp.offset(-21);
         }
 
         Process {

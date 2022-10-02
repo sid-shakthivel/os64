@@ -3,7 +3,7 @@ CC = x86_64-elf-gcc
 CFLAGS = -ffreestanding -O2 -Wall -Wextra
 LINKER_FLAGS = -ffreestanding -O2 -nostdlib -z max-page-size=4096 -lgcc
 
-LINKER_FILE = ../linker.ld
+LINKER_FILE = linker.ld
 LIBC = $(shell pwd)/../libc/build/x86_64-sidos/lib/libc.a
 LIBM = $(shell pwd)/../libc/build/x86_64-sidos/lib/libm.a
 LIBG = $(shell pwd)/../libc/build/x86_64-sidos/lib/libg.a

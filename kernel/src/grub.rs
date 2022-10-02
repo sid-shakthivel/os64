@@ -37,10 +37,11 @@ const VBE_DISPI_INDEX_X_OFFSET: u16 = 8;
 const VBE_DISPI_INDEX_Y_OFFSET: u16 = 9;
 const VBE_DISPI_LFB_ENABLED: u16 = 0x40;
 
+pub static mut process_index: u64 = 0; // This index determines the PID for each process
+
 pub fn initialise_userland(boot_info: &BootInformation) {
     let mut i = 0;
 
-    let mut process_index = 0; // This index determines the PID for each process
     for module in boot_info.module_tags() {
         print_serial!(
             "MODULE ADDRESS = 0x{:x}, SIZE =  0x{:x} END ADDRESS = 0x{:x}\n",
@@ -56,8 +57,9 @@ pub fn initialise_userland(boot_info: &BootInformation) {
             elf::parse(module.start_address() as u64);
 
             // Allocate memory for the usermode process
-            let user_process =
-                multitask::Process::init(multitask::ProcessPriority::High, process_index);
+            let user_process = unsafe {
+                multitask::Process::init(multitask::ProcessPriority::High, process_index)
+            };
 
             // Add process to list of processes
             multitask::PROCESS_SCHEDULAR
@@ -65,7 +67,9 @@ pub fn initialise_userland(boot_info: &BootInformation) {
                 .add_process(user_process);
             multitask::PROCESS_SCHEDULAR.free();
 
-            process_index += 1;
+            unsafe {
+                process_index += 1;
+            }
         }
 
         i += 1;

@@ -9,7 +9,7 @@ typedef struct Event
     char key_pressed;
 } Event;
 
-typedef struct Windowss
+typedef struct Window
 {
     int x;
     int y;
