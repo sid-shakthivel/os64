@@ -60,8 +60,17 @@ pub enum PrivilegeLevel {
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub struct Registers {
-    pub rdi: u64,
+    pub r15: u64,
+    pub r14: u64,
+    pub r13: u64,
+    pub r12: u64,
+    pub r11: u64,
+    pub r10: u64,
+    pub r9: u64,
+    pub r8: u64,
     pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
     pub rdx: u64,
     pub rcx: u64,
     pub rbx: u64,
@@ -223,7 +232,7 @@ pub extern "C" fn interrupt_handler(registers: Registers) {
 pub extern "C" fn pit_handler() {
     // Acknowledge interrupt and timer
     PICS.lock().acknowledge(0x20);
-    PIT.lock().handle_timer();
+    // PIT.lock().handle_timer();
 
     // print_serial!("PIT INTERRUPT\n");
 

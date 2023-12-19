@@ -38,6 +38,7 @@ use crate::page_frame_allocator::PAGE_FRAME_ALLOCATOR;
 use crate::pic::PICS;
 use crate::pit::PIT;
 use crate::uart::CONSOLE;
+use core::arch::asm;
 use core::panic::PanicInfo;
 use multiboot2::load;
 
@@ -62,6 +63,8 @@ pub extern "C" fn rust_main(multiboot_information_address: usize) {
     framebuffer::init(boot_info.framebuffer_tag().unwrap());
 
     grub::initialise_userland(&boot_info);
+
+    print_serial!("Execution Finished\n");
 
     interrupts::enable();
 
