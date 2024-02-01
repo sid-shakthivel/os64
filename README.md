@@ -1,5 +1,7 @@
 # os64
 
+This os is currently being rewritten
+
 Features:
 - VGA Text Mode
 - Interrupts (including PIT)

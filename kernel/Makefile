@@ -32,4 +32,4 @@ clean:
 run:
 	$(R_COMPILER) build --target $(TARGET)
 	rm -f kernel.bin
-	docker run --rm -v /Users/siddharth/Code/rust/os64/:/code os64/toolchain bash -c "cd code/kernel && make"
+	docker run --rm -v /Users/siddharth/Code/rust/os64/:/code sid_os/toolchain bash -c "cd code/kernel && make"
